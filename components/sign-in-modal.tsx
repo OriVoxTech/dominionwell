@@ -72,11 +72,11 @@ export default function SignInModal({ className }: SignInModalProps) {
                     Login as Patient
                   </Link>
                   <Link
-                    href="/login/consultant"
+                    href="/login/doctor"
                     className="rounded-xl border border-[#001b5e] px-4 py-3 text-center text-sm font-semibold text-[#001b5e]"
                     onClick={() => setOpen(false)}
                   >
-                    Login as Consultant
+                    Login as Doctor
                   </Link>
                 </div>
               </div>

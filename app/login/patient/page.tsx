@@ -1,6 +1,15 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function PatientLoginPage() {
+  const router = useRouter();
+
+  const goToDashboard = () => {
+    router.push("/dashboard/patient");
+  };
+
   return (
     <main className="min-h-screen bg-[#f7f9fc] px-4 py-10 md:px-8">
       <div className="mx-auto w-full max-w-[1120px] overflow-hidden rounded-3xl border border-[#c6c6cf] bg-white shadow-xl md:grid md:grid-cols-[1.1fr_0.9fr]">
@@ -17,6 +26,7 @@ export default function PatientLoginPage() {
 
           <button
             type="button"
+            onClick={goToDashboard}
             className="mt-6 flex w-full items-center justify-center gap-3 rounded-xl border border-[#c6c6cf] px-4 py-3 text-sm font-semibold text-[#1f2937] hover:bg-[#f8fafc]"
           >
             <span
@@ -34,7 +44,13 @@ export default function PatientLoginPage() {
             <span className="h-px flex-1 bg-[#e2e8f0]" />
           </div>
 
-          <form className="grid gap-4" action="#" method="post">
+          <form
+            className="grid gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              goToDashboard();
+            }}
+          >
             <label className="grid gap-2 text-sm font-medium text-[#001b5e]">
               Email
               <input
