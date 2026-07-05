@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SignInModal from "../../components/sign-in-modal";
 
 export default function AboutPage() {
   return (
@@ -25,9 +26,7 @@ export default function AboutPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <button className="px-4 py-2 text-sm text-[#16b46f]" type="button">
-            Sign In
-          </button>
+          <SignInModal className="px-4 py-2 text-sm text-[#16b46f]" />
           <button className="rounded-lg bg-[#16b46f] px-4 py-2 text-sm font-medium text-white" type="button">
             Register
           </button>
