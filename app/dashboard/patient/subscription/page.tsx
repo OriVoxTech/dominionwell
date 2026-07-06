@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const plans = [
@@ -45,8 +45,13 @@ const PAYMENT_RECORDS_KEY = "dwPaymentRecords";
 
 export default function SubscriptionPage() {
     const router = useRouter();
-    const searchParams = useSearchParams();
-    const mode = searchParams.get("mode");
+    const [mode] = useState<string | null>(() => {
+        if (typeof window === "undefined") {
+            return null;
+        }
+
+        return new URLSearchParams(window.location.search).get("mode");
+    });
     const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
     const [accountName, setAccountName] = useState("");
     const [transferReference, setTransferReference] = useState("");
