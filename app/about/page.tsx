@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import SignInModal from "../../components/sign-in-modal";
 
@@ -6,7 +7,7 @@ export default function AboutPage() {
     <div className="min-h-screen overflow-x-hidden bg-[#f7f9fc] text-[#191c1e]">
       <nav className="sticky top-0 z-50 flex h-16 w-full items-center justify-between border-b border-[#c6c6cf] bg-[#f7f9fc] px-4 md:px-10">
         <div className="flex items-center gap-4">
-          <img alt="DominionWell Logo" className="h-8 w-auto" src="/logo.png" />
+          <Image alt="DominionWell Logo" className="h-8 w-auto" src="/logo.png" width={128} height={32} />
           <span className="text-1xl font-bold text-[#001b5e]">DominionWell+</span>
         </div>
 
@@ -49,10 +50,14 @@ export default function AboutPage() {
 
             <div className="relative w-full md:ml-auto md:mr-0 md:w-[34%] md:shrink-0">
               <div className="aspect-[4/5] max-h-[360px] overflow-hidden rounded-2xl shadow-xl">
-                <img
-                  className="h-full w-full object-cover"
+                <Image
+                  className="object-cover"
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuCAsUen5gbGcZABaV1l8cmeZKRVtXdPEt44mco83irrl-OL3pB2-uJ0JkMIeTNaVJxJvHKjirhsfrnralm5ZkVaTc3NDHlLF-k262QNI37RVI96iUmTTa8ql7ljI2cTEnnHzw4O_HvJe7ZR1JCJNhumUObGyqibj47bsS65FJz2r1rDRUYRNI0TXJBkN5NdsVTj4m7Z1SJQSPFDvTPHw807xGpSkaeoO1CQSxMjfoYkXV63pq7PB4qc4Ud7AMHcTyKAiH7rwHT1SgVV"
                   alt="Doctor portrait"
+                  width={720}
+                  height={900}
+                  sizes="(max-width: 768px) 100vw, 34vw"
+                  unoptimized
                 />
               </div>
               <div className="absolute -bottom-4 -left-4 flex items-center gap-2 rounded-xl border border-[#c6c6cf] bg-white p-2 shadow-lg">
@@ -91,10 +96,14 @@ export default function AboutPage() {
                   </p>
                 </div>
                 <div className="h-52 w-full overflow-hidden rounded-xl md:w-1/2">
-                  <img
+                  <Image
                     className="h-full w-full object-cover"
                     src="https://lh3.googleusercontent.com/aida-public/AB6AXuBcXmxBMCmj6sPQSGONLywmBt6NSww3y5RuM2gLWmw6H2_JozxuPvyNDEYhGZ4gNTViRoihZDRmzGSCER_WeuPKo59kxVxpg_ghnc1v7HghauRg56o_mzC04AB4PDMGAZpGV4Wp9I7KH5c_yKWLwRE0vUIv9pxERam7Yfg5paEezxH3ocpkanYFWYol8fJudiXCp66g1Wgo9te-R6lQS7HL80F8rxJlqSozJGVCai4CN-ADX-UIsVegRtAZ7fwNgFeP4A-eIgnLG_34"
                     alt="Medical interface"
+                    width={640}
+                    height={416}
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    unoptimized
                   />
                 </div>
               </div>
@@ -180,7 +189,7 @@ export default function AboutPage() {
               ].map((leader) => (
                 <div className="group flex flex-col" key={leader.name}>
                   <div className="relative mb-4 aspect-[4/5] overflow-hidden rounded-xl">
-                    <img className="h-full w-full object-cover grayscale transition-all duration-500 group-hover:grayscale-0" src={leader.image} alt={leader.name} />
+                    <Image className="object-cover grayscale transition-all duration-500 group-hover:grayscale-0" src={leader.image} alt={leader.name} fill sizes="(max-width: 1024px) 100vw, 33vw" unoptimized />
                     <div className="absolute bottom-4 left-4 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
                       <a className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#001b5e] shadow-lg hover:text-[#16b46f]" href="#">
                         <span className="material-symbols-outlined text-sm">link</span>

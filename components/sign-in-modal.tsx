@@ -1,44 +1,69 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 type SignInModalProps = {
   className?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+  triggerLabel?: string;
 };
 
-export default function SignInModal({ className }: SignInModalProps) {
-  const [open, setOpen] = useState(false);
+export default function SignInModal({
+  className,
+  open,
+  onOpenChange,
+  hideTrigger = false,
+  triggerLabel = "Sign In",
+}: SignInModalProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = typeof open === "boolean";
+  const isOpen = isControlled ? open : internalOpen;
   const canUseDOM = typeof window !== "undefined";
 
+  const setOpenState = useCallback(
+    (nextOpen: boolean) => {
+      if (!isControlled) {
+        setInternalOpen(nextOpen);
+      }
+
+      onOpenChange?.(nextOpen);
+    },
+    [isControlled, onOpenChange],
+  );
+
   useEffect(() => {
-    if (!open) return;
+    if (!isOpen) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen(false);
+        setOpenState(false);
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open]);
+  }, [isOpen, setOpenState]);
 
   return (
     <>
-      <button className={className} type="button" onClick={() => setOpen(true)}>
-        Sign In
-      </button>
+      {!hideTrigger ? (
+        <button className={className} type="button" onClick={() => setOpenState(true)}>
+          {triggerLabel}
+        </button>
+      ) : null}
 
-      {canUseDOM && open
+      {canUseDOM && isOpen
         ? createPortal(
             <div
               className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#001b5e]/45 px-4"
               role="dialog"
               aria-modal="true"
               aria-label="Login options"
-              onClick={() => setOpen(false)}
+              onClick={() => setOpenState(false)}
             >
               <div
                 className="w-full max-w-md rounded-2xl border border-[#c6c6cf] bg-white p-6 shadow-2xl"
@@ -57,7 +82,7 @@ export default function SignInModal({ className }: SignInModalProps) {
                     className="rounded-full px-2 py-1 text-xl leading-none text-[#64748b] hover:bg-[#f3f4f6]"
                     type="button"
                     aria-label="Close"
-                    onClick={() => setOpen(false)}
+                    onClick={() => setOpenState(false)}
                   >
                     x
                   </button>
@@ -67,14 +92,14 @@ export default function SignInModal({ className }: SignInModalProps) {
                   <Link
                     href="/login/patient"
                     className="rounded-xl border border-[#16b46f] bg-[#16b46f] px-4 py-3 text-center text-sm font-semibold text-white"
-                    onClick={() => setOpen(false)}
+                    onClick={() => setOpenState(false)}
                   >
                     Login as Patient
                   </Link>
                   <Link
                     href="/login/doctor"
                     className="rounded-xl border border-[#001b5e] px-4 py-3 text-center text-sm font-semibold text-[#001b5e]"
-                    onClick={() => setOpen(false)}
+                    onClick={() => setOpenState(false)}
                   >
                     Login as Doctor
                   </Link>

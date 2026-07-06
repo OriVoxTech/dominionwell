@@ -1,12 +1,56 @@
+"use client";
+
+import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import SignInModal from "../components/sign-in-modal";
 
+const PATIENT_AUTH_KEY = "dwPatientLoggedIn";
+
 export default function Home() {
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  const isPatientLoggedIn = () => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.localStorage.getItem(PATIENT_AUTH_KEY) === "true";
+  };
+
+  const requirePatientLogin = (nextAction: () => void) => {
+    if (isPatientLoggedIn()) {
+      nextAction();
+      return;
+    }
+
+    setShowLoginModal(true);
+  };
+
+  const handleSearch = () => {
+    requirePatientLogin(() => {
+      const query = searchQuery.trim();
+      const route = query
+        ? `/dashboard/patient/doctors?query=${encodeURIComponent(query)}`
+        : "/dashboard/patient/doctors";
+      router.push(route);
+    });
+  };
+
+  const handleBookConsultation = () => {
+    requirePatientLogin(() => {
+      router.push("/dashboard/patient/doctors");
+    });
+  };
+
   return (
     <div className="min-h-screen bg-[#f7f9fc] text-[#191c1e]">
       <header className="sticky top-0 z-50 flex h-16 w-full items-center justify-between border-b border-[#c6c6cf] bg-[#f7f9fc]/95 px-4 backdrop-blur md:px-10">
         <div className="flex items-center gap-2">
-          <img alt="DominionWell Logo" className="h-8 w-auto" src="/logo.png" />
+          <Image alt="DominionWell Logo" className="h-8 w-auto" src="/logo.png" width={128} height={32} />
           <span className="text-1xl font-bold text-[#001b5e]">DominionWell+</span>
         </div>
 
@@ -14,22 +58,23 @@ export default function Home() {
           <a className="border-b-2 border-[#16b46f] pb-1 text-sm font-bold text-[#16b46f]" href="#">
             Find Doctors
           </a>
-          <a className="text-sm text-[#45464e] hover:text-[#16b46f]" href="#">
+          <Link className="text-sm text-[#45464e] hover:text-[#16b46f]" href="/services">
             Services
-          </a>
+          </Link>
           <Link className="text-sm text-[#45464e] hover:text-[#16b46f]" href="/about">
             About
           </Link>
-          <a className="text-sm text-[#45464e] hover:text-[#16b46f]" href="#">
+          <Link className="text-sm text-[#45464e] hover:text-[#16b46f]" href="/contact">
             Contact
-          </a>
+          </Link>
         </nav>
 
         <div className="flex items-center gap-3">
           <SignInModal className="text-sm text-[#45464e] hover:text-[#16b46f]" />
-          <button className="rounded-lg bg-[#16b46f] px-4 py-2 text-sm font-semibold text-white" type="button">
+          <SignInModal open={showLoginModal} onOpenChange={setShowLoginModal} hideTrigger />
+          <Link href="/register" className="rounded-lg bg-[#16b46f] px-4 py-2 text-sm font-semibold text-white">
             Register
-          </button>
+          </Link>
         </div>
       </header>
 
@@ -53,9 +98,19 @@ export default function Home() {
               <div className="glass-card flex max-w-2xl flex-col gap-2 rounded-xl p-2 shadow-lg md:flex-row">
                 <div className="flex flex-1 items-center gap-3 px-2 py-2">
                   <span className="material-symbols-outlined text-[#76767f]">search</span>
-                  <input className="w-full border-none bg-transparent text-[#191c1e] placeholder:text-[#c6c6cf] focus:outline-none" placeholder="Specialty or Doctor Name" type="text" />
+                  <input
+                    className="w-full border-none bg-transparent text-[#191c1e] placeholder:text-[#c6c6cf] focus:outline-none"
+                    placeholder="Specialty or Doctor Name"
+                    type="text"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                  />
                 </div>
-                <button className="flex items-center justify-center gap-2 rounded-lg bg-[#16b46f] px-8 py-3 text-sm font-semibold text-white" type="button">
+                <button
+                  className="flex items-center justify-center gap-2 rounded-lg bg-[#16b46f] px-8 py-3 text-sm font-semibold text-white"
+                  type="button"
+                  onClick={handleSearch}
+                >
                   Search
                 </button>
               </div>
@@ -153,7 +208,7 @@ export default function Home() {
             <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
               <article className="group overflow-hidden rounded-2xl border border-[#c6c6cf] bg-white transition-all duration-300 hover:shadow-xl">
                 <div className="relative h-64 overflow-hidden">
-                  <img className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdVENcuEGku3lbM2PPqI4t1CqMjy5CB31TeEL_xUOLUl8ClPRkzQhs2oxl-Md3qLt72L0_lcWVsb4YIBvatXsZ_Osb-RR_KA_rKjvKAoTTghpVJPrhWLIpyc8NwD3K3d2EaDZnrL9pZQ_krsOryzAEyIQ5mO4Cwa5OqcRG3wOEJwTXEoh3Mep8Mtg5Kju7AWH2IQ1xZLkkb9wVwEJHoom_VDqlDoSEXZK5wRQuVDetFt3g6krqKFpWXf6MrBDjYLkgUqYNGO8o-97d" alt="Dr. Sarah Jenkins" />
+                  <Image className="object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdVENcuEGku3lbM2PPqI4t1CqMjy5CB31TeEL_xUOLUl8ClPRkzQhs2oxl-Md3qLt72L0_lcWVsb4YIBvatXsZ_Osb-RR_KA_rKjvKAoTTghpVJPrhWLIpyc8NwD3K3d2EaDZnrL9pZQ_krsOryzAEyIQ5mO4Cwa5OqcRG3wOEJwTXEoh3Mep8Mtg5Kju7AWH2IQ1xZLkkb9wVwEJHoom_VDqlDoSEXZK5wRQuVDetFt3g6krqKFpWXf6MrBDjYLkgUqYNGO8o-97d" alt="Dr. Sarah Jenkins" fill sizes="(max-width: 1024px) 100vw, 25vw" unoptimized />
                   <div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-[#16b46f] px-3 py-1 text-xs font-semibold text-white">
                     <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                       star
@@ -164,7 +219,7 @@ export default function Home() {
                 <div className="p-6">
                   <h4 className="mb-1 text-1xl font-semibold text-[#001b5e]">Dr. Sarah Jenkins</h4>
                   <p className="mb-4 text-sm text-[#45464e]">Senior Cardiologist</p>
-                  <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button">
+                  <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button" onClick={handleBookConsultation}>
                     Book Consultation
                   </button>
                 </div>
@@ -172,7 +227,7 @@ export default function Home() {
 
               <article className="group overflow-hidden rounded-2xl border border-[#c6c6cf] bg-white transition-all duration-300 hover:shadow-xl">
                 <div className="relative h-64 overflow-hidden">
-                  <img className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuADFuaVYzu4xfvRjN6OI0agehpArk2-F5bPsvXCo4R4Pm2C_Y3jf0Ho0kB6LxjRWz0GX5ojZAYIzWMk4PWMHzQQ7N__YE8_WFOkiqalOC0fCy23IM7vi9xabG1l0apWq_pz7O74SqmT9ZXndePOUKl8HUpSn0uaKgTZFgUTX2OGmq8go75XZv-1u5e3wPcn727UGXslJIqJhEwO9S_ABNt0_6sn8tAXR2LMAqBb2nP4Myxnc8Ts-VsgA-YyJ5Yk6037hzQRsf5mP9_3" alt="Dr. Michael Chen" />
+                  <Image className="object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuADFuaVYzu4xfvRjN6OI0agehpArk2-F5bPsvXCo4R4Pm2C_Y3jf0Ho0kB6LxjRWz0GX5ojZAYIzWMk4PWMHzQQ7N__YE8_WFOkiqalOC0fCy23IM7vi9xabG1l0apWq_pz7O74SqmT9ZXndePOUKl8HUpSn0uaKgTZFgUTX2OGmq8go75XZv-1u5e3wPcn727UGXslJIqJhEwO9S_ABNt0_6sn8tAXR2LMAqBb2nP4Myxnc8Ts-VsgA-YyJ5Yk6037hzQRsf5mP9_3" alt="Dr. Michael Chen" fill sizes="(max-width: 1024px) 100vw, 25vw" unoptimized />
                   <div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-[#16b46f] px-3 py-1 text-xs font-semibold text-white">
                     <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                       star
@@ -183,7 +238,7 @@ export default function Home() {
                 <div className="p-6">
                   <h4 className="mb-1 text-1xl font-semibold text-[#001b5e]">Dr. Michael Chen</h4>
                   <p className="mb-4 text-sm text-[#45464e]">Pediatric Specialist</p>
-                  <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button">
+                  <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button" onClick={handleBookConsultation}>
                     Book Consultation
                   </button>
                 </div>
@@ -191,7 +246,7 @@ export default function Home() {
 
               <article className="group overflow-hidden rounded-2xl border border-[#c6c6cf] bg-white transition-all duration-300 hover:shadow-xl">
                 <div className="relative h-64 overflow-hidden">
-                  <img className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC25sw_gICQG5nUJgb_PzGHdVreboISlxs_vniy40Z1LHsTyFlhmXocw8eRdx5dMAzSNoheRbkowynsyyiBfyFkfy6bXDZ2HhIH8q_J5SXKy8XBHT5Z2VRn1NxS1RDzIt_R4zk6u64-5smighKYHASUGWyfSnGE8NvxEZZ6b65qaHxMwLpHUNRtCieMj1EfysHms-2cKiuCbXx5v3fu9IGtstLCSksFNFzLmAmyLWi8ghlUK06XdbEpUGIUSZn0O5z59i6g1GXA1Gqw" alt="Dr. Elena Rodriguez" />
+                  <Image className="object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC25sw_gICQG5nUJgb_PzGHdVreboISlxs_vniy40Z1LHsTyFlhmXocw8eRdx5dMAzSNoheRbkowynsyyiBfyFkfy6bXDZ2HhIH8q_J5SXKy8XBHT5Z2VRn1NxS1RDzIt_R4zk6u64-5smighKYHASUGWyfSnGE8NvxEZZ6b65qaHxMwLpHUNRtCieMj1EfysHms-2cKiuCbXx5v3fu9IGtstLCSksFNFzLmAmyLWi8ghlUK06XdbEpUGIUSZn0O5z59i6g1GXA1Gqw" alt="Dr. Elena Rodriguez" fill sizes="(max-width: 1024px) 100vw, 25vw" unoptimized />
                   <div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-[#16b46f] px-3 py-1 text-xs font-semibold text-white">
                     <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                       star
@@ -202,7 +257,7 @@ export default function Home() {
                 <div className="p-6">
                   <h4 className="mb-1 text-1xl font-semibold text-[#001b5e]">Dr. Elena Rodriguez</h4>
                   <p className="mb-4 text-sm text-[#45464e]">Neurology &amp; Sleep</p>
-                  <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button">
+                  <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button" onClick={handleBookConsultation}>
                     Book Consultation
                   </button>
                 </div>
@@ -210,7 +265,7 @@ export default function Home() {
 
               <article className="group overflow-hidden rounded-2xl border border-[#c6c6cf] bg-white transition-all duration-300 hover:shadow-xl">
                 <div className="relative h-64 overflow-hidden">
-                  <img className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYFUtMxwiPHOcqAbO8vdXbKTQAFa9DdY4yXLN0kUA-XI5QHiYVuBL8cTrfLl35_m0bWc6gCAvrKgM2g96nCm_jvowlbOJPaGlLEbSlTi1OnUYy85ft3ZEthpLktCziuH5rdT6ZhbthRNCQC7Y0XCwisCeuLHkyGi6mgzKExG9_YpJtoZKAvHXrsiWdkYpf5m6Pml0vBK1HeScObFbB3JDAkSkfTRomb15MJ1PcWdEYn0AamuPiEGs7eYe4b3Lb8gkXWl7ANaJ9RDkf" alt="Dr. James Wilson" />
+                  <Image className="object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYFUtMxwiPHOcqAbO8vdXbKTQAFa9DdY4yXLN0kUA-XI5QHiYVuBL8cTrfLl35_m0bWc6gCAvrKgM2g96nCm_jvowlbOJPaGlLEbSlTi1OnUYy85ft3ZEthpLktCziuH5rdT6ZhbthRNCQC7Y0XCwisCeuLHkyGi6mgzKExG9_YpJtoZKAvHXrsiWdkYpf5m6Pml0vBK1HeScObFbB3JDAkSkfTRomb15MJ1PcWdEYn0AamuPiEGs7eYe4b3Lb8gkXWl7ANaJ9RDkf" alt="Dr. James Wilson" fill sizes="(max-width: 1024px) 100vw, 25vw" unoptimized />
                   <div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-[#16b46f] px-3 py-1 text-xs font-semibold text-white">
                     <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                       star
@@ -221,7 +276,7 @@ export default function Home() {
                 <div className="p-6">
                   <h4 className="mb-1 text-1xl font-semibold text-[#001b5e]">Dr. James Wilson</h4>
                   <p className="mb-4 text-sm text-[#45464e]">Dermatology</p>
-                  <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button">
+                  <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button" onClick={handleBookConsultation}>
                     Book Consultation
                   </button>
                 </div>
@@ -239,9 +294,9 @@ export default function Home() {
                   Join thousands of patients who have already transformed their healthcare experience with DominionWell+.
                 </p>
                 <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                  <button className="w-full rounded-xl bg-[#16b46f] px-10 py-4 text-lg font-semibold text-white sm:w-auto" type="button">
+                  <Link href="/register" className="w-full rounded-xl bg-[#16b46f] px-10 py-4 text-center text-lg font-semibold text-white sm:w-auto">
                     Get Started for Free
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -254,7 +309,7 @@ export default function Home() {
           <div className="mb-12 grid grid-cols-1 gap-12 md:grid-cols-4">
             <div>
               <div className="mb-6 flex items-center gap-2">
-                <img alt="DominionWell Logo" className="h-6 w-auto" src="/logo.png" />
+                <Image alt="DominionWell Logo" className="h-6 w-auto" src="/logo.png" width={96} height={24} />
                 <span className="text-m font-bold text-[#001b5e]">DominionWell+</span>
               </div>
               <p className="text-base text-[#45464e]">
@@ -267,15 +322,15 @@ export default function Home() {
                 <li><a className="hover:text-[#16b46f]" href="#">Find Doctors</a></li>
                 <li><a className="hover:text-[#16b46f]" href="#">Specialties</a></li>
                 <li><a className="hover:text-[#16b46f]" href="#">Telehealth</a></li>
-                <li><a className="hover:text-[#16b46f]" href="#">Pricing</a></li>
+                <li><Link className="hover:text-[#16b46f]" href="/services">Services</Link></li>
               </ul>
             </div>
             <div>
               <h5 className="mb-6 text-sm font-bold text-[#001b5e]">Company</h5>
               <ul className="space-y-4 text-[#45464e]">
-                <li><a className="hover:text-[#16b46f]" href="#">About Us</a></li>
+                <li><Link className="hover:text-[#16b46f]" href="/about">About Us</Link></li>
                 <li><a className="hover:text-[#16b46f]" href="#">Careers</a></li>
-                <li><a className="hover:text-[#16b46f]" href="#">Contact</a></li>
+                <li><Link className="hover:text-[#16b46f]" href="/contact">Contact</Link></li>
                 <li><a className="hover:text-[#16b46f]" href="#">Privacy</a></li>
               </ul>
             </div>

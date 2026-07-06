@@ -1,4 +1,8 @@
+"use client";
+
+import Image from "next/image";
 import Link from "next/link";
+import { useMemo } from "react";
 
 const recentDoctors = [
     {
@@ -30,10 +34,21 @@ const recentDoctors = [
     },
 ];
 
+const CONSULTATION_BALANCE_KEY = "dwConsultationBalance";
+
 export default function PatientDashboardPage() {
     const consultationsBooked = 4;
     const nextBadgeTarget = 10;
     const progressPercent = Math.min((consultationsBooked / nextBadgeTarget) * 100, 100);
+    const remainingConsultations = useMemo(() => {
+        if (typeof window === "undefined") {
+            return 48;
+        }
+
+        const storedBalance = Number(window.localStorage.getItem(CONSULTATION_BALANCE_KEY));
+
+        return Number.isFinite(storedBalance) ? Math.max(0, Math.floor(storedBalance)) : 48;
+    }, []);
 
     return (
         <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
@@ -43,11 +58,14 @@ export default function PatientDashboardPage() {
                 </div>
 
                 <div className="mb-6 flex items-center gap-3 px-2">
-                    <div className="h-11 w-11 overflow-hidden rounded-full border-2 border-[#16b46f]/40">
-                        <img
-                            className="h-full w-full object-cover"
+                    <div className="relative h-11 w-11 overflow-hidden rounded-full border-2 border-[#16b46f]/40">
+                        <Image
+                            className="object-cover"
                             src="https://lh3.googleusercontent.com/aida-public/AB6AXuAPurUR2thld9ARCgQv5h5zzRrmbx5VzEhRhGSj-4R3LQBMFeO5bA8OOCajuwGXXWPjtINjhw8-RqL2BIwlmrOkDz58EbqhMGjnRdrjEPNB6wMXEYirVhXLKHukNRiuOjWAxDoEcMTG9A2c2wKRcRRN4U7gxeFEPhJ7G7sLUQezeiulcTpl6y2fsYeeLmQHBuYLxYwyY3mOhVegyEsvP846S3aiHmWvjDLrjKsx9yBY9vkJssTPuipSUEY4d1WwN6dlulgSFUQpfRjW"
                             alt="Alex Johnson"
+                            fill
+                            sizes="44px"
+                            unoptimized
                         />
                     </div>
                     <div className="min-w-0">
@@ -61,33 +79,29 @@ export default function PatientDashboardPage() {
                         <span className="material-symbols-outlined text-[20px]">dashboard</span>
                         <span>Dashboard</span>
                     </div>
-                    <div className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
+                    <Link href="/dashboard/patient/appointments" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
                         <span className="material-symbols-outlined text-[20px]">calendar_month</span>
-                        <span>Consultations</span>
-                    </div>
-                    <div className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
+                        <span>Appointments</span>
+                    </Link>
+                    <Link className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10" href="/dashboard/patient/doctors">
                         <span className="material-symbols-outlined text-[20px]">medical_services</span>
-                        <span>My Health</span>
-                    </div>
-                    <div className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-                        <span className="material-symbols-outlined text-[20px]">analytics</span>
-                        <span>Reports</span>
-                    </div>
-                    <div className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
+                        <span>Browse Doctors</span>
+                    </Link>
+                    <Link href="/dashboard/patient/settings" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
                         <span className="material-symbols-outlined text-[20px]">settings</span>
                         <span>Settings</span>
-                    </div>
+                    </Link>
                 </nav>
 
-                <button className="mb-6 mt-4 rounded-xl bg-[#16b46f] py-2.5 text-sm font-semibold text-white">
+                <Link href="/dashboard/patient/doctors" className="mb-6 mt-4 rounded-xl bg-[#16b46f] py-2.5 text-center text-sm font-semibold text-white">
                     Book New Consult
-                </button>
+                </Link>
 
                 <div className="space-y-1 border-t border-white/10 pt-4 text-sm text-[#d8e2ff]">
-                    <div className="flex items-center gap-3 px-3 py-2 hover:bg-white/10">
+                    <Link href="/dashboard/patient/help-center" className="flex items-center gap-3 px-3 py-2 hover:bg-white/10">
                         <span className="material-symbols-outlined text-[20px]">help</span>
                         <span>Help Center</span>
-                    </div>
+                    </Link>
                     <Link className="flex items-center gap-3 px-3 py-2 hover:bg-white/10" href="/">
                         <span className="material-symbols-outlined text-[20px]">logout</span>
                         <span>Logout</span>
@@ -135,10 +149,9 @@ export default function PatientDashboardPage() {
                                 <div className="rounded-lg bg-[#16b46f]/15 p-2 text-[#16b46f]">
                                     <span className="material-symbols-outlined">event_available</span>
                                 </div>
-                                <span className="text-[11px] font-semibold text-[#16b46f]">2 pending</span>
                             </div>
                             <p className="text-[12px] uppercase tracking-wider text-[#64748b]">Remaining Consultations</p>
-                            <h3 className="mt-1 text-1xl font-semibold text-[#001b5e]">48</h3>
+                            <h3 className="mt-1 text-1xl font-semibold text-[#001b5e]">{remainingConsultations}</h3>
                             <p className="text-[9px] text-[#475569]">for this billing cycle</p>
                         </div>
 
@@ -157,28 +170,23 @@ export default function PatientDashboardPage() {
 
                     <div className="col-span-12 row-span-2 lg:col-span-4">
                         <div className="relative h-full overflow-hidden rounded-2xl bg-[#001b5e] p-5 text-white shadow-xl">
-                            <h3 className="mb-5 text-lg font-semibold">Upcoming Consultations</h3>
+                            <h3 className="mb-5 text-lg font-semibold">Most Consulted</h3>
 
                             <div className="space-y-4">
                                 <div className="rounded-xl border border-white/20 bg-white/10 p-4">
-                                    <div className="mb-3 flex items-center gap-2 text-[#16b46f]">
-                                        {/* <span className="material-symbols-outlined text-[18px]">videocam</span> */}
-                                        <span className="text-xs">Tomorrow, 10:30 AM</span>
-                                    </div>
                                     <h4 className="text-base font-semibold">Dr. Richardson</h4>
                                     <p className="mb-3 text-xs text-[#d8e2ff]">Routine Cardiovascular Review</p>
                                     <button className="w-full rounded-lg bg-white py-2 text-xs font-semibold text-[#001b5e]">
-                                       Join Consultation
+                                       Start Consultation
                                     </button>
                                 </div>
 
                                 <div className="rounded-xl border border-white/10 bg-white/5 p-4 opacity-90">
-                                    <div className="mb-2 flex items-center gap-2 text-[#d8e2ff]">
-                                        <span className="material-symbols-outlined text-[16px]">event</span>
-                                        <span className="text-[11px]">Friday, 14 Oct • 09:00 AM</span>
-                                    </div>
                                     <h4 className="text-sm font-semibold">Dr. Emily Stone</h4>
-                                    <p className="text-xs text-[#bfd2ff]">Dermatology Check-up</p>
+                                    <p className="mb-3 text-xs text-[#bfd2ff]">Dermatology Check-up</p>
+                                     <button className="w-full rounded-lg bg-white py-2 text-xs font-semibold text-[#001b5e]">
+                                       Start Consultation
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -188,10 +196,10 @@ export default function PatientDashboardPage() {
                         <div className="overflow-hidden rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
                             <div className="mb-4 flex items-center justify-between">
                                 <h3 className="text-lg font-semibold text-[#001b5e]">Recently Visited Doctors</h3>
-                                <button className="flex items-center gap-1 text-xs font-semibold text-[#16b46f]">
+                                <Link href="/dashboard/patient/doctors" className="flex items-center gap-1 text-xs font-semibold text-[#16b46f]">
                                     View All
                                     <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                                </button>
+                                </Link>
                             </div>
 
                             <div className="overflow-x-auto">
@@ -210,8 +218,8 @@ export default function PatientDashboardPage() {
                                             <tr key={doctor.name} className="border-b border-[#e2e8f0] last:border-b-0 hover:bg-[#f8fafc]">
                                                 <td className="px-3 py-3">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="h-9 w-9 overflow-hidden rounded-full bg-[#e2e8f0]">
-                                                            <img className="h-full w-full object-cover" src={doctor.image} alt={doctor.name} />
+                                                        <div className="relative h-9 w-9 overflow-hidden rounded-full bg-[#e2e8f0]">
+                                                            <Image className="object-cover" src={doctor.image} alt={doctor.name} fill sizes="36px" unoptimized />
                                                         </div>
                                                         <span className="font-medium text-[#001b5e]">{doctor.name}</span>
                                                     </div>

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export default function ConsultantDashboardPage() {
@@ -9,11 +10,14 @@ export default function ConsultantDashboardPage() {
         </div>
 
         <div className="mb-8 flex items-center gap-4 px-2">
-          <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-[#16b36c] bg-[#e0e3e6]">
-            <img
-              className="h-full w-full object-cover"
+          <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#16b36c] bg-[#e0e3e6]">
+            <Image
+              className="object-cover"
               alt="Dr. Richardson"
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuBveWw5sJYO4vcFdjWVdbuGQDlC0JKaMeg6jsjDDSJkIwdRjG_4H_Ao7x2stxD6kTx4oY4DP80Tf-kMczLWJQqZw7ajzN4HpSFJ0W7qcoFs9bxbSpMN7PrAqivavfdvvECjYhZNcT_25wMoRamMlavt1GZ5bU5v1LXmZRreRkSDQzcoG5jXyD19NtcvpsAZFGHlPJkNdm6Vme6nV5SmbMT-CGGHwt91t_aHyC2bbT4qoU6rYhO4t232jYBYnX0OKrxpnI_i4VeK-yJ_"
+              fill
+              sizes="48px"
+              unoptimized
             />
           </div>
           <div>
@@ -143,11 +147,14 @@ export default function ConsultantDashboardPage() {
               <div className="space-y-4">
                 <div className="flex flex-col justify-between gap-4 rounded-lg border border-[#c6c6cf] bg-[#f2f4f7] p-4 md:flex-row md:items-center">
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 overflow-hidden rounded-full bg-[#e0e3e6]">
-                      <img
-                        className="h-full w-full object-cover"
+                    <div className="relative h-12 w-12 overflow-hidden rounded-full bg-[#e0e3e6]">
+                      <Image
+                        className="object-cover"
                         alt="Arthur Morgan"
                         src="https://lh3.googleusercontent.com/aida-public/AB6AXuBicIz7a3L5D-fduW62tVRqHFqZexE0XphWfvSduFvdydH_wSj91I_6WgDLDk91VxmF-YNvBR6gsmcJyx0afr3rKJ8qBFVfMAwyNQJfgfiOqCiDVjf-t2bm_1gE0HvCIE9XQxALQIUHHsDXj3erqg3kdqYbiO70AsJZHET68M2UjAGgM1gkqPAanvqTK4q5pggH7qSmAkAmHnV-1EUkSj82HUT2qRF3nepDbB9EDxWuoKRWOn6k9cS_Z9XDyxlJLDLvIMB6vqqf5DQQ"
+                        fill
+                        sizes="48px"
+                        unoptimized
                       />
                     </div>
                     <div>
@@ -163,11 +170,14 @@ export default function ConsultantDashboardPage() {
 
                 <div className="flex flex-col justify-between gap-4 rounded-lg border border-[#c6c6cf] bg-[#f2f4f7] p-4 md:flex-row md:items-center">
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 overflow-hidden rounded-full bg-[#e0e3e6]">
-                      <img
-                        className="h-full w-full object-cover"
+                    <div className="relative h-12 w-12 overflow-hidden rounded-full bg-[#e0e3e6]">
+                      <Image
+                        className="object-cover"
                         alt="Sarah Williams"
                         src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRLWFOPKr0Ns04yIIxmV6T_Ok90BWig1GuOVZwkgBlct2PpCSJn9OFSCAORhoMaOiKnv9YERgnrB1CtYcSAhbKrHs8MbSMVoqlke5jB93bGWeC-Qcamw7mT9Mgg6klR1MKApzGT9iapUOnVYvcKEumu5hA_Wbzrh9mgFMxy9ll81tXRhHIJ408_HW_FTB6GJLiJcSriF4cvjo4sx0yHQmTQ3befKqyJzJt1eKkUvKraIF3STdSPgVUe3Fc7TcMeaUWBOBuaUJYC644"
+                        fill
+                        sizes="48px"
+                        unoptimized
                       />
                     </div>
                     <div>

@@ -3,10 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+const PATIENT_AUTH_KEY = "dwPatientLoggedIn";
+
 export default function PatientLoginPage() {
   const router = useRouter();
 
   const goToDashboard = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(PATIENT_AUTH_KEY, "true");
+    }
+
     router.push("/dashboard/patient");
   };
 
