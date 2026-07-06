@@ -206,7 +206,8 @@ export default function ConsultantDashboardPage() {
                 </div>
               </div>
 
-              <div className="relative space-y-8 pl-12 before:absolute before:bottom-2 before:left-[18px] before:top-2 before:w-[2px] before:bg-[#c6c6cf] before:content-['']">
+              <div className="relative space-y-8 pl-12">
+                <div className="absolute bottom-2 left-[18px] top-2 w-[2px] bg-[#c6c6cf]" aria-hidden="true" />
                 <div className="relative">
                   <div className="absolute -left-[38px] top-1 h-4 w-4 rounded-full bg-[#16b36c] ring-4 ring-white" />
                   <div className="flex items-start justify-between gap-3">
