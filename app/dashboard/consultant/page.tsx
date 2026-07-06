@@ -1,10 +1,48 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import DoctorMobileNav from "@/components/doctor-mobile-nav";
+
+const DOCTOR_NOTIFICATIONS_KEY = "dwDoctorNotifications";
 
 export default function ConsultantDashboardPage() {
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  useEffect(() => {
+    const refreshUnreadCount = () => {
+      const stored = window.localStorage.getItem(DOCTOR_NOTIFICATIONS_KEY);
+
+      if (!stored) {
+        setUnreadNotifications(0);
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(stored) as Array<{ unread?: boolean }>;
+        const unreadCount = Array.isArray(parsed) ? parsed.filter((item) => item.unread).length : 0;
+        setUnreadNotifications(unreadCount);
+      } catch {
+        setUnreadNotifications(0);
+      }
+    };
+
+    refreshUnreadCount();
+    window.addEventListener("storage", refreshUnreadCount);
+    window.addEventListener("dw-notifications-updated", refreshUnreadCount);
+
+    return () => {
+      window.removeEventListener("storage", refreshUnreadCount);
+      window.removeEventListener("dw-notifications-updated", refreshUnreadCount);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
-      <aside className="fixed left-0 top-0 z-40 flex h-full w-[280px] flex-col bg-[#0d1b3d] px-4 py-8 text-white shadow-md">
+      <DoctorMobileNav />
+
+      <aside className="fixed left-0 top-0 z-40 hidden h-full w-[280px] flex-col bg-[#0d1b3d] px-4 py-8 text-white shadow-md lg:flex">
         <div className="mb-8 px-2">
           <span className="text-1xl font-extrabold text-[#7784ac]">DominionWell+</span>
         </div>
@@ -69,11 +107,11 @@ export default function ConsultantDashboardPage() {
         </div>
       </aside>
 
-      <main className="ml-[280px] min-h-screen p-6 md:p-10">
-        <header className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+      <main className="min-h-screen p-4 sm:p-6 md:p-10 lg:ml-[280px]">
+        <header className="mb-6 flex flex-col justify-between gap-3 sm:mb-8 sm:gap-4 md:flex-row md:items-end">
           <div>
-            <h1 className="text-2xl font-semibold text-[#00020d]">Physician Dashboard</h1>
-            <p className="text-sm text-[#45464e]">Welcome back, Dr. Richardson. You have 8 appointments today.</p>
+            <h1 className="text-xl font-semibold text-[#00020d] sm:text-2xl">Physician Dashboard</h1>
+            <p className="text-xs text-[#45464e] sm:text-sm">Welcome back, Dr. Richardson. You have 8 appointments today.</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex -space-x-2">
@@ -83,14 +121,14 @@ export default function ConsultantDashboardPage() {
                 +5
               </div>
             </div>
-            <div className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#c6c6cf] bg-[#f7f9fc] p-2 hover:bg-[#eceef1]">
+            <Link href="/dashboard/doctor/notifications" className="flex items-center gap-2 rounded-lg border border-[#c6c6cf] bg-[#f7f9fc] p-2 hover:bg-[#eceef1]" aria-label="Notifications">
               <span className="material-symbols-outlined text-[#45464e]">notifications</span>
-              <span className="h-2 w-2 rounded-full bg-[#ba1a1a]" />
-            </div>
+              {unreadNotifications > 0 ? <span className="h-2 w-2 rounded-full bg-[#ba1a1a]" /> : null}
+            </Link>
           </div>
         </header>
 
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:mb-8 sm:gap-6 md:grid-cols-4">
           <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">
             <div className="mb-2 flex items-start justify-between">
               <div className="rounded-lg bg-[#16b36c]/10 p-2">
@@ -98,8 +136,8 @@ export default function ConsultantDashboardPage() {
               </div>
               <span className="text-xs font-bold text-[#16b36c]">+12%</span>
             </div>
-            <h3 className="text-sm text-[#45464e]">Appointments Today</h3>
-            <p className="text-2xl font-semibold text-[#00020d]">14</p>
+            <h3 className="text-xs text-[#45464e] sm:text-sm">Appointments Today</h3>
+            <p className="text-xl font-semibold text-[#00020d] sm:text-2xl">14</p>
           </div>
 
           <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">
@@ -109,8 +147,8 @@ export default function ConsultantDashboardPage() {
               </div>
               <span className="text-xs font-bold text-[#16b36c]">+12%</span>
             </div>
-            <h3 className="text-sm text-[#45464e]">Completed Consultations</h3>
-            <p className="text-2xl font-semibold text-[#00020d]">06</p>
+            <h3 className="text-xs text-[#45464e] sm:text-sm">Completed Consultations</h3>
+            <p className="text-xl font-semibold text-[#00020d] sm:text-2xl">06</p>
           </div>
 
           <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">
@@ -120,8 +158,8 @@ export default function ConsultantDashboardPage() {
               </div>
               <span className="text-xs font-bold text-[#45464e]">Total</span>
             </div>
-            <h3 className="text-sm text-[#45464e]">New Patients</h3>
-            <p className="text-2xl font-semibold text-[#00020d]">28</p>
+            <h3 className="text-xs text-[#45464e] sm:text-sm">New Patients</h3>
+            <p className="text-xl font-semibold text-[#00020d] sm:text-2xl">28</p>
           </div>
 
           <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">
@@ -131,8 +169,8 @@ export default function ConsultantDashboardPage() {
               </div>
               <span className="text-xs font-bold text-[#16b36c]">98%</span>
             </div>
-            <h3 className="text-sm text-[#45464e]">Patient Satisfaction</h3>
-            <p className="text-2xl font-semibold text-[#00020d]">4.9/5</p>
+            <h3 className="text-xs text-[#45464e] sm:text-sm">Patient Satisfaction</h3>
+            <p className="text-xl font-semibold text-[#00020d] sm:text-2xl">4.9/5</p>
           </div>
         </div>
 

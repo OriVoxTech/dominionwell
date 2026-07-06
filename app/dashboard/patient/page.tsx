@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import PatientMobileNav from "@/components/patient-mobile-nav";
 
 const recentDoctors = [
     {
@@ -35,6 +36,7 @@ const recentDoctors = [
 ];
 
 const CONSULTATION_BALANCE_KEY = "dwConsultationBalance";
+const PATIENT_NOTIFICATIONS_KEY = "dwPatientNotifications";
 
 export default function PatientDashboardPage() {
     const consultationsBooked = 4;
@@ -49,10 +51,54 @@ export default function PatientDashboardPage() {
 
         return Number.isFinite(storedBalance) ? Math.max(0, Math.floor(storedBalance)) : 48;
     }, []);
+    const [unreadNotifications, setUnreadNotifications] = useState(0);
+    const greeting = (() => {
+        const hour = new Date().getHours();
+
+        if (hour < 12) {
+            return "Good morning";
+        }
+
+        if (hour < 17) {
+            return "Good afternoon";
+        }
+
+        return "Good evening";
+    })();
+
+    useEffect(() => {
+        const refreshUnreadCount = () => {
+            const stored = window.localStorage.getItem(PATIENT_NOTIFICATIONS_KEY);
+
+            if (!stored) {
+                setUnreadNotifications(0);
+                return;
+            }
+
+            try {
+                const parsed = JSON.parse(stored) as Array<{ unread?: boolean }>;
+                const unreadCount = Array.isArray(parsed) ? parsed.filter((item) => item.unread).length : 0;
+                setUnreadNotifications(unreadCount);
+            } catch {
+                setUnreadNotifications(0);
+            }
+        };
+
+        refreshUnreadCount();
+        window.addEventListener("storage", refreshUnreadCount);
+        window.addEventListener("dw-notifications-updated", refreshUnreadCount);
+
+        return () => {
+            window.removeEventListener("storage", refreshUnreadCount);
+            window.removeEventListener("dw-notifications-updated", refreshUnreadCount);
+        };
+    }, []);
 
     return (
         <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
-            <aside className="fixed left-0 top-0 z-40 flex h-full w-[250px] flex-col bg-[#001b5e] px-3 py-6 text-white shadow-md">
+            <PatientMobileNav active="dashboard" />
+
+            <aside className="fixed left-0 top-0 z-40 hidden h-full w-[250px] flex-col bg-[#001b5e] px-3 py-6 text-white shadow-md lg:flex">
                 <div className="mb-8 px-2">
                     <h1 className="text-1xl font-extrabold tracking-tight">DominionWell+</h1>
                 </div>
@@ -109,11 +155,11 @@ export default function PatientDashboardPage() {
                 </div>
             </aside>
 
-            <main className="ml-[250px] min-h-screen p-6 md:p-8">
+            <main className="min-h-screen p-4 sm:p-6 md:p-8 lg:ml-[250px]">
                 <header className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
                     <div>
-                        <h2 className="text-2xl font-semibold text-[#001b5e]">Good morning, Alex</h2>
-                        <p className="text-sm text-[#475569]">Your vitals are stable. Next appointment is tomorrow.</p>
+                        <h2 className="text-2xl font-semibold text-[#001b5e]">{greeting}, Alex</h2>
+                        <p className="text-sm text-[#475569]">How are you feeling today?</p>
                     </div>
 
                     <div className="flex w-full max-w-xl items-center gap-3">
@@ -131,14 +177,14 @@ export default function PatientDashboardPage() {
                             </span>
                         </div>
 
-                        <button
-                            type="button"
+                        <Link
+                            href="/dashboard/patient/notifications"
                             className="relative grid h-11 w-11 place-items-center rounded-xl border border-[#c6c6cf] bg-white text-[#001b5e]"
                             aria-label="Notifications"
                         >
                             <span className="material-symbols-outlined">notifications</span>
-                            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#16b46f]" />
-                        </button>
+                            {unreadNotifications > 0 ? <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#16b46f]" /> : null}
+                        </Link>
                     </div>
                 </header>
 

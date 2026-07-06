@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 const plans = [
@@ -46,6 +45,8 @@ const PAYMENT_RECORDS_KEY = "dwPaymentRecords";
 
 export default function SubscriptionPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const mode = searchParams.get("mode");
     const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
     const [accountName, setAccountName] = useState("");
     const [transferReference, setTransferReference] = useState("");
@@ -101,6 +102,7 @@ export default function SubscriptionPage() {
 
         window.localStorage.setItem(CONSULTATION_BALANCE_KEY, String(updatedBalance));
         window.localStorage.setItem(PAYMENT_RECORDS_KEY, JSON.stringify(updatedRecords));
+        window.dispatchEvent(new Event("dw-subscription-updated"));
         setPaymentHistory(updatedRecords);
 
         setSuccessMessage(
@@ -109,19 +111,40 @@ export default function SubscriptionPage() {
         closePaymentModal();
     };
 
+    const pageTitle =
+        mode === "manage" ? "Manage Subscription" : mode === "change" ? "Change Subscription" : "Subscriptions";
+
+    const pageSubtitle =
+        mode === "manage"
+            ? "Review your plan and keep your consultation balance active."
+            : mode === "change"
+              ? "Switch to another plan that fits your current care needs."
+              : "Choose a plan to continue speaking with doctors.";
+
+    const handleGoBack = () => {
+        if (typeof window !== "undefined" && window.history.length > 1) {
+            router.back();
+            return;
+        }
+
+        router.push("/dashboard/patient");
+    };
+
     return (
         <div className="min-h-screen bg-[#f9fafb] px-6 py-8 text-[#191c1e] md:px-10">
             <div className="mx-auto w-full max-w-5xl">
                 <header className="mb-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h1 className="text-3xl font-semibold text-[#001b5e]">Subscriptions</h1>
-                        <p className="text-sm text-[#475569]">
-                            You have no consultations remaining. Choose a plan to continue speaking with doctors.
-                        </p>
+                        <h1 className="text-3xl font-semibold text-[#001b5e]">{pageTitle}</h1>
+                        <p className="text-sm text-[#475569]">{pageSubtitle}</p>
                     </div>
-                    <Link href="/dashboard/patient/doctors" className="text-sm font-semibold text-[#0aa4b4]">
-                        Back to Doctors
-                    </Link>
+                    <button
+                        type="button"
+                        onClick={handleGoBack}
+                        className="w-fit text-sm font-semibold text-[#0aa4b4]"
+                    >
+                        Go Back
+                    </button>
                 </header>
 
                 {successMessage ? (

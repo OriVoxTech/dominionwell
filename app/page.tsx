@@ -48,10 +48,10 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#f7f9fc] text-[#191c1e]">
-      <header className="sticky top-0 z-50 flex h-16 w-full items-center justify-between border-b border-[#c6c6cf] bg-[#f7f9fc]/95 px-4 backdrop-blur md:px-10">
+      <header className="sticky top-0 z-50 flex h-16 w-full items-center justify-between border-b border-[#c6c6cf] bg-[#f7f9fc]/95 px-3 backdrop-blur sm:px-4 md:px-10">
         <div className="flex items-center gap-2">
-          <Image alt="DominionWell Logo" className="h-8 w-auto" src="/logo.png" width={128} height={32} />
-          <span className="text-1xl font-bold text-[#001b5e]">DominionWell+</span>
+          <Image alt="DominionWell Logo" className="h-7 w-auto sm:h-8" src="/logo.png" width={128} height={32} />
+          <span className="text-lg font-bold text-[#001b5e] sm:text-1xl">DominionWell+</span>
         </div>
 
         <nav className="hidden items-center gap-6 md:flex">
@@ -69,17 +69,17 @@ export default function Home() {
           </Link>
         </nav>
 
-        <div className="flex items-center gap-3">
-          <SignInModal className="text-sm text-[#45464e] hover:text-[#16b46f]" />
+        <div className="flex items-center gap-2 sm:gap-3">
+          <SignInModal className="text-xs text-[#45464e] hover:text-[#16b46f] sm:text-sm" />
           <SignInModal open={showLoginModal} onOpenChange={setShowLoginModal} hideTrigger />
-          <Link href="/register" className="rounded-lg bg-[#16b46f] px-4 py-2 text-sm font-semibold text-white">
+          <Link href="/register" className="rounded-lg bg-[#16b46f] px-3 py-2 text-xs font-semibold text-white sm:px-4 sm:text-sm">
             Register
           </Link>
         </div>
       </header>
 
       <main>
-        <section className="hero-pattern relative flex min-h-[70vh] items-center overflow-hidden">
+        <section className="hero-pattern relative flex min-h-[64vh] items-center overflow-hidden sm:min-h-[70vh]">
           <div className="mx-auto w-full max-w-[1440px] px-4 md:px-10">
             <div className="max-w-3xl">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[#16b46f] px-3 py-1 text-white">
@@ -87,10 +87,10 @@ export default function Home() {
                 <span className="text-[10px] font-semibold uppercase tracking-wider">Trusted by 500+ Clinics</span>
               </div>
 
-              <h1 className="mb-4 text-4xl font-bold tracking-tight text-[#001b5e] md:text-5xl">
+              <h1 className="mb-3 text-2xl font-bold tracking-tight text-[#001b5e] sm:mb-4 sm:text-4xl md:text-5xl">
                 Healthcare Without Boundaries
               </h1>
-              <p className="mb-8 max-w-xl text-m leading-8 text-[#45464e]">
+              <p className="mb-6 max-w-xl text-base leading-7 text-[#45464e] sm:mb-8 sm:text-lg sm:leading-8">
                 Experience a new era of medical care. DominionWell+ connects you with world-class specialists through our secure,
                 HIPAA-compliant SaaS platform designed for modern life.
               </p>
@@ -107,7 +107,7 @@ export default function Home() {
                   />
                 </div>
                 <button
-                  className="flex items-center justify-center gap-2 rounded-lg bg-[#16b46f] px-8 py-3 text-sm font-semibold text-white"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-[#16b46f] px-6 py-3 text-sm font-semibold text-white sm:px-8"
                   type="button"
                   onClick={handleSearch}
                 >
@@ -115,11 +115,11 @@ export default function Home() {
                 </button>
               </div>
 
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                <span className="text-sm text-[#45464e]">Popular:</span>
-                <span className="cursor-pointer rounded-full border border-[#c6c6cf] bg-[#eceef1] px-4 py-1.5 text-xs font-semibold text-[#191c1e]">Cardiologist</span>
+              <div className="mt-6 flex flex-wrap items-center gap-2.5 sm:mt-8 sm:gap-3">
+                <span className="text-xs text-[#45464e] sm:text-sm">Popular:</span>
+                <span className="cursor-pointer rounded-full border border-[#c6c6cf] bg-[#eceef1] px-4 py-1.5 text-xs font-semibold text-[#191c1e]">Gynecologist</span>
                 <span className="cursor-pointer rounded-full border border-[#c6c6cf] bg-[#eceef1] px-4 py-1.5 text-xs font-semibold text-[#191c1e]">Pediatrician</span>
-                <span className="cursor-pointer rounded-full border border-[#c6c6cf] bg-[#eceef1] px-4 py-1.5 text-xs font-semibold text-[#191c1e]">Dermatologist</span>
+                <span className="cursor-pointer rounded-full border border-[#c6c6cf] bg-[#eceef1] px-4 py-1.5 text-xs font-semibold text-[#191c1e]">General Practitioner</span>
               </div>
             </div>
           </div>
@@ -139,22 +139,22 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="bg-[#f2f4f7] py-12">
+        <section className="bg-[#f2f4f7] py-10 sm:py-12">
           <div className="mx-auto w-full max-w-[1440px] px-4 md:px-10">
-            <div className="mx-auto mb-16 max-w-2xl text-center">
-              <h2 className="mb-4 text-3xl font-semibold text-[#001b5e]">How DominionWell+ Works</h2>
-              <p className="text-base text-[#45464e]">
+            <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-16">
+              <h2 className="mb-3 text-2xl font-semibold text-[#001b5e] sm:mb-4 sm:text-3xl">How DominionWell+ Works</h2>
+              <p className="text-sm text-[#45464e] sm:text-base">
                 We&apos;ve simplified the journey from feeling unwell to receiving expert care. Your health, managed in three simple steps.
               </p>
             </div>
 
             <div className="bento-grid">
-              <div className="glass-card col-span-12 flex flex-col items-start gap-4 rounded-2xl border border-[#c6c6cf] p-8 md:col-span-4">
+              <div className="glass-card col-span-12 flex flex-col items-start gap-3 rounded-2xl border border-[#c6c6cf] p-6 sm:gap-4 sm:p-8 md:col-span-4">
                 <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-[#001b5e]">
                   <span className="material-symbols-outlined text-[#16b46f]">search_check</span>
                 </div>
-                <h3 className="text-2xl font-semibold text-[#001b5e]">Find a Provider</h3>
-                <p className="text-base text-[#45464e]">
+                <h3 className="text-xl font-semibold text-[#001b5e] sm:text-2xl">Find a Provider</h3>
+                <p className="text-sm text-[#45464e] sm:text-base">
                   Browse our curated network of board-certified specialists. Filter by rating, language, or availability.
                 </p>
                 <div className="mt-auto flex items-center gap-1 pt-4 text-sm font-medium text-[#16b46f]">
@@ -162,12 +162,12 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="col-span-12 flex flex-col items-start gap-4 rounded-2xl bg-[#001b5e] p-8 shadow-xl md:col-span-4">
+              <div className="col-span-12 flex flex-col items-start gap-3 rounded-2xl bg-[#001b5e] p-6 shadow-xl sm:gap-4 sm:p-8 md:col-span-4">
                 <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-[#16b46f]">
                   <span className="material-symbols-outlined text-white">calendar_month</span>
                 </div>
-                <h3 className="text-2xl font-semibold text-white">Instant Booking</h3>
-                <p className="text-base text-[#b9c5f1]">
+                <h3 className="text-xl font-semibold text-white sm:text-2xl">Instant Booking</h3>
+                <p className="text-sm text-[#b9c5f1] sm:text-base">
                   Secure your slot in seconds. No more waiting on hold, choose a time that works for your schedule.
                 </p>
                 <div className="mt-auto flex items-center gap-1 pt-4 text-sm font-medium text-[#16b46f]">
@@ -175,12 +175,12 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="glass-card col-span-12 flex flex-col items-start gap-4 rounded-2xl border border-[#c6c6cf] p-8 md:col-span-4">
+              <div className="glass-card col-span-12 flex flex-col items-start gap-3 rounded-2xl border border-[#c6c6cf] p-6 sm:gap-4 sm:p-8 md:col-span-4">
                 <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-[#002126]">
                   <span className="material-symbols-outlined text-[#0aa4b4]">medical_information</span>
                 </div>
-                <h3 className="text-2xl font-semibold text-[#001b5e]">Receive Care</h3>
-                <p className="text-base text-[#45464e]">
+                <h3 className="text-xl font-semibold text-[#001b5e] sm:text-2xl">Receive Care</h3>
+                <p className="text-sm text-[#45464e] sm:text-base">
                   Consult via HD video or in-person. Access your digital records and prescriptions immediately after.
                 </p>
                 <div className="mt-auto flex items-center gap-1 pt-4 text-sm font-medium text-[#16b46f]">
@@ -191,12 +191,12 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="py-24">
+        <section className="py-14 sm:py-24">
           <div className="mx-auto w-full max-w-[1440px] px-4 md:px-10">
-            <div className="mb-12 flex items-end justify-between gap-8">
+            <div className="mb-8 flex items-end justify-between gap-8 sm:mb-12">
               <div className="max-w-xl">
-                <h2 className="mb-2 text-2xl font-semibold text-[#001b5e]">Featured Specialists</h2>
-                <p className="text-base text-[#45464e]">
+                <h2 className="mb-2 text-xl font-semibold text-[#001b5e] sm:text-2xl">Featured Specialists</h2>
+                <p className="text-sm text-[#45464e] sm:text-base">
                   Meet our top-rated medical professionals who are setting new standards in clinical excellence and patient care.
                 </p>
               </div>
@@ -205,7 +205,7 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-8 lg:grid-cols-4">
               <article className="group overflow-hidden rounded-2xl border border-[#c6c6cf] bg-white transition-all duration-300 hover:shadow-xl">
                 <div className="relative h-64 overflow-hidden">
                   <Image className="object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdVENcuEGku3lbM2PPqI4t1CqMjy5CB31TeEL_xUOLUl8ClPRkzQhs2oxl-Md3qLt72L0_lcWVsb4YIBvatXsZ_Osb-RR_KA_rKjvKAoTTghpVJPrhWLIpyc8NwD3K3d2EaDZnrL9pZQ_krsOryzAEyIQ5mO4Cwa5OqcRG3wOEJwTXEoh3Mep8Mtg5Kju7AWH2IQ1xZLkkb9wVwEJHoom_VDqlDoSEXZK5wRQuVDetFt3g6krqKFpWXf6MrBDjYLkgUqYNGO8o-97d" alt="Dr. Sarah Jenkins" fill sizes="(max-width: 1024px) 100vw, 25vw" unoptimized />
@@ -216,7 +216,7 @@ export default function Home() {
                     4.9
                   </div>
                 </div>
-                <div className="p-6">
+                <div className="p-5 sm:p-6">
                   <h4 className="mb-1 text-1xl font-semibold text-[#001b5e]">Dr. Sarah Jenkins</h4>
                   <p className="mb-4 text-sm text-[#45464e]">Senior Cardiologist</p>
                   <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button" onClick={handleBookConsultation}>
@@ -285,12 +285,12 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="px-4 py-20 md:px-10">
+        <section className="px-4 py-14 md:px-10 md:py-20">
           <div className="mx-auto max-w-[1440px]">
-            <div className="relative overflow-hidden rounded-[2rem] bg-[#001b5e] p-12 text-center md:p-20">
+            <div className="relative overflow-hidden rounded-[2rem] bg-[#001b5e] p-7 text-center sm:p-12 md:p-20">
               <div className="relative z-10 mx-auto max-w-2xl">
-                <h2 className="mb-6 text-4xl font-bold tracking-tight text-white md:text-4xl">Ready to prioritize your health?</h2>
-                <p className="mb-10 text-lg text-[#7784ac]">
+                <h2 className="mb-4 text-2xl font-bold tracking-tight text-white sm:mb-6 sm:text-4xl md:text-4xl">Ready to prioritize your health?</h2>
+                <p className="mb-8 text-sm text-[#7784ac] sm:mb-10 sm:text-lg">
                   Join thousands of patients who have already transformed their healthcare experience with DominionWell+.
                 </p>
                 <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import PatientMobileNav from "@/components/patient-mobile-nav";
 
 type FaqItem = {
     question: string;
@@ -42,7 +43,9 @@ export default function PatientHelpCenterPage() {
 
     return (
         <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
-            <aside className="fixed left-0 top-0 z-40 flex h-full w-[250px] flex-col bg-[#001b5e] px-3 py-6 text-white shadow-md">
+            <PatientMobileNav active="help" />
+
+            <aside className="fixed left-0 top-0 z-40 hidden h-full w-[250px] flex-col bg-[#001b5e] px-3 py-6 text-white shadow-md lg:flex">
                 <div className="mb-8 px-2">
                     <h1 className="text-1xl font-extrabold tracking-tight">DominionWell+</h1>
                 </div>
@@ -99,7 +102,7 @@ export default function PatientHelpCenterPage() {
                 </div>
             </aside>
 
-            <main className="ml-[250px] min-h-screen p-6 md:p-8">
+            <main className="min-h-screen p-4 sm:p-6 md:p-8 lg:ml-[250px]">
                 <header className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <h2 className="text-2xl font-semibold text-[#001b5e]">Help Center</h2>

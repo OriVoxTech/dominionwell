@@ -2,7 +2,101 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
+import PatientMobileNav from "@/components/patient-mobile-nav";
+
+type PaymentRecord = {
+    planName?: string;
+    createdAt?: string;
+};
+
+type CurrentSubscription = {
+    planName: string;
+    price: number;
+    balance: number;
+    status: "Active" | "No Active Plan";
+    renewalLabel: string;
+    featureSummary: string;
+};
+
+const PLAN_PRICE_MAP: Record<string, number> = {
+    Starter: 39,
+    Plus: 69,
+    Premium: 249,
+};
+
+const PLAN_FEATURE_MAP: Record<string, string> = {
+    Starter: "5 consultations for occasional check-ins and follow-up care.",
+    Plus: "10 consultations with stronger support for ongoing treatment.",
+    Premium: "50 consultations for family-level and high-frequency care.",
+};
+
+const CONSULTATION_BALANCE_KEY = "dwConsultationBalance";
+const PAYMENT_RECORDS_KEY = "dwPaymentRecords";
+
+function getSubscriptionSnapshot(): CurrentSubscription {
+    if (typeof window === "undefined") {
+        return {
+            planName: "No Active Plan",
+            price: 0,
+            balance: 0,
+            status: "No Active Plan",
+            renewalLabel: "No renewal date",
+            featureSummary: "Choose a subscription plan to unlock consultations and priority care.",
+        };
+    }
+
+    const rawBalance = Number(window.localStorage.getItem(CONSULTATION_BALANCE_KEY));
+    const balance = Number.isFinite(rawBalance) ? rawBalance : 0;
+
+    const rawRecords = window.localStorage.getItem(PAYMENT_RECORDS_KEY);
+    let records: PaymentRecord[] = [];
+
+    if (rawRecords) {
+        try {
+            records = JSON.parse(rawRecords) as PaymentRecord[];
+        } catch {
+            records = [];
+        }
+    }
+    const latestRecord = Array.isArray(records)
+        ? records.reduce<PaymentRecord | null>((latest, current) => {
+              const latestTime = latest?.createdAt ? new Date(latest.createdAt).getTime() : 0;
+              const currentTime = current?.createdAt ? new Date(current.createdAt).getTime() : 0;
+              return currentTime > latestTime ? current : latest;
+          }, null)
+        : null;
+
+    const activePlanName = latestRecord?.planName && PLAN_PRICE_MAP[latestRecord.planName] ? latestRecord.planName : "";
+
+    if (!activePlanName) {
+        return {
+            planName: "No Active Plan",
+            price: 0,
+            balance,
+            status: "No Active Plan",
+            renewalLabel: "No renewal date",
+            featureSummary: "Choose a subscription plan to unlock consultations and priority care.",
+        };
+    }
+
+    const startDate = latestRecord?.createdAt ? new Date(latestRecord.createdAt) : new Date();
+    const renewalDate = new Date(startDate.getTime());
+    renewalDate.setMonth(renewalDate.getMonth() + 1);
+
+    return {
+        planName: activePlanName,
+        price: PLAN_PRICE_MAP[activePlanName],
+        balance,
+        status: "Active",
+        renewalLabel: renewalDate.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+        }),
+        featureSummary: PLAN_FEATURE_MAP[activePlanName],
+    };
+}
 
 export default function PatientSettingsPage() {
     const [fullName, setFullName] = useState("Alex Johnson");
@@ -14,6 +108,7 @@ export default function PatientSettingsPage() {
     const [emailNotifications, setEmailNotifications] = useState(true);
     const [whatsappNotifications, setWhatsappNotifications] = useState(true);
     const [saveMessage, setSaveMessage] = useState("");
+    const [subscription, setSubscription] = useState<CurrentSubscription>(() => getSubscriptionSnapshot());
 
     const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
         const selectedFile = event.target.files?.[0];
@@ -30,9 +125,25 @@ export default function PatientSettingsPage() {
         setSaveMessage("Settings updated successfully.");
     };
 
+    useEffect(() => {
+        const syncSubscription = () => {
+            setSubscription(getSubscriptionSnapshot());
+        };
+
+        window.addEventListener("storage", syncSubscription);
+        window.addEventListener("dw-subscription-updated", syncSubscription);
+
+        return () => {
+            window.removeEventListener("storage", syncSubscription);
+            window.removeEventListener("dw-subscription-updated", syncSubscription);
+        };
+    }, []);
+
     return (
         <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
-            <aside className="fixed left-0 top-0 z-40 flex h-full w-[250px] flex-col bg-[#001b5e] px-3 py-6 text-white shadow-md">
+            <PatientMobileNav active="settings" />
+
+            <aside className="fixed left-0 top-0 z-40 hidden h-full w-[250px] flex-col bg-[#001b5e] px-3 py-6 text-white shadow-md lg:flex">
                 <div className="mb-8 px-2">
                     <h1 className="text-1xl font-extrabold tracking-tight">DominionWell+</h1>
                 </div>
@@ -87,7 +198,7 @@ export default function PatientSettingsPage() {
                 </div>
             </aside>
 
-            <main className="ml-[250px] min-h-screen p-6 md:p-8">
+            <main className="min-h-screen p-4 sm:p-6 md:p-8 lg:ml-[250px]">
                 <header className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <h2 className="text-2xl font-semibold text-[#001b5e]">Settings</h2>
@@ -206,6 +317,70 @@ export default function PatientSettingsPage() {
                         </div>
 
                         {saveMessage ? <p className="mt-3 text-sm font-semibold text-[#16b46f]">{saveMessage}</p> : null}
+                    </section>
+
+                    <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm lg:col-span-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h3 className="text-lg font-semibold text-[#001b5e]">Present Subscription</h3>
+                                <p className="text-sm text-[#64748b]">Manage your current plan or switch to a new one.</p>
+                            </div>
+                            <span
+                                className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${
+                                    subscription.status === "Active"
+                                        ? "bg-[#16b46f]/15 text-[#16b46f]"
+                                        : "bg-[#64748b]/15 text-[#64748b]"
+                                }`}
+                            >
+                                {subscription.status}
+                            </span>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
+                                <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Plan</p>
+                                <p className="mt-1 text-sm font-semibold text-[#001b5e]">{subscription.planName}</p>
+                            </div>
+                            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
+                                <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Monthly Price</p>
+                                <p className="mt-1 text-sm font-semibold text-[#001b5e]">
+                                    {subscription.price > 0 ? `$${subscription.price}` : "-"}
+                                </p>
+                            </div>
+                            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
+                                <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Consultation Balance</p>
+                                <p className="mt-1 text-sm font-semibold text-[#001b5e]">{subscription.balance}</p>
+                            </div>
+                            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
+                                <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Next Renewal</p>
+                                <p className="mt-1 text-sm font-semibold text-[#001b5e]">{subscription.renewalLabel}</p>
+                            </div>
+                        </div>
+
+                        <div className="mt-3 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3 text-sm text-[#475569]">
+                            {subscription.featureSummary}
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            <Link
+                                href="/dashboard/patient/subscription?mode=manage"
+                                className="rounded-lg bg-[#001b5e] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b2b75]"
+                            >
+                                Manage Subscription
+                            </Link>
+                            <Link
+                                href="/dashboard/patient/subscription?mode=change"
+                                className="rounded-lg border border-[#001b5e] px-4 py-2 text-sm font-semibold text-[#001b5e] hover:bg-[#f8fafc]"
+                            >
+                                Change Subscription
+                            </Link>
+                            <Link
+                                href="/dashboard/patient/subscription?mode=buy"
+                                className="rounded-lg border border-[#16b46f] px-4 py-2 text-sm font-semibold text-[#16b46f] hover:bg-[#16b46f]/10"
+                            >
+                                Buy New Plan
+                            </Link>
+                        </div>
                     </section>
                 </div>
             </main>
