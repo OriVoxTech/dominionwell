@@ -6,20 +6,26 @@ import { useState } from "react";
 const plans = [
     {
         name: "Starter",
+        consultations: 1,
+        price: 20000,
+        description: "Good for instant consultations.",
+    },
+    {
+        name: "Starter Pro",
         consultations: 5,
-        price: 39,
+        price: 100000,
         description: "Good for occasional consultations and basic follow-ups.",
     },
     {
         name: "Plus",
         consultations: 10,
-        price: 69,
+        price: 200000,
         description: "Best for regular check-ins and ongoing care management.",
     },
     {
         name: "Premium",
         consultations: 50,
-        price: 249,
+        price: 500000,
         description: "For families and high-frequency care with maximum flexibility.",
     },
 ];
@@ -42,6 +48,11 @@ type PaymentRecord = {
 
 const CONSULTATION_BALANCE_KEY = "dwConsultationBalance";
 const PAYMENT_RECORDS_KEY = "dwPaymentRecords";
+const amountFormatter = new Intl.NumberFormat("en-NG");
+
+function formatAmount(amount: number) {
+    return `₦${amountFormatter.format(amount)}`;
+}
 
 export default function SubscriptionPage() {
     const router = useRouter();
@@ -123,8 +134,8 @@ export default function SubscriptionPage() {
         mode === "manage"
             ? "Review your plan and keep your consultation balance active."
             : mode === "change"
-              ? "Switch to another plan that fits your current care needs."
-              : "Choose a plan to continue speaking with doctors.";
+                ? "Switch to another plan that fits your current care needs."
+                : "Choose a plan to continue speaking with doctors.";
 
     const handleGoBack = () => {
         if (typeof window !== "undefined" && window.history.length > 1) {
@@ -138,19 +149,27 @@ export default function SubscriptionPage() {
     return (
         <div className="min-h-screen bg-[#f9fafb] px-6 py-8 text-[#191c1e] md:px-10">
             <div className="mx-auto w-full max-w-5xl">
-                <header className="mb-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 className="text-3xl font-semibold text-[#001b5e]">{pageTitle}</h1>
-                        <p className="text-sm text-[#475569]">{pageSubtitle}</p>
+                <header className="mb-8">
+                    <div className="mb-2 flex items-center gap-2 sm:gap-3">
+                        <button
+                            type="button"
+                            onClick={handleGoBack}
+                            aria-label="Back"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                        </button>
+                        <h1 className="text-2xl font-semibold text-[#001b5e]">{pageTitle}</h1>
                     </div>
-                    <button
-                        type="button"
-                        onClick={handleGoBack}
-                        className="w-fit text-sm font-semibold text-[#0aa4b4]"
-                    >
-                        Go Back
-                    </button>
+                    <p className="text-[13px] mt-2 text-[#475569]">{pageSubtitle}</p>
                 </header>
+
+                <section className="mb-6 rounded-xl border border-[#c6c6cf] bg-white p-4">
+                    <p className="text-sm font-semibold text-[#001b5e]">Consultation Duration Policy</p>
+                    <p className="mt-1 text-sm text-[#475569]">
+                        Each consultation lasts for a maximum of 1 hour. To extend a consultation, you need to book again.
+                    </p>
+                </section>
 
                 {successMessage ? (
                     <section className="mb-6 rounded-xl border border-[#16b46f]/30 bg-[#16b46f]/10 p-4">
@@ -170,7 +189,8 @@ export default function SubscriptionPage() {
                         <article key={plan.name} className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
                             <h2 className="text-lg font-semibold text-[#001b5e]">{plan.name}</h2>
                             <p className="mt-1 text-sm text-[#64748b]">{plan.consultations} Consultations</p>
-                            <p className="mt-4 text-3xl font-bold text-[#001b5e]">${plan.price}</p>
+                            <p className="mt-1 text-xs text-[#64748b]">Max 1 hour per consultation</p>
+                            <p className="mt-4 text-3xl font-bold text-[#001b5e]">{formatAmount(plan.price)}</p>
                             <p className="mt-2 min-h-12 text-sm text-[#475569]">{plan.description}</p>
                             <button
                                 type="button"
@@ -213,7 +233,7 @@ export default function SubscriptionPage() {
                                 <p className="mt-1">Bank: Dominion Health Bank</p>
                                 <p>Account Number: 0293009487</p>
                                 <p>Account Name: DominionWell Health Services</p>
-                                <p className="mt-2 font-semibold">Amount: ${selectedPlan.price}</p>
+                                <p className="mt-2 font-semibold">Amount: {formatAmount(selectedPlan.price)}</p>
                                 <p>Plan: {selectedPlan.consultations} Consultations</p>
                             </div>
 
@@ -298,7 +318,7 @@ export default function SubscriptionPage() {
                                             </td>
                                             <td className="px-3 py-3 text-[#001b5e]">{record.planName}</td>
                                             <td className="px-3 py-3 text-[#475569]">{record.consultationsAdded}</td>
-                                            <td className="px-3 py-3 text-[#475569]">${record.amount}</td>
+                                            <td className="px-3 py-3 text-[#475569]">{formatAmount(record.amount)}</td>
                                             <td className="px-3 py-3 text-[#475569]">
                                                 {record.reference || record.paystackReference || "-"}
                                             </td>

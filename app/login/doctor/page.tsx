@@ -1,22 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function DoctorLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isPasswordResetComplete = searchParams.get("reset") === "success";
 
   return (
     <main className="min-h-screen bg-[#f7f9fc] px-4 py-7 sm:py-10 md:px-8">
       <div className="mx-auto w-full max-w-[1120px] overflow-hidden rounded-3xl border border-[#c6c6cf] bg-white shadow-xl md:grid md:grid-cols-[1.1fr_0.9fr]">
         <section className="p-5 sm:p-6 md:p-10">
-          <Link href="/" className="text-xs font-semibold text-[#0aa4b4] sm:text-sm">
-            Back to Home
-          </Link>
-          <h1 className="mt-2.5 text-2xl font-bold text-[#001b5e] sm:mt-3 sm:text-3xl">Doctor Login</h1>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/"
+              aria-label="Back"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            </Link>
+            <h1 className="text-2xl font-bold text-[#001b5e] sm:text-3xl">Doctor Login</h1>
+          </div>
           <p className="mt-1.5 text-xs text-[#475569] sm:mt-2 sm:text-sm">
             Sign in with your username and password to access your dashboard.
           </p>
+
+          {isPasswordResetComplete ? (
+            <div className="mt-4 rounded-xl border border-[#16b46f]/30 bg-[#16b46f]/10 px-4 py-3 text-xs font-medium text-[#166534] sm:text-sm">
+              Your password has been reset. Sign in with your new password.
+            </div>
+          ) : null}
 
           <form
             className="mt-5 grid gap-3 sm:mt-7 sm:gap-4"
@@ -50,9 +64,9 @@ export default function DoctorLoginPage() {
                 <input type="checkbox" className="h-4 w-4 accent-[#16b46f]" />
                 Remember me
               </label>
-              <a href="#" className="font-medium text-[#0aa4b4]">
+              <Link href="/login/doctor/forgot-password" className="font-medium text-[#0aa4b4]">
                 Forgot password?
-              </a>
+              </Link>
             </div>
 
             <button

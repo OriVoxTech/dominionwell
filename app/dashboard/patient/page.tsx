@@ -159,7 +159,7 @@ export default function PatientDashboardPage() {
                 <header className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
                     <div>
                         <h2 className="text-2xl font-semibold text-[#001b5e]">{greeting}, Alex</h2>
-                        <p className="text-sm text-[#475569]">How are you feeling today?</p>
+                        <p className="mt-2 text-xs text-[#475569]">How are you feeling today?</p>
                     </div>
 
                     <div className="flex w-full max-w-xl items-center gap-3">
@@ -196,9 +196,9 @@ export default function PatientDashboardPage() {
                                     <span className="material-symbols-outlined">event_available</span>
                                 </div>
                             </div>
-                            <p className="text-[12px] uppercase tracking-wider text-[#64748b]">Remaining Consultations</p>
+                            <p className="text-[12px] uppercase tracking-wider text-[#64748b] font-bold">Remaining Consultations</p>
                             <h3 className="mt-1 text-1xl font-semibold text-[#001b5e]">{remainingConsultations}</h3>
-                            <p className="text-[9px] text-[#475569]">for this billing cycle</p>
+                            <p className="mt-1 text-[9px] text-[#475569]">for this billing cycle</p>
                         </div>
 
                         <div className="rounded-xl border border-[#c6c6cf] bg-white p-5">
@@ -208,28 +208,28 @@ export default function PatientDashboardPage() {
                                 </div>
                                 <span className="text-[11px] font-semibold text-[#16b46f]">Active</span>
                             </div>
-                            <p className="text-[12px] uppercase tracking-wider text-[#64748b]">Current Subscription</p>
+                            <p className="text-[12px] uppercase tracking-wider text-[#64748b] font-bold">Current Subscription</p>
                             <h3 className="mt-1 text-1xl font-semibold text-[#001b5e]">Premium Care</h3>
-                            <p className="text-[9px] text-[#475569]">Expires on Nov 24, 2026</p>
+                            <p className="mt-1 text-[9px] text-[#475569]">Expires on Nov 24, 2026</p>
                         </div>
                     </div>
 
                     <div className="col-span-12 row-span-2 lg:col-span-4">
                         <div className="relative h-full overflow-hidden rounded-2xl bg-[#001b5e] p-5 text-white shadow-xl">
-                            <h3 className="mb-5 text-lg font-semibold">Most Consulted</h3>
+                            <h3 className="mb-5 text-md font-semibold">Most Consulted</h3>
 
                             <div className="space-y-4">
                                 <div className="rounded-xl border border-white/20 bg-white/10 p-4">
-                                    <h4 className="text-base font-semibold">Dr. Richardson</h4>
-                                    <p className="mb-3 text-xs text-[#d8e2ff]">Routine Cardiovascular Review</p>
+                                    <h4 className="mb-2 text-sm font-semibold">Dr. Richardson</h4>
+                                    <p className="mb-3 text-[11px] text-[#d8e2ff]">Routine Cardiovascular Review</p>
                                     <button className="w-full rounded-lg bg-white py-2 text-xs font-semibold text-[#001b5e]">
                                        Start Consultation
                                     </button>
                                 </div>
 
                                 <div className="rounded-xl border border-white/10 bg-white/5 p-4 opacity-90">
-                                    <h4 className="text-sm font-semibold">Dr. Emily Stone</h4>
-                                    <p className="mb-3 text-xs text-[#bfd2ff]">Dermatology Check-up</p>
+                                    <h4 className="mb-2 text-sm font-semibold">Dr. Emily Stone</h4>
+                                    <p className="mb-3 text-[11px] text-[#bfd2ff]">Dermatology Check-up</p>
                                      <button className="w-full rounded-lg bg-white py-2 text-xs font-semibold text-[#001b5e]">
                                        Start Consultation
                                     </button>
@@ -241,10 +241,10 @@ export default function PatientDashboardPage() {
                     <div className="col-span-12 lg:col-span-8">
                         <div className="overflow-hidden rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
                             <div className="mb-4 flex items-center justify-between">
-                                <h3 className="text-lg font-semibold text-[#001b5e]">Recently Visited Doctors</h3>
+                                <h3 className="text-md font-semibold text-[#001b5e]">Recently Visited Doctors</h3>
                                 <Link href="/dashboard/patient/doctors" className="flex items-center gap-1 text-xs font-semibold text-[#16b46f]">
                                     View All
-                                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                                    <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                                 </Link>
                             </div>
 
@@ -267,16 +267,16 @@ export default function PatientDashboardPage() {
                                                         <div className="relative h-9 w-9 overflow-hidden rounded-full bg-[#e2e8f0]">
                                                             <Image className="object-cover" src={doctor.image} alt={doctor.name} fill sizes="36px" unoptimized />
                                                         </div>
-                                                        <span className="font-medium text-[#001b5e]">{doctor.name}</span>
+                                                        <span className="font-medium text-[13px] text-[#001b5e]">{doctor.name}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-3 py-3 text-[#475569]">{doctor.specialty}</td>
+                                                <td className="px-3 py-3 text-[13px] text-[#475569]">{doctor.specialty}</td>
                                                 <td className="px-3 py-3">
                                                     <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${doctor.statusClass}`}>
                                                         {doctor.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-3 py-3 text-[#475569]">{doctor.lastVisit}</td>
+                                                <td className="px-3 py-3 text-[#475569] text-[13px]">{doctor.lastVisit}</td>
                                                 <td className="px-3 py-3">
                                                     <button className="text-[#16b46f]">
                                                         <span className="material-symbols-outlined text-[18px]">more_vert</span>
@@ -294,8 +294,8 @@ export default function PatientDashboardPage() {
                         <div className="rounded-2xl border border-[#c6c6cf] bg-white/80 p-6 backdrop-blur-sm">
                             <div className="mb-5 flex items-start justify-between gap-4">
                                 <div>
-                                    <h3 className="text-lg font-semibold text-[#001b5e]">Earn a Badge</h3>
-                                    <p className="text-sm text-[#475569]">
+                                    <h3 className="text-md font-semibold text-[#001b5e]">Earn a Badge</h3>
+                                    <p className="text-sm mt-3 text-[#475569] text-[12px]">
                                         The more consultations you book, the faster you unlock your next badge.
                                     </p>
                                 </div>

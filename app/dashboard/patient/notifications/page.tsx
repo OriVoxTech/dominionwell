@@ -171,20 +171,23 @@ export default function PatientNotificationsPage() {
       </aside>
 
       <main className="min-h-screen p-4 sm:p-6 md:p-8 lg:ml-[250px]">
-        <header className="mb-5 flex flex-col gap-2 sm:mb-6 sm:gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
+        <header className="mb-5 sm:mb-6">
+          <div className="mb-3 flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/dashboard/patient"
+              aria-label="Back"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            </Link>
             <h2 className="text-xl font-semibold text-[#001b5e] sm:text-2xl">Notifications</h2>
-            <p className="text-xs text-[#475569] sm:text-sm">Stay updated with your appointments and account activity.</p>
           </div>
-          <Link href="/dashboard/patient" className="inline-flex items-center gap-2 text-xs font-semibold text-[#0aa4b4] sm:text-sm">
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            Back to Dashboard
-          </Link>
+          <p className="text-xs text-[#475569] sm:text-[13px]">Stay updated with your appointments and account activity.</p>
         </header>
 
         <section className="mb-5 rounded-2xl border border-[#c6c6cf] bg-white p-4 shadow-sm sm:mb-6 sm:p-5">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-[#001b5e] sm:text-base">Recent Alerts</h3>
+            <h3 className="text-sm font-semibold text-[#001b5e] sm:text-[15px]">Recent Alerts</h3>
             <div className="flex items-center gap-2">
               <span className="rounded-full bg-[#16b46f]/15 px-2.5 py-1 text-[11px] font-semibold text-[#16b46f]">
                 {unreadCount} unread
@@ -205,8 +208,8 @@ export default function PatientNotificationsPage() {
             <article key={item.id} className="rounded-2xl border border-[#c6c6cf] bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
-                  <h4 className="text-sm font-semibold text-[#001b5e] sm:text-base">{item.title}</h4>
-                  <p className="text-xs text-[#475569] sm:text-sm">{item.description}</p>
+                  <h4 className="text-sm font-semibold text-[#001b5e] sm:text-[15px]">{item.title}</h4>
+                  <p className="text-xs text-[#475569] sm:text-[12px] mt-2">{item.description}</p>
                 </div>
                 {item.unread ? <span className="mt-1 h-2.5 w-2.5 rounded-full bg-[#16b46f]" aria-label="Unread notification" /> : null}
               </div>

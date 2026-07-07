@@ -10,6 +10,30 @@ import { availabilityStyles, doctors, type Doctor } from "./data";
 const CONSULTATION_BALANCE_KEY = "dwConsultationBalance";
 const PATIENT_NAME = "Alex Johnson";
 
+function isDoctorAvailable(availability: Doctor["availability"]) {
+    return availability === "Available";
+}
+
+function getDoctorActionLabel(availability: Doctor["availability"]) {
+    if (availability === "Available") {
+        return "Contact Doctor";
+    }
+
+    if (availability === "Busy") {
+        return "In Consultation";
+    }
+
+    return "Offline";
+}
+
+function WhatsAppIcon() {
+    return (
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 flex-none fill-current">
+            <path d="M12 2a10 10 0 0 0-8.58 15.12L2.5 22l4.98-1.34A10 10 0 1 0 12 2Zm0 18a7.9 7.9 0 0 1-4.04-1.1l-.29-.17-2.95.79.79-2.88-.19-.3A8 8 0 1 1 12 20Zm4.35-5.7c-.24.68-1.2 1.25-1.66 1.34-.44.09-.99.13-1.6-.07-.37-.12-.84-.28-1.45-.54-2.55-1.1-4.2-3.67-4.32-3.84-.12-.17-1.04-1.38-1.04-2.63s.65-1.87.88-2.13c.23-.26.51-.32.68-.32h.49c.16 0 .39-.06.61.47.24.55.82 1.9.89 2.04.07.14.12.31.02.5-.1.2-.15.31-.29.48-.14.17-.3.37-.42.49-.14.14-.29.29-.12.58.17.29.78 1.31 1.68 2.12 1.16 1.03 2.12 1.35 2.42 1.5.29.14.46.12.63-.07.17-.2.71-.82.9-1.1.18-.29.37-.24.62-.14.25.1 1.6.75 1.88.89.28.14.47.21.54.33.06.12.06.68-.18 1.36Z" />
+        </svg>
+    );
+}
+
 export default function BrowseDoctorsPage() {
     const router = useRouter();
     const [query, setQuery] = useState("");
@@ -58,13 +82,17 @@ export default function BrowseDoctorsPage() {
     }, [query, specializationFilter]);
 
     const handleSpeakToDoctor = (doctor: Doctor) => {
-        if (consultationsRemaining > 0) {
-            setSelectedDoctor(doctor);
-            setIsConfirmingConsultation(false);
+        if (!isDoctorAvailable(doctor.availability)) {
             return;
         }
 
-        router.push("/dashboard/patient/subscription");
+        if (consultationsRemaining <= 0) {
+            router.push("/dashboard/patient/subscription");
+            return;
+        }
+
+        setSelectedDoctor(doctor);
+        setIsConfirmingConsultation(false);
     };
 
     const closeSpeakModal = () => {
@@ -90,6 +118,7 @@ export default function BrowseDoctorsPage() {
 
         if (typeof window !== "undefined") {
             window.localStorage.setItem(CONSULTATION_BALANCE_KEY, String(nextBalance));
+            window.dispatchEvent(new Event("dw-subscription-updated"));
             window.open(
                 `https://wa.me/${selectedDoctor.whatsappNumber}?text=${encodedMessage}`,
                 "_blank",
@@ -173,19 +202,22 @@ export default function BrowseDoctorsPage() {
             </aside>
 
             <main className="min-h-screen p-4 sm:p-6 md:p-8 lg:ml-[250px]">
-                <header className="mb-5 flex flex-col gap-2 sm:mb-6 sm:gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h2 className="text-xl font-semibold text-[#001b5e] sm:text-2xl">Doctors</h2>
-                        <p className="text-xs text-[#475569] sm:text-sm">View all doctors and find the right specialist quickly.</p>
+                <header className="mb-5 sm:mb-6">
+                    <div className="mb-2 flex items-center gap-2 sm:gap-3">
+                        <Link
+                            href="/dashboard/patient"
+                            aria-label="Back"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                        </Link>
+                        <h2 className="text-2xl font-semibold text-[#001b5e] sm:text-1xl">Browse Doctors</h2>
                     </div>
-                    <Link href="/dashboard/patient" className="inline-flex items-center gap-2 text-xs font-semibold text-[#0aa4b4] sm:text-sm">
-                        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-                        Back to Dashboard
-                    </Link>
+                    <p className="text-xs text-[#475569] sm:text-[13px]">View all doctors and find the right specialist quickly.</p>
                 </header>
 
                 <section className="mb-5 rounded-2xl border border-[#c6c6cf] bg-white p-4 shadow-sm sm:mb-6 sm:p-5">
-                    <h3 className="mb-3 text-sm font-semibold text-[#001b5e] sm:mb-4 sm:text-base">Search doctors</h3>
+                    <h3 className="mb-3 text-sm font-semibold text-[#001b5e] sm:mb-4 sm:text-[15px]">Search doctors</h3>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_220px]">
                         <label className="relative block">
                             <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]">
@@ -196,7 +228,7 @@ export default function BrowseDoctorsPage() {
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
                                 placeholder="Search by doctor name or specialization"
-                                className="h-10 w-full rounded-xl border border-[#c6c6cf] bg-white pl-10 pr-4 text-xs outline-none focus:border-[#0aa4b4] sm:h-11 sm:text-sm"
+                                className="h-10 w-full rounded-xl border border-[#c6c6cf] bg-white pl-10 pr-4 text-xs outline-none focus:border-[#0aa4b4] sm:h-11 sm:text-[13px]"
                             />
                         </label>
 
@@ -205,7 +237,7 @@ export default function BrowseDoctorsPage() {
                                 Filter by specialization
                             </span>
                             <select
-                                className="h-10 w-full rounded-xl border border-[#c6c6cf] bg-white px-3 text-xs outline-none focus:border-[#0aa4b4] sm:h-11 sm:text-sm"
+                                className="h-10 w-full rounded-xl border border-[#c6c6cf] bg-white px-3 text-xs outline-none focus:border-[#0aa4b4] sm:h-11 sm:text-[13px]"
                                 value={specializationFilter}
                                 onChange={(event) => setSpecializationFilter(event.target.value)}
                                 aria-label="Filter by specialization"
@@ -221,8 +253,8 @@ export default function BrowseDoctorsPage() {
                 </section>
 
                 <section className="mb-3 flex items-center justify-between sm:mb-4">
-                    <h3 className="text-sm font-semibold text-[#001b5e] sm:text-base">View all doctors</h3>
-                    <p className="text-xs text-[#475569] sm:text-sm">{filteredDoctors.length} results</p>
+                    <h3 className="text-sm font-semibold text-[#001b5e] sm:text-[15px]">View all doctors</h3>
+                    <p className="text-xs text-[#475569] sm:text-[13px]">{filteredDoctors.length} results</p>
                 </section>
 
                 <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -234,8 +266,8 @@ export default function BrowseDoctorsPage() {
                                         <Image className="object-cover" src={doctor.image} alt={doctor.name} fill sizes="56px" unoptimized />
                                     </div>
                                     <div>
-                                        <h4 className="text-sm font-semibold text-[#001b5e] sm:text-base">{doctor.name}</h4>
-                                        <p className="text-xs text-[#475569] sm:text-sm">{doctor.specialization}</p>
+                                        <h4 className="text-sm font-semibold text-[#001b5e] sm:text-[15px] mb-2">{doctor.name}</h4>
+                                        <p className="text-xs text-[#475569] xs:text-[13px]">{doctor.specialization}</p>
                                     </div>
                                 </div>
                                 <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${availabilityStyles[doctor.availability]}`}>
@@ -243,9 +275,9 @@ export default function BrowseDoctorsPage() {
                                 </span>
                             </div>
 
-                            <p className="mb-4 text-xs text-[#475569] sm:text-sm">{doctor.bio}</p>
+                            <p className="mb-4 text-xs text-[#475569] sm:text-[13px]">{doctor.bio}</p>
 
-                            <div className="mb-4 flex flex-wrap gap-2 text-xs text-[#334155]">
+                            <div className="mb-4 flex flex-wrap gap-2 text-[11px] text-[#334155]">
                                 <span className="rounded-md bg-[#f2f4f7] px-2 py-1">{doctor.experienceYears} years experience</span>
                                 <span className="rounded-md bg-[#f2f4f7] px-2 py-1">{doctor.rating.toFixed(1)} rating</span>
                             </div>
@@ -253,11 +285,12 @@ export default function BrowseDoctorsPage() {
                             <div className="flex flex-wrap items-center justify-end gap-2">
                                 <button
                                     type="button"
-                                    disabled={doctor.availability === "Busy"}
-                                    className={`rounded-lg px-3 py-2 text-xs font-semibold text-white ${doctor.availability === "Busy" ? "cursor-not-allowed bg-[#94a3b8]" : "bg-[#16b46f] hover:bg-[#149660]"}`}
+                                    disabled={!isDoctorAvailable(doctor.availability)}
+                                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white ${isDoctorAvailable(doctor.availability) ? "bg-[#16b46f] hover:bg-[#149660]" : "cursor-not-allowed bg-[#94a3b8]"}`}
                                     onClick={() => handleSpeakToDoctor(doctor)}
                                 >
-                                    {doctor.availability === "Busy" ? "Doctor Busy" : "Speak to Doctor"}
+                                    <WhatsAppIcon />
+                                    {getDoctorActionLabel(doctor.availability)}
                                 </button>
                                 <Link
                                     href={`/dashboard/patient/doctors/${doctor.id}`}

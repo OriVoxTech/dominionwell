@@ -1,12 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const PATIENT_AUTH_KEY = "dwPatientLoggedIn";
 
+function GoogleIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 flex-none">
+      <path
+        fill="#4285F4"
+        d="M21.82 12.23c0-.72-.06-1.25-.19-1.8H12.2v3.56h5.53c-.11.89-.72 2.23-2.07 3.13l-.02.12 3.02 2.29.21.02c1.96-1.77 3.09-4.37 3.09-7.32Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12.2 21.9c2.71 0 4.98-.87 6.64-2.35l-3.21-2.43c-.86.59-2.01 1-3.43 1-2.65 0-4.9-1.77-5.7-4.22l-.12.01-3.14 2.38-.04.11c1.66 3.22 5.07 5.5 9 5.5Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M6.5 13.9c-.21-.59-.34-1.23-.34-1.9s.13-1.31.33-1.9l-.01-.13-3.18-2.42-.1.04A9.72 9.72 0 0 0 2.2 12c0 1.54.37 3 1 4.31l3.3-2.41Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12.2 5.88c1.79 0 3 .75 3.69 1.38l2.7-2.57C17.17 3.38 14.91 2.1 12.2 2.1c-3.93 0-7.34 2.28-9 5.49l3.29 2.51c.81-2.45 3.06-4.22 5.71-4.22Z"
+      />
+    </svg>
+  );
+}
+
 export default function PatientLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isPasswordResetComplete = searchParams.get("reset") === "success";
 
   const goToDashboard = () => {
     if (typeof window !== "undefined") {
@@ -20,27 +45,34 @@ export default function PatientLoginPage() {
     <main className="min-h-screen bg-[#f7f9fc] px-4 py-7 sm:py-10 md:px-8">
       <div className="mx-auto w-full max-w-[1120px] overflow-hidden rounded-3xl border border-[#c6c6cf] bg-white shadow-xl md:grid md:grid-cols-[1.1fr_0.9fr]">
         <section className="p-5 sm:p-6 md:p-10">
-          <Link href="/" className="text-xs font-semibold text-[#0aa4b4] sm:text-sm">
-            Back to Home
-          </Link>
-          <h1 className="mt-2.5 text-2xl font-bold text-[#001b5e] sm:mt-3 sm:text-3xl">
-            Patient Login
-          </h1>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/"
+              aria-label="Back"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            </Link>
+            <h1 className="text-2xl font-bold text-[#001b5e] sm:text-3xl">
+              Patient Login
+            </h1>
+          </div>
           <p className="mt-1.5 text-xs text-[#475569] sm:mt-2 sm:text-sm">
             Continue your care journey securely with DominionWell+.
           </p>
+
+          {isPasswordResetComplete ? (
+            <div className="mt-4 rounded-xl border border-[#16b46f]/30 bg-[#16b46f]/10 px-4 py-3 text-xs font-medium text-[#166534] sm:text-sm">
+              Your password has been reset. Sign in with your new password.
+            </div>
+          ) : null}
 
           <button
             type="button"
             onClick={goToDashboard}
             className="mt-5 flex w-full items-center justify-center gap-3 rounded-xl border border-[#c6c6cf] px-4 py-2.5 text-xs font-semibold text-[#1f2937] hover:bg-[#f8fafc] sm:mt-6 sm:py-3 sm:text-sm"
           >
-            <span
-              className="grid h-6 w-6 place-items-center rounded-full bg-white text-sm font-bold"
-              aria-hidden="true"
-            >
-              G
-            </span>
+            <GoogleIcon />
             Continue with Google
           </button>
 
@@ -82,9 +114,9 @@ export default function PatientLoginPage() {
                 <input type="checkbox" className="h-4 w-4 accent-[#16b46f]" />
                 Remember me
               </label>
-              <a href="#" className="font-medium text-[#0aa4b4]">
+              <Link href="/login/patient/forgot-password" className="font-medium text-[#0aa4b4]">
                 Forgot password?
-              </a>
+              </Link>
             </div>
 
             <button
@@ -97,9 +129,9 @@ export default function PatientLoginPage() {
 
           <p className="mt-4 text-xs text-[#475569] sm:mt-5 sm:text-sm">
             New to DominionWell+?{" "}
-            <a href="#" className="font-semibold text-[#0aa4b4]">
+            <Link href="/register" className="font-semibold text-[#0aa4b4]">
               Create an account
-            </a>
+            </Link>
           </p>
         </section>
 

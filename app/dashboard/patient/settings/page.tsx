@@ -199,20 +199,23 @@ export default function PatientSettingsPage() {
             </aside>
 
             <main className="min-h-screen p-4 sm:p-6 md:p-8 lg:ml-[250px]">
-                <header className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
+                <header className="mb-6">
+                    <div className="mb-2 flex items-center gap-2">
+                        <Link
+                            href="/dashboard/patient"
+                            aria-label="Back"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                        </Link>
                         <h2 className="text-2xl font-semibold text-[#001b5e]">Settings</h2>
-                        <p className="text-sm text-[#475569]">Manage your account, notifications, and security preferences.</p>
                     </div>
-                    <Link href="/dashboard/patient" className="inline-flex items-center gap-2 text-sm font-semibold text-[#0aa4b4]">
-                        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-                        Back to Dashboard
-                    </Link>
+                    <p className="text-[13px] mt-2 text-[#475569]">Manage your account, notifications, and security preferences.</p>
                 </header>
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                     <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm lg:col-span-2">
-                        <h3 className="mb-4 text-lg font-semibold text-[#001b5e]">Profile Settings</h3>
+                        <h3 className="mb-4 text-m font-semibold text-[#001b5e]">Profile Settings</h3>
                         <div className="mb-4 flex items-center gap-4 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
                             <div className="relative h-16 w-16 overflow-hidden rounded-full border border-[#c6c6cf] bg-white">
                                 <Image className="object-cover" src={profileImage} alt={fullName} fill sizes="64px" unoptimized />
@@ -261,7 +264,7 @@ export default function PatientSettingsPage() {
                     </section>
 
                     <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
-                        <h3 className="mb-4 text-lg font-semibold text-[#001b5e]">Security</h3>
+                        <h3 className="mb-4 text-m font-semibold text-[#001b5e]">Security</h3>
                         <div className="space-y-3 text-sm">
                             <button
                                 type="button"
@@ -279,7 +282,7 @@ export default function PatientSettingsPage() {
                     </section>
 
                     <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm lg:col-span-3">
-                        <h3 className="mb-4 text-lg font-semibold text-[#001b5e]">Notification Preferences</h3>
+                        <h3 className="mb-4 text-m font-semibold text-[#001b5e]">Notification Preferences</h3>
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             <label className="flex items-center justify-between rounded-lg border border-[#c6c6cf] p-3 text-sm">
                                 <span>Email Notifications</span>
@@ -322,8 +325,8 @@ export default function PatientSettingsPage() {
                     <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm lg:col-span-3">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                <h3 className="text-lg font-semibold text-[#001b5e]">Present Subscription</h3>
-                                <p className="text-sm text-[#64748b]">Manage your current plan or switch to a new one.</p>
+                                <h3 className="text-lg font-semibold text-[#001b5e]">Current Plan</h3>
+                                <p className="text-xs mt-3 text-[#64748b]">Manage your current plan or switch to a new one.</p>
                             </div>
                             <span
                                 className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${
@@ -367,12 +370,6 @@ export default function PatientSettingsPage() {
                                 className="rounded-lg bg-[#001b5e] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b2b75]"
                             >
                                 Manage Subscription
-                            </Link>
-                            <Link
-                                href="/dashboard/patient/subscription?mode=change"
-                                className="rounded-lg border border-[#001b5e] px-4 py-2 text-sm font-semibold text-[#001b5e] hover:bg-[#f8fafc]"
-                            >
-                                Change Subscription
                             </Link>
                             <Link
                                 href="/dashboard/patient/subscription?mode=buy"

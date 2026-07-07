@@ -179,15 +179,18 @@ export default function ConsultantNotificationsPage() {
       </aside>
 
       <main className="min-h-screen p-4 sm:p-6 md:p-8 lg:ml-[280px]">
-        <header className="mb-5 flex flex-col gap-2 sm:mb-6 sm:gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
+        <header className="mb-5 sm:mb-6">
+          <div className="mb-2 flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/dashboard/doctor"
+              aria-label="Back"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#16b36c] hover:bg-[#f8fafc]"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            </Link>
             <h1 className="text-xl font-semibold text-[#00020d] sm:text-2xl">Notifications</h1>
-            <p className="text-xs text-[#45464e] sm:text-sm">Monitor requests, alerts, and reminders from your care workspace.</p>
           </div>
-          <Link href="/dashboard/doctor" className="inline-flex items-center gap-2 text-xs font-semibold text-[#16b36c] sm:text-sm">
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            Back to Dashboard
-          </Link>
+          <p className="text-xs text-[#45464e] sm:text-sm">Monitor requests, alerts, and reminders from your care workspace.</p>
         </header>
 
         <section className="mb-5 rounded-2xl border border-[#eaecf0] bg-white p-4 shadow-sm sm:mb-6 sm:p-5">

@@ -103,20 +103,23 @@ export default function PatientHelpCenterPage() {
             </aside>
 
             <main className="min-h-screen p-4 sm:p-6 md:p-8 lg:ml-[250px]">
-                <header className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h2 className="text-2xl font-semibold text-[#001b5e]">Help Center</h2>
-                        <p className="text-sm text-[#475569]">Find quick answers and support for your patient dashboard.</p>
+                <header className="mb-6">
+                    <div className="mb-2 flex items-center gap-2">
+                        <Link
+                            href="/dashboard/patient"
+                            aria-label="Back"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                        </Link>
+                        <h2 className="text-[20px] font-semibold text-[#001b5e]">Help Center</h2>
                     </div>
-                    <Link href="/dashboard/patient" className="inline-flex items-center gap-2 text-sm font-semibold text-[#0aa4b4]">
-                        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-                        Back to Dashboard
-                    </Link>
+                    <p className="text-[13px] text-[#475569]">Find quick answers and support for your patient dashboard.</p>
                 </header>
 
                 <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
-                        <h3 className="text-lg font-semibold text-[#001b5e]">Frequently Asked Questions</h3>
+                        <h3 className="text-m font-semibold text-[#001b5e]">Frequently Asked Questions</h3>
                         <p className="text-xs text-[#64748b]">{faqItems.length} FAQs</p>
                     </div>
 

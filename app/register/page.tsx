@@ -22,7 +22,16 @@ export default function RegisterPage() {
       <main className="mx-auto w-full max-w-[720px] px-4 py-8 md:px-10 md:py-12">
         <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm sm:p-8">
           <div className="mb-5 sm:mb-6">
-            <h1 className="mb-1.5 text-2xl font-bold text-[#001b5e] sm:mb-2 sm:text-3xl">Create Patient Account</h1>
+            <div className="mb-1.5 flex items-center gap-2 sm:gap-3 sm:mb-2">
+              <Link
+                href="/login/patient"
+                aria-label="Back"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
+              >
+                <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+              </Link>
+              <h1 className="text-2xl font-bold text-[#001b5e] sm:text-3xl">Create Patient Account</h1>
+            </div>
             <p className="text-xs text-[#475569] sm:text-sm">Registration is currently available for patients only.</p>
           </div>
 
@@ -68,6 +77,13 @@ export default function RegisterPage() {
                 Register as Patient
               </button>
             </div>
+
+            <p className="md:col-span-2 text-center text-xs text-[#475569] sm:text-sm">
+              Already have an account?{" "}
+              <Link href="/login/patient" className="font-semibold text-[#0aa4b4]">
+                Login
+              </Link>
+            </p>
           </form>
         </section>
       </main>
