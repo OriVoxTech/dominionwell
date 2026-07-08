@@ -16,7 +16,7 @@ export default function Home() {
             className="logo"
             priority
           />
-          <p className="status-pill">Coming Soon</p>
+          <p className="status-pill">Coming Soon!!!</p>
         </header>
 
         <div className="content-grid">
