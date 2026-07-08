@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import PatientMobileNav from "@/components/patient-mobile-nav";
 import {
     APPOINTMENT_REQUESTS_UPDATED_EVENT,
@@ -29,7 +29,7 @@ function getDoctorActionLabel(availability: Doctor["availability"]) {
     return "Unavailable";
 }
 
-export default function BrowseDoctorsPage() {
+function BrowseDoctorsContent() {
     const searchParams = useSearchParams();
     const initialQuery = searchParams.get("query") ?? "";
     const [query, setQuery] = useState(initialQuery);
@@ -443,5 +443,13 @@ export default function BrowseDoctorsPage() {
                 ) : null}
             </main>
         </div>
+    );
+}
+
+export default function BrowseDoctorsPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-[#f9fafb]" />}>
+            <BrowseDoctorsContent />
+        </Suspense>
     );
 }
