@@ -1,21 +1,25 @@
 import type { Metadata } from "next";
-import { Sora, Manrope } from "next/font/google";
+import { Manrope, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
-const sora = Sora({
+const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-display",
   subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  display: "swap",
 });
 
 const manrope = Manrope({
   variable: "--font-body",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "DominionWell | Coming Soon",
+  title: "DominionWell | Healthcare Without Boundaries",
   description:
-    "DominionWell is preparing a better digital healthcare experience. Coming soon.",
+    "DominionWell connects patients with trusted specialists through secure, modern digital healthcare.",
 };
 
 export default function RootLayout({
@@ -26,8 +30,15 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${sora.variable} ${manrope.variable} h-full antialiased`}
+      className={`${plusJakartaSans.variable} ${manrope.variable} h-full antialiased`}
     >
+      <head>
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
