@@ -136,37 +136,29 @@ export default function ConsultantNotificationsPage() {
             <span className="material-symbols-outlined">dashboard</span>
             <span>Dashboard</span>
           </Link>
-          <a className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="#">
+          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/consultations">
             <span className="material-symbols-outlined">medical_services</span>
             <span>Consultations</span>
-          </a>
+          </Link>
           <div className="flex items-center gap-3 rounded-lg border-l-4 border-[#16b36c] bg-[#74fcad] p-3 text-[#007443]">
             <span className="material-symbols-outlined">notifications</span>
             <span>Notifications</span>
           </div>
-          <a className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="#">
+          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/patients">
             <span className="material-symbols-outlined">group</span>
             <span>Patients</span>
-          </a>
-          <a className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="#">
-            <span className="material-symbols-outlined">calendar_month</span>
-            <span>Schedule</span>
-          </a>
-          <a className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="#">
+          </Link>
+          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/reports">
             <span className="material-symbols-outlined">analytics</span>
             <span>Reports</span>
-          </a>
-          <a className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="#">
+          </Link>
+          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/settings">
             <span className="material-symbols-outlined">settings</span>
             <span>Settings</span>
-          </a>
+          </Link>
         </div>
 
         <div className="mt-auto space-y-2 border-t border-[#7784ac]/10 pt-6 text-sm">
-          <button className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#16b36c] px-4 py-3 font-semibold text-white">
-            <span className="material-symbols-outlined">add</span>
-            <span>New Consultation</span>
-          </button>
           <a className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="#">
             <span className="material-symbols-outlined">help</span>
             <span>Help Center</span>

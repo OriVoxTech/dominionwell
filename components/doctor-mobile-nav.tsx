@@ -1,21 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const menuItems = [
   { label: "Dashboard", icon: "dashboard", href: "/dashboard/doctor" },
-  { label: "Consultations", icon: "medical_services", href: "#" },
+  { label: "Consultations", icon: "medical_services", href: "/dashboard/doctor/consultations" },
   { label: "Notifications", icon: "notifications", href: "/dashboard/doctor/notifications" },
-  { label: "Patients", icon: "group", href: "#" },
-  { label: "Schedule", icon: "calendar_month", href: "#" },
-  { label: "Reports", icon: "analytics", href: "#" },
-  { label: "Settings", icon: "settings", href: "#" },
+  { label: "Patients", icon: "group", href: "/dashboard/doctor/patients" },
+  { label: "Reports", icon: "analytics", href: "/dashboard/doctor/reports" },
+  { label: "Settings", icon: "settings", href: "/dashboard/doctor/settings" },
 ];
 
 export default function DoctorMobileNav() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
 
   useEffect(() => {
     const refreshUnreadCount = () => {
@@ -45,6 +47,16 @@ export default function DoctorMobileNav() {
     };
   }, []);
 
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, []);
+
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-[#c6c6cf] bg-white/95 backdrop-blur lg:hidden">
@@ -61,13 +73,27 @@ export default function DoctorMobileNav() {
             <p className="text-base font-extrabold text-[#0d1b3d]">DominionWell+</p>
           </div>
 
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded-lg bg-[#16b36c] px-2.5 py-1.5 text-xs font-semibold text-white"
-          >
-            <span className="material-symbols-outlined text-[14px]">add</span>
-            New Consult
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg border border-[#c6c6cf] bg-[#f7f9fc] px-2.5 py-1.5 text-right">
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-[#64748b]">Time</p>
+              <div className="text-[11px] font-bold text-[#001b5e]">
+                {currentTime.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </div>
+            </div>
+
+            <Link
+              href="/dashboard/doctor/notifications"
+              className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#c6c6cf] bg-[#f7f9fc] text-[#45464e]"
+              aria-label="Notifications"
+            >
+              <span className="material-symbols-outlined text-[18px]">notifications</span>
+              {unreadNotifications > 0 ? <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#ba1a1a]" /> : null}
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -94,8 +120,8 @@ export default function DoctorMobileNav() {
             </div>
 
             <nav className="space-y-1 text-sm">
-              {menuItems.map((item, index) => {
-                const isActive = index === 0;
+              {menuItems.map((item) => {
+                const isActive = item.href !== "#" && pathname === item.href;
 
                 return (
                   <Link
