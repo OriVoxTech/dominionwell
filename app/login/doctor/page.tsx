@@ -2,12 +2,18 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
+import { getAdminDoctorByUsername } from "@/lib/admin-portal";
+
+const DOCTOR_SESSION_KEY = "dwDoctorSession";
 
 function DoctorLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isPasswordResetComplete = searchParams.get("reset") === "success";
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
 
   return (
     <main className="min-h-screen bg-[#f7f9fc] px-4 py-7 sm:py-10 md:px-8">
@@ -37,28 +43,53 @@ function DoctorLoginContent() {
             className="mt-5 grid gap-3 sm:mt-7 sm:gap-4"
             onSubmit={(event) => {
               event.preventDefault();
+
+              const doctor = getAdminDoctorByUsername(username);
+
+              if (!doctor || doctor.password !== password) {
+                setLoginError("Invalid doctor username or password.");
+                return;
+              }
+
+              if (doctor.status === "Blacklisted") {
+                setLoginError("This doctor account is currently blacklisted. Contact admin.");
+                return;
+              }
+
+              window.localStorage.setItem(
+                DOCTOR_SESSION_KEY,
+                JSON.stringify({ doctorId: doctor.id, doctorName: doctor.name, loggedInAt: new Date().toISOString() })
+              );
+
+              setLoginError("");
               router.push("/dashboard/doctor");
             }}
           >
             <label className="grid gap-1.5 text-xs font-medium text-[#001b5e] sm:gap-2 sm:text-sm">
-              Username
+              Username(richardson)
               <input
                 type="text"
                 required
                 placeholder="doctor.username"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
                 className="h-10 rounded-xl border border-[#cbd5e1] px-3 text-xs text-[#0f172a] outline-none focus:border-[#0aa4b4] sm:h-11 sm:text-sm"
               />
             </label>
 
             <label className="grid gap-1.5 text-xs font-medium text-[#001b5e] sm:gap-2 sm:text-sm">
-              Password
+              Password(Doctor@123)
               <input
                 type="password"
                 required
                 placeholder="Enter your password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
                 className="h-10 rounded-xl border border-[#cbd5e1] px-3 text-xs text-[#0f172a] outline-none focus:border-[#0aa4b4] sm:h-11 sm:text-sm"
               />
             </label>
+
+            {loginError ? <p className="text-xs font-medium text-[#b91c1c] sm:text-sm">{loginError}</p> : null}
 
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:gap-3 sm:text-sm">
               <label className="inline-flex items-center gap-2 text-[#475569]">

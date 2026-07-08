@@ -11,6 +11,7 @@ import {
   updateAppointmentRequestStatus,
   type AppointmentRequest,
 } from "@/lib/appointments";
+import { creditDoctorForCompletedConsultation } from "@/lib/admin-portal";
 
 type ConsultationStatus = "Completed" | "Pending" | "Cancelled" | "Ongoing";
 
@@ -157,6 +158,8 @@ export default function ConsultantConsultationsPage() {
       })
     );
 
+    creditDoctorForCompletedConsultation("dr-richardson", completionConsultationId);
+
     setCompletionError("");
     setCompletionStep("reportPrompt");
   };
@@ -235,7 +238,7 @@ export default function ConsultantConsultationsPage() {
     setVerificationMessage(`Consultation verified for patient ID ${normalizedPatientId}.`);
   };
 
-  const handleAppointmentDecision = (appointmentId: string, decision: "Booked" | "Rejected") => {
+  const handleAppointmentDecision = (appointmentId: string, decision: "Booked" | "Rejected" | "Completed") => {
     updateAppointmentRequestStatus(appointmentId, decision);
     setAppointmentRequests(readAppointmentRequests());
   };
@@ -282,6 +285,10 @@ export default function ConsultantConsultationsPage() {
           <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/reports">
             <span className="material-symbols-outlined">analytics</span>
             <span>Reports</span>
+          </Link>
+          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/wallet">
+            <span className="material-symbols-outlined">wallet</span>
+            <span>Wallet</span>
           </Link>
           <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/settings">
             <span className="material-symbols-outlined">settings</span>
@@ -446,6 +453,8 @@ export default function ConsultantConsultationsPage() {
                             className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${
                               request.status === "Pending"
                                 ? "bg-[#f59e0b]/15 text-[#b45309]"
+                                : request.status === "Completed"
+                                  ? "bg-[#0aa4b4]/15 text-[#0369a1]"
                                 : request.status === "Booked" || request.status === "Accepted"
                                   ? "bg-[#16b46f]/15 text-[#16b46f]"
                                   : "bg-[#ef4444]/12 text-[#dc2626]"
@@ -472,6 +481,14 @@ export default function ConsultantConsultationsPage() {
                                 Accept
                               </button>
                             </div>
+                          ) : request.status === "Booked" || request.status === "Accepted" ? (
+                            <button
+                              type="button"
+                              className="rounded-lg bg-[#001b5e] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0b2b75]"
+                              onClick={() => handleAppointmentDecision(request.id, "Completed")}
+                            >
+                              Mark Completed
+                            </button>
                           ) : (
                             <span className="text-xs text-[#64748b]">No action</span>
                           )}

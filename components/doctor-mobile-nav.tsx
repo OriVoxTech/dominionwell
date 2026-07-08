@@ -10,6 +10,7 @@ const menuItems = [
   { label: "Notifications", icon: "notifications", href: "/dashboard/doctor/notifications" },
   { label: "Patients", icon: "group", href: "/dashboard/doctor/patients" },
   { label: "Reports", icon: "analytics", href: "/dashboard/doctor/reports" },
+  { label: "Wallet", icon: "wallet", href: "/dashboard/doctor/wallet" },
   { label: "Settings", icon: "settings", href: "/dashboard/doctor/settings" },
 ];
 

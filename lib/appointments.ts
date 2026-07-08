@@ -1,4 +1,6 @@
-export type AppointmentRequestStatus = "Pending" | "Booked" | "Accepted" | "Rejected";
+import { creditDoctorForCompletedConsultation } from "@/lib/admin-portal";
+
+export type AppointmentRequestStatus = "Pending" | "Booked" | "Accepted" | "Rejected" | "Completed";
 
 export type AppointmentRequest = {
   id: string;
@@ -13,6 +15,7 @@ export type AppointmentRequest = {
   status: AppointmentRequestStatus;
   createdAt: string;
   deductedSubscription?: boolean;
+  walletCredited?: boolean;
 };
 
 type CreateAppointmentRequestInput = Omit<AppointmentRequest, "id" | "status" | "createdAt">;
@@ -112,15 +115,21 @@ export function updateAppointmentRequestStatus(appointmentId: string, status: Ap
 
     const nextStatus = status === "Accepted" ? "Booked" : status;
     const shouldDeductSubscription = nextStatus === "Booked" && !request.deductedSubscription;
+    const shouldCreditWallet = nextStatus === "Completed" && !request.walletCredited;
 
     if (shouldDeductSubscription) {
       deductPatientSubscriptionBalance();
+    }
+
+    if (shouldCreditWallet) {
+      creditDoctorForCompletedConsultation(request.doctorId, request.id);
     }
 
     return {
       ...request,
       status: nextStatus,
       deductedSubscription: shouldDeductSubscription ? true : request.deductedSubscription,
+      walletCredited: shouldCreditWallet ? true : request.walletCredited,
     };
   });
 

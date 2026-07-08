@@ -152,6 +152,10 @@ export default function ConsultantNotificationsPage() {
             <span className="material-symbols-outlined">analytics</span>
             <span>Reports</span>
           </Link>
+          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/wallet">
+            <span className="material-symbols-outlined">wallet</span>
+            <span>Wallet</span>
+          </Link>
           <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/settings">
             <span className="material-symbols-outlined">settings</span>
             <span>Settings</span>

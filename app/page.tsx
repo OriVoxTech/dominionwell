@@ -331,6 +331,7 @@ export default function Home() {
                 <li><Link className="hover:text-[#16b46f]" href="/about">About Us</Link></li>
                 <li><a className="hover:text-[#16b46f]" href="#">Careers</a></li>
                 <li><Link className="hover:text-[#16b46f]" href="/contact">Contact</Link></li>
+                <li><Link className="hover:text-[#16b46f]" href="/admin/login">Admin Portal</Link></li>
                 <li><a className="hover:text-[#16b46f]" href="#">Privacy</a></li>
               </ul>
             </div>

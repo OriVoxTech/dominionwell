@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
 import {
+  ADMIN_UPDATED_EVENT,
+  readDoctorWalletSummary,
+} from "@/lib/admin-portal";
+import {
   APPOINTMENT_REQUESTS_UPDATED_EVENT,
   isConsultationInviteWindow,
   readAppointmentRequests,
@@ -86,6 +90,7 @@ export default function ConsultantDashboardPage() {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
+  const [walletSummary, setWalletSummary] = useState(() => readDoctorWalletSummary("dr-richardson"));
   const today = useMemo(() => new Date(), []);
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth();
@@ -174,9 +179,24 @@ export default function ConsultantDashboardPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const syncWallet = () => {
+      setWalletSummary(readDoctorWalletSummary("dr-richardson"));
+    };
+
+    syncWallet();
+    window.addEventListener("storage", syncWallet);
+    window.addEventListener(ADMIN_UPDATED_EVENT, syncWallet);
+
+    return () => {
+      window.removeEventListener("storage", syncWallet);
+      window.removeEventListener(ADMIN_UPDATED_EVENT, syncWallet);
+    };
+  }, []);
+
   const pendingAppointments = appointmentRequests.filter((request) => request.status === "Pending");
 
-  const handleAppointmentAction = (appointmentId: string, action: "Booked" | "Rejected") => {
+  const handleAppointmentAction = (appointmentId: string, action: "Booked" | "Rejected" | "Completed") => {
     updateAppointmentRequestStatus(appointmentId, action);
     setAppointmentRequests(readAppointmentRequests());
   };
@@ -234,6 +254,10 @@ export default function ConsultantDashboardPage() {
             <span className="material-symbols-outlined">analytics</span>
             <span>Reports</span>
           </Link>
+          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/wallet">
+            <span className="material-symbols-outlined">wallet</span>
+            <span>Wallet</span>
+          </Link>
           <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/settings">
             <span className="material-symbols-outlined">settings</span>
             <span>Settings</span>
@@ -255,8 +279,8 @@ export default function ConsultantDashboardPage() {
       <main className="min-h-screen p-4 sm:p-6 md:p-10 lg:ml-[280px]">
         <header className="mb-6 flex flex-col justify-between gap-3 sm:mb-8 sm:gap-4 md:flex-row md:items-end">
           <div>
-            <h1 className="text-xl font-semibold text-[#00020d] sm:text-2xl">Physician Dashboard</h1>
-            <p className="text-xs text-[#45464e] sm:text-sm">Welcome back, Dr. Richardson. You have 8 appointments today.</p>
+            <h1 className="text-xl font-semibold text-[#00020d] sm:text-2xl mb-2">Physician Dashboard</h1>
+            <p className="text-xs text-[#45464e] sm:text-[13px]">Welcome back, Dr. Richardson. You have 8 appointments today.</p>
           </div>
           <div className="hidden items-center gap-4 md:flex">
             <div className="rounded-lg border border-[#c6c6cf] bg-[#f7f9fc] px-3 py-2 text-right">
@@ -279,8 +303,8 @@ export default function ConsultantDashboardPage() {
         <section className="mb-6 rounded-xl border border-[#dbeafe] bg-[#f8fbff] p-4 shadow-sm sm:mb-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-[#001b5e] sm:text-base">Quick Link</h2>
-              <p className="text-xs text-[#475569] sm:text-sm">Jump directly to consultation verification when a patient shares their credentials.</p>
+              <h2 className="text-sm font-semibold text-[#001b5e] sm:text-base mb-2">Quick Link</h2>
+              <p className="text-xs text-[#475569] sm:text-[12px]">Jump directly to consultation verification when a patient shares their credentials.</p>
             </div>
             <Link
               href="/dashboard/doctor/consultations#verify-consultation"
@@ -292,7 +316,51 @@ export default function ConsultantDashboardPage() {
           </div>
         </section>
 
-        <section className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm sm:mb-8">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:mb-8 sm:gap-6 md:grid-cols-5">
+          <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">
+            <div className="mb-2 flex items-start justify-between">
+              <div className="rounded-lg bg-[#16b36c]/10 p-2">
+                <span className="material-symbols-outlined text-[#16b36c]">event_available</span>
+              </div>
+              <span className="text-xs font-bold text-[#16b36c]">+12%</span>
+            </div>
+            <h3 className="text-xs text-[#45464e] sm:text-[13px] mb-2">Appointments Today</h3>
+            <p className="text-xl font-semibold text-[#00020d] sm:text-1xl">14</p>
+          </div>
+
+          <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">
+            <div className="mb-2 flex items-start justify-between">
+              <div className="rounded-lg bg-[#67d6e7]/20 p-2">
+                <span className="material-symbols-outlined text-[#0093a2]">pending_actions</span>
+              </div>
+              <span className="text-xs font-bold text-[#16b36c]">+12%</span>
+            </div>
+            <h3 className="text-xs text-[#45464e] sm:text-[13px] mb-2">Completed Consultations</h3>
+            <p className="text-xl font-semibold text-[#00020d] sm:text-1xl">06</p>
+          </div>
+
+          <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">
+            <div className="mb-2 flex items-start justify-between">
+              <div className="rounded-lg bg-[#16b36c]/10 p-2">
+                <span className="material-symbols-outlined text-[#16b36c]">monitoring</span>
+              </div>
+              <span className="text-xs font-bold text-[#16b36c]">98%</span>
+            </div>
+            <h3 className="text-xs text-[#45464e] sm:text-[13px] mb-2">Patient Satisfaction</h3>
+            <p className="text-xl font-semibold text-[#00020d] sm:text-1xl">4.9/5</p>
+          </div>
+
+          <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">
+            <div className="mb-2 flex items-start justify-between">
+              <div className="rounded-lg bg-[#0aa4b4]/10 p-2">
+                <span className="material-symbols-outlined text-[#0aa4b4]">wallet</span>
+              </div>
+            </div>
+            <h3 className="text-xs text-[#45464e] sm:text-[13px] mb-2">Total Points</h3>
+            <p className="text-xl font-semibold text-[#00020d] sm:text-1xl">{walletSummary.points} pts</p>
+          </div>
+        </div>
+           <section className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm sm:mb-8">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-[#00020d]">New Appointment Requests</h2>
             <p className="text-xs text-[#64748b]">Pending: {pendingAppointments.length}</p>
@@ -308,7 +376,7 @@ export default function ConsultantDashboardPage() {
                 <article key={request.id} className="rounded-lg border border-[#e2e8f0] bg-white p-3">
                   <div className="mb-2 flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-[#001b5e]">{request.patientName}</p>
+                      <p className="text-sm font-semibold text-[#001b5e] mb-1">{request.patientName}</p>
                       <p className="text-xs text-[#475569]">
                         {request.doctorName} • {request.dateLabel} • {request.timeSlot}
                       </p>
@@ -317,6 +385,8 @@ export default function ConsultantDashboardPage() {
                       className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${
                         request.status === "Pending"
                           ? "bg-[#f59e0b]/15 text-[#b45309]"
+                          : request.status === "Completed"
+                            ? "bg-[#0aa4b4]/15 text-[#0369a1]"
                           : request.status === "Booked" || request.status === "Accepted"
                             ? "bg-[#16b46f]/15 text-[#16b46f]"
                             : "bg-[#ef4444]/12 text-[#dc2626]"
@@ -347,58 +417,22 @@ export default function ConsultantDashboardPage() {
                         Accept
                       </button>
                     </div>
+                  ) : request.status === "Booked" || request.status === "Accepted" ? (
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        className="rounded-lg bg-[#001b5e] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0b2b75]"
+                        onClick={() => handleAppointmentAction(request.id, "Completed")}
+                      >
+                        Mark Completed
+                      </button>
+                    </div>
                   ) : null}
                 </article>
               ))}
             </div>
           )}
         </section>
-
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:mb-8 sm:gap-6 md:grid-cols-4">
-          <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">
-            <div className="mb-2 flex items-start justify-between">
-              <div className="rounded-lg bg-[#16b36c]/10 p-2">
-                <span className="material-symbols-outlined text-[#16b36c]">event_available</span>
-              </div>
-              <span className="text-xs font-bold text-[#16b36c]">+12%</span>
-            </div>
-            <h3 className="text-xs text-[#45464e] sm:text-sm">Appointments Today</h3>
-            <p className="text-xl font-semibold text-[#00020d] sm:text-2xl">14</p>
-          </div>
-
-          <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">
-            <div className="mb-2 flex items-start justify-between">
-              <div className="rounded-lg bg-[#67d6e7]/20 p-2">
-                <span className="material-symbols-outlined text-[#0093a2]">pending_actions</span>
-              </div>
-              <span className="text-xs font-bold text-[#16b36c]">+12%</span>
-            </div>
-            <h3 className="text-xs text-[#45464e] sm:text-sm">Completed Consultations</h3>
-            <p className="text-xl font-semibold text-[#00020d] sm:text-2xl">06</p>
-          </div>
-
-          <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">
-            <div className="mb-2 flex items-start justify-between">
-              <div className="rounded-lg bg-[#00020d]/5 p-2">
-                <span className="material-symbols-outlined text-[#00020d]">group</span>
-              </div>
-              <span className="text-xs font-bold text-[#45464e]">Total</span>
-            </div>
-            <h3 className="text-xs text-[#45464e] sm:text-sm">New Patients</h3>
-            <p className="text-xl font-semibold text-[#00020d] sm:text-2xl">28</p>
-          </div>
-
-          <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">
-            <div className="mb-2 flex items-start justify-between">
-              <div className="rounded-lg bg-[#16b36c]/10 p-2">
-                <span className="material-symbols-outlined text-[#16b36c]">monitoring</span>
-              </div>
-              <span className="text-xs font-bold text-[#16b36c]">98%</span>
-            </div>
-            <h3 className="text-xs text-[#45464e] sm:text-sm">Patient Satisfaction</h3>
-            <p className="text-xl font-semibold text-[#00020d] sm:text-2xl">4.9/5</p>
-          </div>
-        </div>
 
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-12 space-y-6 lg:col-span-8">
@@ -412,7 +446,7 @@ export default function ConsultantDashboardPage() {
                 {recentConsultations.map((consultation) => (
                   <div key={consultation.id} className="flex flex-col justify-between gap-4 rounded-lg border border-[#c6c6cf] bg-[#f2f4f7] p-4 md:flex-row md:items-center">
                     <div>
-                      <h4 className="font-semibold text-[#00020d]">{consultation.patient}</h4>
+                      <h4 className="font-semibold text-[#00020d] mb-2">{consultation.patient}</h4>
                       <p className="text-xs text-[#45464e]">{consultation.details}</p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -441,7 +475,7 @@ export default function ConsultantDashboardPage() {
                           {getInitials(review.patient)}
                         </div>
                         <div>
-                          <h4 className="text-sm font-semibold text-[#00020d]">{review.patient}</h4>
+                          <h4 className="text-sm font-semibold text-[#00020d] mb-1">{review.patient}</h4>
                           <p className="text-[11px] text-[#45464e]">Verified consultation review</p>
                         </div>
                       </div>

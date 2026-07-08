@@ -33,6 +33,7 @@ const appointmentRequestStyles: Record<AppointmentRequest["status"], string> = {
     Pending: "bg-[#f59e0b]/15 text-[#b45309]",
     Booked: "bg-[#16b46f]/15 text-[#16b46f]",
     Accepted: "bg-[#16b46f]/15 text-[#16b46f]",
+    Completed: "bg-[#0aa4b4]/15 text-[#0369a1]",
     Rejected: "bg-[#ef4444]/12 text-[#dc2626]",
 };
 
