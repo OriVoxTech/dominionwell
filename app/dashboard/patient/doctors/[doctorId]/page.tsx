@@ -3,13 +3,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PatientMobileNav from "@/components/patient-mobile-nav";
+import {
+  APPOINTMENT_REQUESTS_UPDATED_EVENT,
+  createAppointmentRequest,
+  readAppointmentRequests,
+  type AppointmentRequest,
+} from "@/lib/appointments";
+import { DOCTOR_AVAILABILITY_UPDATED_EVENT, resolveDoctorCalendar } from "@/lib/doctor-availability";
 import { doctors, type Doctor } from "../data";
 
-const CONSULTATION_BALANCE_KEY = "dwConsultationBalance";
 const PATIENT_NAME = "Alex Johnson";
+const PATIENT_ID = "DW-98231";
 
 function isDoctorAvailable(availability: Doctor["availability"]) {
   return availability === "Available";
@@ -17,52 +23,57 @@ function isDoctorAvailable(availability: Doctor["availability"]) {
 
 function getDoctorAvailabilityActionLabel(availability: Doctor["availability"]) {
   if (availability === "Available") {
-    return "Contact Doctor";
+    return "Book Appointment";
   }
 
-  if (availability === "Busy") {
-    return "In Consultation";
-  }
-
-  return "Offline";
-}
-
-function generateVerificationPassword() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let password = "";
-
-  for (let i = 0; i < 8; i += 1) {
-    const randomIndex = Math.floor(Math.random() * chars.length);
-    password += chars[randomIndex];
-  }
-
-  return `DW-${password}`;
-}
-
-function WhatsAppIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 flex-none fill-current">
-      <path d="M12 2a10 10 0 0 0-8.58 15.12L2.5 22l4.98-1.34A10 10 0 1 0 12 2Zm0 18a7.9 7.9 0 0 1-4.04-1.1l-.29-.17-2.95.79.79-2.88-.19-.3A8 8 0 1 1 12 20Zm4.35-5.7c-.24.68-1.2 1.25-1.66 1.34-.44.09-.99.13-1.6-.07-.37-.12-.84-.28-1.45-.54-2.55-1.1-4.2-3.67-4.32-3.84-.12-.17-1.04-1.38-1.04-2.63s.65-1.87.88-2.13c.23-.26.51-.32.68-.32h.49c.16 0 .39-.06.61.47.24.55.82 1.9.89 2.04.07.14.12.31.02.5-.1.2-.15.31-.29.48-.14.17-.3.37-.42.49-.14.14-.29.29-.12.58.17.29.78 1.31 1.68 2.12 1.16 1.03 2.12 1.35 2.42 1.5.29.14.46.12.63-.07.17-.2.71-.82.9-1.1.18-.29.37-.24.62-.14.25.1 1.6.75 1.88.89.28.14.47.21.54.33.06.12.06.68-.18 1.36Z" />
-    </svg>
-  );
+  return "Unavailable";
 }
 
 export default function DoctorProfilePage() {
-  const router = useRouter();
   const params = useParams<{ doctorId: string }>();
   const doctorId = typeof params?.doctorId === "string" ? params.doctorId : "";
   const doctor = doctors.find((item) => item.id === doctorId);
-  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
-  const [isConfirmingConsultation, setIsConfirmingConsultation] = useState(false);
-  const [consultationsRemaining, setConsultationsRemaining] = useState(() => {
-    if (typeof window === "undefined") {
-      return 48;
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState("");
+  const [bookingError, setBookingError] = useState("");
+  const [bookingMessage, setBookingMessage] = useState("");
+  const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
+  const [doctorCalendar, setDoctorCalendar] = useState<Doctor["calendar"]>([]);
+
+  useEffect(() => {
+    const syncRequests = () => {
+      setAppointmentRequests(readAppointmentRequests());
+    };
+
+    syncRequests();
+    window.addEventListener("storage", syncRequests);
+    window.addEventListener(APPOINTMENT_REQUESTS_UPDATED_EVENT, syncRequests);
+
+    return () => {
+      window.removeEventListener("storage", syncRequests);
+      window.removeEventListener(APPOINTMENT_REQUESTS_UPDATED_EVENT, syncRequests);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!doctor) {
+      return;
     }
 
-    const storedBalance = Number(window.localStorage.getItem(CONSULTATION_BALANCE_KEY));
+    const syncDoctorCalendar = () => {
+      setDoctorCalendar(resolveDoctorCalendar(doctor));
+    };
 
-    return Number.isFinite(storedBalance) ? Math.max(0, Math.floor(storedBalance)) : 48;
-  });
+    syncDoctorCalendar();
+    window.addEventListener("storage", syncDoctorCalendar);
+    window.addEventListener(DOCTOR_AVAILABILITY_UPDATED_EVENT, syncDoctorCalendar);
+
+    return () => {
+      window.removeEventListener("storage", syncDoctorCalendar);
+      window.removeEventListener(DOCTOR_AVAILABILITY_UPDATED_EVENT, syncDoctorCalendar);
+    };
+  }, [doctor]);
 
   if (!doctor) {
     return (
@@ -81,49 +92,72 @@ export default function DoctorProfilePage() {
     );
   }
 
-  const openConsultationModal = () => {
+  const openBookingModal = () => {
+    if (!doctor) {
+      return;
+    }
+
     if (!isDoctorAvailable(doctor.availability)) {
       return;
     }
 
-    if (consultationsRemaining <= 0) {
-      router.push("/dashboard/patient/subscription");
+    setIsBookingOpen(true);
+    setSelectedDate((doctorCalendar.length > 0 ? doctorCalendar : doctor.calendar)[0]?.date ?? "");
+    setSelectedTimeSlot("");
+    setBookingError("");
+  };
+
+  const closeBookingModal = () => {
+    setIsBookingOpen(false);
+    setSelectedDate("");
+    setSelectedTimeSlot("");
+    setBookingError("");
+  };
+
+  const resolvedCalendar = doctorCalendar.length > 0 ? doctorCalendar : doctor.calendar;
+
+  const selectedCalendarDay = resolvedCalendar.find((day) => day.date === selectedDate) ?? null;
+
+  const takenSlots = new Set(
+    appointmentRequests
+      .filter((request) => {
+        return (
+          request.doctorId === doctor.id &&
+          request.date === selectedDate &&
+          (request.status === "Booked" || request.status === "Accepted")
+        );
+      })
+      .map((request) => request.timeSlot)
+  );
+
+  const handleBookNow = () => {
+    if (!doctor) {
       return;
     }
 
-    setSelectedDoctor(doctor);
-    setIsConfirmingConsultation(false);
-  };
-
-  const closeConsultationModal = () => {
-    setSelectedDoctor(null);
-    setIsConfirmingConsultation(false);
-  };
-
-  const confirmWhatsAppConsultation = () => {
-    if (!selectedDoctor) {
+    if (!selectedCalendarDay || !selectedTimeSlot) {
+      setBookingError("Please select a date and time slot before booking.");
       return;
     }
 
-    const nextBalance = Math.max(consultationsRemaining - 1, 0);
-    const verificationPassword = generateVerificationPassword();
-    const whatsappMessage = [
-      `Hello ${selectedDoctor.name},`,
-      `This is ${PATIENT_NAME}.`,
-      "I am proceeding with my consultation request.",
-      `Consultation verification password: ${verificationPassword}`,
-      "Please use this code to verify this consultation.",
-    ].join("\n");
-    const encodedMessage = encodeURIComponent(whatsappMessage);
-
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(CONSULTATION_BALANCE_KEY, String(nextBalance));
-      window.dispatchEvent(new Event("dw-subscription-updated"));
-      window.open(`https://wa.me/${selectedDoctor.whatsappNumber}?text=${encodedMessage}`, "_blank", "noopener,noreferrer");
+    if (takenSlots.has(selectedTimeSlot)) {
+      setBookingError("That slot is already taken. Please select another time.");
+      return;
     }
 
-    setConsultationsRemaining(nextBalance);
-    closeConsultationModal();
+    createAppointmentRequest({
+      doctorId: doctor.id,
+      doctorName: doctor.name,
+      doctorSpecialization: doctor.specialization,
+      patientName: PATIENT_NAME,
+      patientId: PATIENT_ID,
+      date: selectedCalendarDay.date,
+      dateLabel: selectedCalendarDay.label,
+      timeSlot: selectedTimeSlot,
+    });
+
+    setBookingMessage(`Appointment request sent to ${doctor.name}.`);
+    closeBookingModal();
   };
 
   return (
@@ -145,6 +179,12 @@ export default function DoctorProfilePage() {
             </div>
             <p className="text-xs text-[#475569] sm:text-[13px]">Review doctor details before booking your consultation.</p>
           </header>
+
+          {bookingMessage ? (
+            <section className="mb-4 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-3 text-sm text-[#166534]">
+              {bookingMessage}
+            </section>
+          ) : null}
 
           <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm sm:p-6">
             <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -197,12 +237,12 @@ export default function DoctorProfilePage() {
               <button
                 type="button"
                 disabled={!isDoctorAvailable(doctor.availability)}
-                onClick={openConsultationModal}
+                onClick={openBookingModal}
                 className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white ${
                   isDoctorAvailable(doctor.availability) ? "bg-[#16b46f] hover:bg-[#149660]" : "cursor-not-allowed bg-[#94a3b8]"
                 }`}
               >
-                <WhatsAppIcon />
+                <span className="material-symbols-outlined text-[16px]">calendar_month</span>
                 {getDoctorAvailabilityActionLabel(doctor.availability)}
               </button>
             </div>
@@ -210,74 +250,87 @@ export default function DoctorProfilePage() {
         </div>
       </main>
 
-      {selectedDoctor ? (
+      {isBookingOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center p-4">
           <button
             type="button"
             className="absolute inset-0 bg-[#0f172a]/45"
-            aria-label="Close contact modal"
-            onClick={closeConsultationModal}
+            aria-label="Close booking modal"
+            onClick={closeBookingModal}
           />
 
-          <section className="relative z-10 w-full max-w-md rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-xl">
+          <section className="relative z-10 w-full max-w-xl rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-xl">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <h4 className="text-lg font-semibold text-[#001b5e]">Speak to Doctor</h4>
-                <p className="text-sm text-[#475569]">Contact {selectedDoctor.name} via WhatsApp.</p>
+                <h4 className="text-lg font-semibold text-[#001b5e]">Book Appointment</h4>
+                <p className="text-sm text-[#475569]">Choose an available date and time with {doctor.name}.</p>
               </div>
               <button
                 type="button"
                 className="rounded-md p-1 text-[#64748b] hover:bg-[#f2f4f7]"
                 aria-label="Close modal"
-                onClick={closeConsultationModal}
+                onClick={closeBookingModal}
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
-            {isConfirmingConsultation ? (
-              <>
-                <div className="mb-4 rounded-lg bg-[#f8fafc] p-3 text-sm text-[#334155]">
-                  Once you proceed, one consultation will be deducted from your subscription. You will have{" "}
-                  <span className="font-semibold text-[#001b5e]">{Math.max(consultationsRemaining - 1, 0)}</span> subscription(s) left.
-                </div>
+            <div>
+              <h5 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#64748b]">Select Date</h5>
+              <div className="mb-4 flex flex-wrap gap-2">
+                {resolvedCalendar.map((day) => (
+                  <button
+                    key={day.date}
+                    type="button"
+                    className={`rounded-lg border px-3 py-2 text-xs font-semibold ${selectedDate === day.date ? "border-[#001b5e] bg-[#001b5e] text-white" : "border-[#c6c6cf] bg-white text-[#334155] hover:bg-[#f8fafc]"}`}
+                    onClick={() => {
+                      setSelectedDate(day.date);
+                      setSelectedTimeSlot("");
+                      setBookingError("");
+                    }}
+                  >
+                    {day.label}
+                  </button>
+                ))}
+              </div>
 
-                <div className="flex items-center justify-end gap-2">
+              <h5 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#64748b]">Select Time Slot</h5>
+              <div className="mb-4 flex flex-wrap gap-2">
+                {selectedCalendarDay?.timeSlots.map((slot) => (
                   <button
+                    key={slot}
                     type="button"
-                    className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#475569] hover:bg-[#f8fafc]"
-                    onClick={() => setIsConfirmingConsultation(false)}
+                    disabled={takenSlots.has(slot)}
+                    className={`rounded-lg border px-3 py-2 text-xs font-semibold ${takenSlots.has(slot) ? "cursor-not-allowed border-[#e2e8f0] bg-[#f1f5f9] text-[#94a3b8]" : selectedTimeSlot === slot ? "border-[#16b46f] bg-[#16b46f] text-white" : "border-[#c6c6cf] bg-white text-[#334155] hover:bg-[#f8fafc]"}`}
+                    onClick={() => {
+                      setSelectedTimeSlot(slot);
+                      setBookingError("");
+                    }}
                   >
-                    Cancel
+                    {takenSlots.has(slot) ? `${slot} (Taken)` : slot}
                   </button>
-                  <button
-                    type="button"
-                    className="rounded-lg bg-[#16b46f] px-3 py-2 text-xs font-semibold text-white hover:bg-[#149660]"
-                    onClick={confirmWhatsAppConsultation}
-                  >
-                    Proceed
-                  </button>
-                </div>
-              </>
-            ) : (
+                ))}
+              </div>
+
+              {bookingError ? <p className="mb-3 text-sm text-[#dc2626]">{bookingError}</p> : null}
+
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
                   className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#475569] hover:bg-[#f8fafc]"
-                  onClick={closeConsultationModal}
+                  onClick={closeBookingModal}
                 >
-                  Close
+                  Cancel
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#16b46f] px-3 py-2 text-xs font-semibold text-white hover:bg-[#149660]"
-                  onClick={() => setIsConfirmingConsultation(true)}
+                  className="inline-flex items-center justify-center rounded-lg bg-[#16b46f] px-3 py-2 text-xs font-semibold text-white hover:bg-[#149660]"
+                  onClick={handleBookNow}
                 >
-                  <WhatsAppIcon />
-                  Contact Doctor
+                  Book Now
                 </button>
               </div>
-            )}
+            </div>
           </section>
         </div>
       ) : null}

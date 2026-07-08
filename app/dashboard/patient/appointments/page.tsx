@@ -2,9 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import PatientMobileNav from "@/components/patient-mobile-nav";
+import {
+    APPOINTMENT_REQUESTS_UPDATED_EVENT,
+    isConsultationInviteWindow,
+    readAppointmentRequests,
+    type AppointmentRequest,
+} from "@/lib/appointments";
 
 type AppointmentStatus = "Completed" | "Follow-up" | "Canceled";
+type AppointmentsTab = "upcoming" | "history";
 
 type Appointment = {
     id: string;
@@ -20,6 +28,15 @@ const statusStyles: Record<AppointmentStatus, string> = {
     "Follow-up": "bg-[#0aa4b4]/15 text-[#0aa4b4]",
     Canceled: "bg-[#ef4444]/12 text-[#dc2626]",
 };
+
+const appointmentRequestStyles: Record<AppointmentRequest["status"], string> = {
+    Pending: "bg-[#f59e0b]/15 text-[#b45309]",
+    Booked: "bg-[#16b46f]/15 text-[#16b46f]",
+    Accepted: "bg-[#16b46f]/15 text-[#16b46f]",
+    Rejected: "bg-[#ef4444]/12 text-[#dc2626]",
+};
+
+const PATIENT_ID = "DW-98231";
 
 const consultationHistory: Appointment[] = [
     {
@@ -57,6 +74,25 @@ const consultationHistory: Appointment[] = [
 ];
 
 export default function PatientAppointmentsPage() {
+    const [activeTab, setActiveTab] = useState<AppointmentsTab>("upcoming");
+    const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
+
+    useEffect(() => {
+        const syncRequests = () => {
+            const requests = readAppointmentRequests().filter((request) => request.patientId === PATIENT_ID);
+            setAppointmentRequests(requests);
+        };
+
+        syncRequests();
+        window.addEventListener("storage", syncRequests);
+        window.addEventListener(APPOINTMENT_REQUESTS_UPDATED_EVENT, syncRequests);
+
+        return () => {
+            window.removeEventListener("storage", syncRequests);
+            window.removeEventListener(APPOINTMENT_REQUESTS_UPDATED_EVENT, syncRequests);
+        };
+    }, []);
+
     return (
         <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
             <PatientMobileNav active="appointments" />
@@ -131,47 +167,127 @@ export default function PatientAppointmentsPage() {
                     <p className="text-sm text-[#475569]">Review your consultation history and doctor notes.</p>
                 </header>
 
-                <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
-                    <div className="mb-4 flex items-center justify-between">
-                        <h3 className="text-lg font-semibold text-[#001b5e]">Consultation History</h3>
-                        <p className="text-xs text-[#64748b]">{consultationHistory.length} records</p>
+                <section className="mb-6 rounded-2xl border border-[#c6c6cf] bg-white p-2 shadow-sm">
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                                activeTab === "upcoming"
+                                    ? "bg-[#001b5e] text-white"
+                                    : "bg-[#f8fafc] text-[#334155] hover:bg-[#eef2f7]"
+                            }`}
+                            onClick={() => setActiveTab("upcoming")}
+                        >
+                            Upcoming ({appointmentRequests.length})
+                        </button>
+                        <button
+                            type="button"
+                            className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                                activeTab === "history"
+                                    ? "bg-[#001b5e] text-white"
+                                    : "bg-[#f8fafc] text-[#334155] hover:bg-[#eef2f7]"
+                            }`}
+                            onClick={() => setActiveTab("history")}
+                        >
+                            History ({consultationHistory.length})
+                        </button>
                     </div>
-
-                    {consultationHistory.length === 0 ? (
-                        <div className="rounded-lg border border-dashed border-[#c6c6cf] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
-                            No consultation history available yet.
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead>
-                                    <tr className="bg-[#f2f4f7] text-[11px] uppercase tracking-wide text-[#64748b]">
-                                        <th className="rounded-l-lg px-3 py-3">Doctor</th>
-                                        <th className="px-3 py-3">Specialty</th>
-                                        <th className="px-3 py-3">Status</th>
-                                        <th className="px-3 py-3">Date</th>
-                                        <th className="rounded-r-lg px-3 py-3">Notes</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {consultationHistory.map((entry) => (
-                                        <tr key={entry.id} className="border-b border-[#e2e8f0] last:border-b-0">
-                                            <td className="px-3 py-3 font-medium text-[#001b5e]">{entry.doctor}</td>
-                                            <td className="px-3 py-3 text-[#475569]">{entry.specialty}</td>
-                                            <td className="px-3 py-3">
-                                                <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${statusStyles[entry.status]}`}>
-                                                    {entry.status}
-                                                </span>
-                                            </td>
-                                            <td className="whitespace-nowrap px-3 py-3 text-[#475569]">{entry.date}</td>
-                                            <td className="min-w-[280px] px-3 py-3 text-[#475569]">{entry.notes}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
                 </section>
+
+                {activeTab === "upcoming" ? (
+                    <section className="mb-6 rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-lg font-semibold text-[#001b5e]">Upcoming Appointments</h3>
+                            <p className="text-xs text-[#64748b]">{appointmentRequests.length} request(s)</p>
+                        </div>
+
+                        {appointmentRequests.length === 0 ? (
+                            <div className="rounded-lg border border-dashed border-[#c6c6cf] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
+                                You have no upcoming appointments yet. Book from the doctors page.
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead>
+                                        <tr className="bg-[#f2f4f7] text-[11px] uppercase tracking-wide text-[#64748b]">
+                                            <th className="rounded-l-lg px-3 py-3">Doctor</th>
+                                            <th className="px-3 py-3">Specialty</th>
+                                            <th className="px-3 py-3">Date</th>
+                                            <th className="px-3 py-3">Time Slot</th>
+                                            <th className="rounded-r-lg px-3 py-3">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {appointmentRequests.map((request) => (
+                                            <tr key={request.id} className="border-b border-[#e2e8f0] last:border-b-0">
+                                                <td className="px-3 py-3 font-medium text-[#001b5e]">{request.doctorName}</td>
+                                                <td className="px-3 py-3 text-[#475569]">{request.doctorSpecialization}</td>
+                                                <td className="whitespace-nowrap px-3 py-3 text-[#475569]">{request.dateLabel}</td>
+                                                <td className="px-3 py-3 text-[#475569]">
+                                                    <div>{request.timeSlot}</div>
+                                                    {isConsultationInviteWindow(request) ? (
+                                                        <p className="mt-1 text-[11px] font-semibold text-[#001b5e]">
+                                                            Check mail for consultation invite
+                                                        </p>
+                                                    ) : null}
+                                                </td>
+                                                <td className="px-3 py-3">
+                                                    <span
+                                                        className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${appointmentRequestStyles[request.status]}`}
+                                                    >
+                                                        {request.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </section>
+                ) : (
+                    <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-lg font-semibold text-[#001b5e]">Consultation History</h3>
+                            <p className="text-xs text-[#64748b]">{consultationHistory.length} records</p>
+                        </div>
+
+                        {consultationHistory.length === 0 ? (
+                            <div className="rounded-lg border border-dashed border-[#c6c6cf] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
+                                No consultation history available yet.
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead>
+                                        <tr className="bg-[#f2f4f7] text-[11px] uppercase tracking-wide text-[#64748b]">
+                                            <th className="rounded-l-lg px-3 py-3">Doctor</th>
+                                            <th className="px-3 py-3">Specialty</th>
+                                            <th className="px-3 py-3">Status</th>
+                                            <th className="px-3 py-3">Date</th>
+                                            <th className="rounded-r-lg px-3 py-3">Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {consultationHistory.map((entry) => (
+                                            <tr key={entry.id} className="border-b border-[#e2e8f0] last:border-b-0">
+                                                <td className="px-3 py-3 font-medium text-[#001b5e]">{entry.doctor}</td>
+                                                <td className="px-3 py-3 text-[#475569]">{entry.specialty}</td>
+                                                <td className="px-3 py-3">
+                                                    <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${statusStyles[entry.status]}`}>
+                                                        {entry.status}
+                                                    </span>
+                                                </td>
+                                                <td className="whitespace-nowrap px-3 py-3 text-[#475569]">{entry.date}</td>
+                                                <td className="min-w-[280px] px-3 py-3 text-[#475569]">{entry.notes}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </section>
+                )}
             </main>
         </div>
     );

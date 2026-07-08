@@ -4,6 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
+import {
+  APPOINTMENT_REQUESTS_UPDATED_EVENT,
+  isConsultationInviteWindow,
+  readAppointmentRequests,
+  updateAppointmentRequestStatus,
+  type AppointmentRequest,
+} from "@/lib/appointments";
 
 const DOCTOR_NOTIFICATIONS_KEY = "dwDoctorNotifications";
 
@@ -78,6 +85,7 @@ function getInitials(name: string) {
 export default function ConsultantDashboardPage() {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
   const today = useMemo(() => new Date(), []);
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth();
@@ -150,6 +158,28 @@ export default function ConsultantDashboardPage() {
       window.removeEventListener("dw-notifications-updated", refreshUnreadCount);
     };
   }, []);
+
+  useEffect(() => {
+    const syncAppointmentRequests = () => {
+      setAppointmentRequests(readAppointmentRequests());
+    };
+
+    syncAppointmentRequests();
+    window.addEventListener("storage", syncAppointmentRequests);
+    window.addEventListener(APPOINTMENT_REQUESTS_UPDATED_EVENT, syncAppointmentRequests);
+
+    return () => {
+      window.removeEventListener("storage", syncAppointmentRequests);
+      window.removeEventListener(APPOINTMENT_REQUESTS_UPDATED_EVENT, syncAppointmentRequests);
+    };
+  }, []);
+
+  const pendingAppointments = appointmentRequests.filter((request) => request.status === "Pending");
+
+  const handleAppointmentAction = (appointmentId: string, action: "Booked" | "Rejected") => {
+    updateAppointmentRequestStatus(appointmentId, action);
+    setAppointmentRequests(readAppointmentRequests());
+  };
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
@@ -260,6 +290,68 @@ export default function ConsultantDashboardPage() {
               <span>Verify Consultation</span>
             </Link>
           </div>
+        </section>
+
+        <section className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm sm:mb-8">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-[#00020d]">New Appointment Requests</h2>
+            <p className="text-xs text-[#64748b]">Pending: {pendingAppointments.length}</p>
+          </div>
+
+          {appointmentRequests.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-[#c6c6cf] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
+              No appointment requests yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {appointmentRequests.slice(0, 5).map((request) => (
+                <article key={request.id} className="rounded-lg border border-[#e2e8f0] bg-white p-3">
+                  <div className="mb-2 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[#001b5e]">{request.patientName}</p>
+                      <p className="text-xs text-[#475569]">
+                        {request.doctorName} • {request.dateLabel} • {request.timeSlot}
+                      </p>
+                    </div>
+                    <span
+                      className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${
+                        request.status === "Pending"
+                          ? "bg-[#f59e0b]/15 text-[#b45309]"
+                          : request.status === "Booked" || request.status === "Accepted"
+                            ? "bg-[#16b46f]/15 text-[#16b46f]"
+                            : "bg-[#ef4444]/12 text-[#dc2626]"
+                      }`}
+                    >
+                      {request.status === "Accepted" ? "Booked" : request.status}
+                    </span>
+                  </div>
+
+                  {isConsultationInviteWindow(request) ? (
+                    <p className="mb-2 text-[11px] font-semibold text-[#001b5e]">Check mail for consultation invite</p>
+                  ) : null}
+
+                  {request.status === "Pending" ? (
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        className="rounded-lg border border-[#ef4444]/40 px-3 py-1.5 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2]"
+                        onClick={() => handleAppointmentAction(request.id, "Rejected")}
+                      >
+                        Reject
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-lg bg-[#16b46f] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#149660]"
+                        onClick={() => handleAppointmentAction(request.id, "Booked")}
+                      >
+                        Accept
+                      </button>
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          )}
         </section>
 
         <div className="mb-6 grid grid-cols-1 gap-4 sm:mb-8 sm:gap-6 md:grid-cols-4">

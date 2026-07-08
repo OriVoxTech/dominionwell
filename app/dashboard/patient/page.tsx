@@ -2,8 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
 import PatientMobileNav from "@/components/patient-mobile-nav";
+
+const TimeOfDayGreeting = dynamic(() => import("../../../components/time-of-day-greeting"), {
+    ssr: false,
+    loading: () => <span>Hello</span>,
+});
 
 const recentDoctors = [
     {
@@ -42,29 +48,25 @@ export default function PatientDashboardPage() {
     const consultationsBooked = 4;
     const nextBadgeTarget = 10;
     const progressPercent = Math.min((consultationsBooked / nextBadgeTarget) * 100, 100);
-    const remainingConsultations = useMemo(() => {
-        if (typeof window === "undefined") {
-            return 48;
-        }
-
-        const storedBalance = Number(window.localStorage.getItem(CONSULTATION_BALANCE_KEY));
-
-        return Number.isFinite(storedBalance) ? Math.max(0, Math.floor(storedBalance)) : 48;
-    }, []);
+    const [remainingConsultations, setRemainingConsultations] = useState(48);
     const [unreadNotifications, setUnreadNotifications] = useState(0);
-    const greeting = (() => {
-        const hour = new Date().getHours();
 
-        if (hour < 12) {
-            return "Good morning";
-        }
+    useEffect(() => {
+        const syncConsultationBalance = () => {
+            const storedBalance = Number(window.localStorage.getItem(CONSULTATION_BALANCE_KEY));
+            const resolved = Number.isFinite(storedBalance) ? Math.max(0, Math.floor(storedBalance)) : 48;
+            setRemainingConsultations(resolved);
+        };
 
-        if (hour < 17) {
-            return "Good afternoon";
-        }
+        syncConsultationBalance();
+        window.addEventListener("storage", syncConsultationBalance);
+        window.addEventListener("dw-subscription-updated", syncConsultationBalance);
 
-        return "Good evening";
-    })();
+        return () => {
+            window.removeEventListener("storage", syncConsultationBalance);
+            window.removeEventListener("dw-subscription-updated", syncConsultationBalance);
+        };
+    }, []);
 
     useEffect(() => {
         const refreshUnreadCount = () => {
@@ -158,7 +160,7 @@ export default function PatientDashboardPage() {
             <main className="min-h-screen p-4 sm:p-6 md:p-8 lg:ml-[250px]">
                 <header className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
                     <div>
-                        <h2 className="text-2xl font-semibold text-[#001b5e]">{greeting}, Alex</h2>
+                        <h2 className="text-2xl font-semibold text-[#001b5e]"><TimeOfDayGreeting />, Alex</h2>
                         <p className="mt-2 text-xs text-[#475569]">How are you feeling today?</p>
                     </div>
 
@@ -222,17 +224,23 @@ export default function PatientDashboardPage() {
                                 <div className="rounded-xl border border-white/20 bg-white/10 p-4">
                                     <h4 className="mb-2 text-sm font-semibold">Dr. Richardson</h4>
                                     <p className="mb-3 text-[11px] text-[#d8e2ff]">Routine Cardiovascular Review</p>
-                                    <button className="w-full rounded-lg bg-white py-2 text-xs font-semibold text-[#001b5e]">
-                                       Start Consultation
-                                    </button>
+                                    <Link
+                                        href={`/dashboard/patient/doctors?query=${encodeURIComponent("Dr. Richardson")}`}
+                                        className="block w-full rounded-lg bg-white py-2 text-center text-xs font-semibold text-[#001b5e]"
+                                    >
+                                        Start Consultation
+                                    </Link>
                                 </div>
 
                                 <div className="rounded-xl border border-white/10 bg-white/5 p-4 opacity-90">
                                     <h4 className="mb-2 text-sm font-semibold">Dr. Emily Stone</h4>
                                     <p className="mb-3 text-[11px] text-[#bfd2ff]">Dermatology Check-up</p>
-                                     <button className="w-full rounded-lg bg-white py-2 text-xs font-semibold text-[#001b5e]">
-                                       Start Consultation
-                                    </button>
+                                    <Link
+                                        href={`/dashboard/patient/doctors?query=${encodeURIComponent("Dr. Emily Stone")}`}
+                                        className="block w-full rounded-lg bg-white py-2 text-center text-xs font-semibold text-[#001b5e]"
+                                    >
+                                        Start Consultation
+                                    </Link>
                                 </div>
                             </div>
                         </div>
