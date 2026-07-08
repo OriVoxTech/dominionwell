@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 const PATIENT_AUTH_KEY = "dwPatientLoggedIn";
 
@@ -28,7 +29,7 @@ function GoogleIcon() {
   );
 }
 
-export default function PatientLoginPage() {
+function PatientLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isPasswordResetComplete = searchParams.get("reset") === "success";
@@ -155,5 +156,13 @@ export default function PatientLoginPage() {
         </aside>
       </div>
     </main>
+  );
+}
+
+export default function PatientLoginPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#f7f9fc]" />}>
+      <PatientLoginContent />
+    </Suspense>
   );
 }

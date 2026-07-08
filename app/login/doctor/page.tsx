@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function DoctorLoginPage() {
+function DoctorLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isPasswordResetComplete = searchParams.get("reset") === "success";
@@ -92,5 +93,13 @@ export default function DoctorLoginPage() {
         </aside>
       </div>
     </main>
+  );
+}
+
+export default function DoctorLoginPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#f7f9fc]" />}>
+      <DoctorLoginContent />
+    </Suspense>
   );
 }
