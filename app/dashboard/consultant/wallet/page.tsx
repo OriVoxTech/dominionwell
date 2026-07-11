@@ -7,6 +7,7 @@ import DoctorMobileNav from "@/components/doctor-mobile-nav";
 import {
   ADMIN_UPDATED_EVENT,
   getPendingDoctorWithdrawalRequest,
+  readDoctorBankDetails,
   readAdminSettings,
   readDoctorWalletActivity,
   readDoctorWalletSummary,
@@ -19,6 +20,7 @@ export default function ConsultantWalletPage() {
   const [walletSummary, setWalletSummary] = useState(() => readDoctorWalletSummary(CURRENT_DOCTOR_ID));
   const [walletActivity, setWalletActivity] = useState(() => readDoctorWalletActivity(CURRENT_DOCTOR_ID));
   const [pointValue, setPointValue] = useState(() => readAdminSettings().pointValue);
+  const [bankDetails, setBankDetails] = useState(() => readDoctorBankDetails(CURRENT_DOCTOR_ID));
   const [pendingRequest, setPendingRequest] = useState(() => getPendingDoctorWithdrawalRequest(CURRENT_DOCTOR_ID));
   const [withdrawAmount, setWithdrawAmount] = useState(() => String(readAdminSettings().pointValue));
   const [notice, setNotice] = useState("");
@@ -28,6 +30,7 @@ export default function ConsultantWalletPage() {
       setWalletSummary(readDoctorWalletSummary(CURRENT_DOCTOR_ID));
       setWalletActivity(readDoctorWalletActivity(CURRENT_DOCTOR_ID));
       setPointValue(readAdminSettings().pointValue);
+      setBankDetails(readDoctorBankDetails(CURRENT_DOCTOR_ID));
       setPendingRequest(getPendingDoctorWithdrawalRequest(CURRENT_DOCTOR_ID));
     };
 
@@ -154,6 +157,34 @@ export default function ConsultantWalletPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Completed Consultations</p>
             <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{completedConsultations}</p>
           </article>
+        </section>
+
+        <section className="mb-5 rounded-2xl border border-[#dbe4f0] bg-white p-4 shadow-sm sm:mb-6 sm:p-5">
+          <h2 className="text-base font-semibold text-[#001b5e]">Bank Details</h2>
+          <div className="mt-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
+            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
+              <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Bank</p>
+              <p className="mt-1 font-semibold text-[#001b5e]">{bankDetails.bankName || "Not set"}</p>
+            </div>
+            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
+              <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Account Name</p>
+              <p className="mt-1 font-semibold text-[#001b5e]">{bankDetails.accountName || "Not set"}</p>
+            </div>
+            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
+              <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Account Number</p>
+              <p className="mt-1 font-semibold text-[#001b5e]">{bankDetails.accountNumber || "Not set"}</p>
+            </div>
+          </div>
+
+          {!bankDetails.bankName || !bankDetails.accountName || !bankDetails.accountNumber ? (
+            <p className="mt-2 text-xs text-[#475569]">
+              Complete your payout account details in
+              <Link href="/dashboard/doctor/settings" className="ml-1 font-semibold text-[#0aa4b4] hover:underline">
+                Settings
+              </Link>
+              .
+            </p>
+          ) : null}
         </section>
 
         <section className="mb-5 rounded-2xl border border-[#dbe4f0] bg-white p-4 shadow-sm sm:mb-6 sm:p-5">

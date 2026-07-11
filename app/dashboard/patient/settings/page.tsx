@@ -106,7 +106,6 @@ export default function PatientSettingsPage() {
         "https://lh3.googleusercontent.com/aida-public/AB6AXuAPurUR2thld9ARCgQv5h5zzRrmbx5VzEhRhGSj-4R3LQBMFeO5bA8OOCajuwGXXWPjtINjhw8-RqL2BIwlmrOkDz58EbqhMGjnRdrjEPNB6wMXEYirVhXLKHukNRiuOjWAxDoEcMTG9A2c2wKRcRRN4U7gxeFEPhJ7G7sLUQezeiulcTpl6y2fsYeeLmQHBuYLxYwyY3mOhVegyEsvP846S3aiHmWvjDLrjKsx9yBY9vkJssTPuipSUEY4d1WwN6dlulgSFUQpfRjW"
     );
     const [emailNotifications, setEmailNotifications] = useState(true);
-    const [whatsappNotifications, setWhatsappNotifications] = useState(true);
     const [saveMessage, setSaveMessage] = useState("");
     const [subscription, setSubscription] = useState<CurrentSubscription>(() => getSubscriptionSnapshot());
 
@@ -290,14 +289,6 @@ export default function PatientSettingsPage() {
                                     type="checkbox"
                                     checked={emailNotifications}
                                     onChange={(event) => setEmailNotifications(event.target.checked)}
-                                />
-                            </label>
-                            <label className="flex items-center justify-between rounded-lg border border-[#c6c6cf] p-3 text-sm">
-                                <span>WhatsApp Notifications</span>
-                                <input
-                                    type="checkbox"
-                                    checked={whatsappNotifications}
-                                    onChange={(event) => setWhatsappNotifications(event.target.checked)}
                                 />
                             </label>
                         </div>

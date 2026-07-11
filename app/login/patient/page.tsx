@@ -6,29 +6,6 @@ import { Suspense } from "react";
 
 const PATIENT_AUTH_KEY = "dwPatientLoggedIn";
 
-function GoogleIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 flex-none">
-      <path
-        fill="#4285F4"
-        d="M21.82 12.23c0-.72-.06-1.25-.19-1.8H12.2v3.56h5.53c-.11.89-.72 2.23-2.07 3.13l-.02.12 3.02 2.29.21.02c1.96-1.77 3.09-4.37 3.09-7.32Z"
-      />
-      <path
-        fill="#34A853"
-        d="M12.2 21.9c2.71 0 4.98-.87 6.64-2.35l-3.21-2.43c-.86.59-2.01 1-3.43 1-2.65 0-4.9-1.77-5.7-4.22l-.12.01-3.14 2.38-.04.11c1.66 3.22 5.07 5.5 9 5.5Z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M6.5 13.9c-.21-.59-.34-1.23-.34-1.9s.13-1.31.33-1.9l-.01-.13-3.18-2.42-.1.04A9.72 9.72 0 0 0 2.2 12c0 1.54.37 3 1 4.31l3.3-2.41Z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12.2 5.88c1.79 0 3 .75 3.69 1.38l2.7-2.57C17.17 3.38 14.91 2.1 12.2 2.1c-3.93 0-7.34 2.28-9 5.49l3.29 2.51c.81-2.45 3.06-4.22 5.71-4.22Z"
-      />
-    </svg>
-  );
-}
-
 function PatientLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -68,23 +45,8 @@ function PatientLoginContent() {
             </div>
           ) : null}
 
-          <button
-            type="button"
-            onClick={goToDashboard}
-            className="mt-5 flex w-full items-center justify-center gap-3 rounded-xl border border-[#c6c6cf] px-4 py-2.5 text-xs font-semibold text-[#1f2937] hover:bg-[#f8fafc] sm:mt-6 sm:py-3 sm:text-sm"
-          >
-            <GoogleIcon />
-            Continue with Google
-          </button>
-
-          <div className="my-4 flex items-center gap-2 text-[10px] uppercase tracking-wider text-[#94a3b8] sm:my-5 sm:gap-3 sm:text-xs">
-            <span className="h-px flex-1 bg-[#e2e8f0]" />
-            <span>Or login with email</span>
-            <span className="h-px flex-1 bg-[#e2e8f0]" />
-          </div>
-
           <form
-            className="grid gap-3 sm:gap-4"
+            className="mt-5 grid gap-3 sm:mt-6 sm:gap-4"
             onSubmit={(event) => {
               event.preventDefault();
               goToDashboard();

@@ -10,6 +10,11 @@ import {
   type AppointmentRequest,
 } from "@/lib/appointments";
 import {
+  readDoctorBankDetails,
+  updateDoctorBankDetails,
+  type DoctorBankDetails,
+} from "@/lib/admin-portal";
+import {
   getCurrentMonthKey,
   readDoctorAvailabilityForMonth,
   upsertDoctorAvailabilityForMonth,
@@ -135,6 +140,7 @@ function getInitialSelectableDate(monthKey: string, availability: DoctorDayAvail
 }
 
 export default function ConsultantSettingsPage() {
+  const [bankDetails, setBankDetails] = useState<DoctorBankDetails>(() => readDoctorBankDetails(CURRENT_DOCTOR_ID));
   const [availabilityStatus, setAvailabilityStatus] = useState<AvailabilityStatus>("Available");
   const [fullName, setFullName] = useState("Dr. Richardson");
   const [specialization, setSpecialization] = useState("Senior Cardiologist");
@@ -157,6 +163,7 @@ export default function ConsultantSettingsPage() {
   const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
 
   const saveProfile = () => {
+    updateDoctorBankDetails(CURRENT_DOCTOR_ID, bankDetails);
     setSuccessMessage("Profile updated successfully.");
   };
 
@@ -633,6 +640,56 @@ export default function ConsultantSettingsPage() {
                 type="text"
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
+                className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
+              />
+            </label>
+
+            <label className="block text-sm md:col-span-2">
+              <span className="mb-1 block font-medium text-[#334155]">Bank Name</span>
+              <input
+                type="text"
+                value={bankDetails.bankName}
+                onChange={(event) => {
+                  setBankDetails((current) => ({
+                    ...current,
+                    bankName: event.target.value,
+                  }));
+                }}
+                placeholder="Enter your bank"
+                className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
+              />
+            </label>
+
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-[#334155]">Account Name</span>
+              <input
+                type="text"
+                value={bankDetails.accountName}
+                onChange={(event) => {
+                  setBankDetails((current) => ({
+                    ...current,
+                    accountName: event.target.value,
+                  }));
+                }}
+                placeholder="Enter account name"
+                className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
+              />
+            </label>
+
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-[#334155]">Account Number</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={10}
+                value={bankDetails.accountNumber}
+                onChange={(event) => {
+                  setBankDetails((current) => ({
+                    ...current,
+                    accountNumber: event.target.value.replace(/\D/g, "").slice(0, 10),
+                  }));
+                }}
+                placeholder="10-digit account number"
                 className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
               />
             </label>

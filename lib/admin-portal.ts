@@ -8,6 +8,7 @@ export const ADMIN_REPORTS_KEY = "dwAdminReports";
 export const ADMIN_SETTINGS_KEY = "dwAdminSettings";
 export const DOCTOR_WALLET_TRANSACTIONS_KEY = "dwDoctorWalletTransactions";
 export const DOCTOR_WITHDRAWAL_REQUESTS_KEY = "dwDoctorWithdrawalRequests";
+export const DOCTOR_BANK_DETAILS_KEY = "dwDoctorBankDetails";
 export const ADMIN_UPDATED_EVENT = "dw-admin-updated";
 
 export type AdminStatus = "Whitelisted" | "Blacklisted";
@@ -89,6 +90,12 @@ export type DoctorWithdrawalRequest = {
   amount: number;
   status: DoctorWithdrawalRequestStatus;
   requestedAt: string;
+};
+
+export type DoctorBankDetails = {
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
 };
 
 function canUseDOM() {
@@ -668,6 +675,35 @@ export function readDoctorWalletActivity(doctorId: string) {
     transactions,
     withdrawals,
   };
+}
+
+export function readDoctorBankDetails(doctorId: string): DoctorBankDetails {
+  const records = readStorageObject<Record<string, DoctorBankDetails>>(DOCTOR_BANK_DETAILS_KEY, {});
+
+  return (
+    records[doctorId] ?? {
+      bankName: "",
+      accountName: "",
+      accountNumber: "",
+    }
+  );
+}
+
+export function updateDoctorBankDetails(doctorId: string, nextDetails: DoctorBankDetails) {
+  const records = readStorageObject<Record<string, DoctorBankDetails>>(DOCTOR_BANK_DETAILS_KEY, {});
+
+  const normalized: DoctorBankDetails = {
+    bankName: nextDetails.bankName.trim(),
+    accountName: nextDetails.accountName.trim(),
+    accountNumber: nextDetails.accountNumber.replace(/\D/g, "").slice(0, 10),
+  };
+
+  writeStorageObject(DOCTOR_BANK_DETAILS_KEY, {
+    ...records,
+    [doctorId]: normalized,
+  });
+
+  return normalized;
 }
 
 export function doctorFromDirectory(doctor: Doctor): AdminDoctor | null {
