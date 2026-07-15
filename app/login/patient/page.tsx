@@ -2,21 +2,63 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, type FormEvent, useState } from "react";
+import { getApiErrorMessage, patientAuthApi } from "@/lib/api";
+import { clearPatientSession, savePatientSession } from "@/lib/patient-session";
 
-const PATIENT_AUTH_KEY = "dwPatientLoggedIn";
+const REMEMBERED_PATIENT_EMAIL_KEY = "dwRememberedPatientEmail";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function getRememberedPatientEmail() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(REMEMBERED_PATIENT_EMAIL_KEY) ?? "";
+}
 
 function PatientLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isPasswordResetComplete = searchParams.get("reset") === "success";
+  const isPatientVerified = searchParams.get("verified") === "success";
+  const isSessionExpired = searchParams.get("session") === "expired";
+  const [email, setEmail] = useState(getRememberedPatientEmail);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => Boolean(getRememberedPatientEmail()));
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isEmailValid = EMAIL_PATTERN.test(email.trim());
+  const isPasswordValid = password.length >= 8;
+  const isLoginFormValid = isEmailValid && isPasswordValid;
 
-  const goToDashboard = () => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(PATIENT_AUTH_KEY, "true");
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isLoginFormValid) return;
+
+    setErrorMessage("");
+    setIsSubmitting(true);
+    clearPatientSession();
+
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const response = await patientAuthApi.login({
+        email: normalizedEmail,
+        password,
+      });
+
+      savePatientSession(response.data, rememberMe);
+
+      if (rememberMe) {
+        window.localStorage.setItem(REMEMBERED_PATIENT_EMAIL_KEY, normalizedEmail);
+      } else {
+        window.localStorage.removeItem(REMEMBERED_PATIENT_EMAIL_KEY);
+      }
+
+      router.push("/dashboard/patient");
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    router.push("/dashboard/patient");
   };
 
   return (
@@ -45,36 +87,89 @@ function PatientLoginContent() {
             </div>
           ) : null}
 
+          {isPatientVerified ? (
+            <div className="mt-4 rounded-xl border border-[#16b46f]/30 bg-[#16b46f]/10 px-4 py-3 text-xs font-medium text-[#166534] sm:text-sm">
+              Your patient account has been verified. Sign in to continue.
+            </div>
+          ) : null}
+
+          {isSessionExpired ? (
+            <div className="mt-4 rounded-xl border border-[#fbbf24]/40 bg-[#fffbeb] px-4 py-3 text-xs font-medium text-[#92400e] sm:text-sm">
+              Your session has expired. Please sign in again.
+            </div>
+          ) : null}
+
           <form
             className="mt-5 grid gap-3 sm:mt-6 sm:gap-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              goToDashboard();
-            }}
+            onSubmit={handleLogin}
           >
             <label className="grid gap-1.5 text-xs font-medium text-[#001b5e] sm:gap-2 sm:text-sm">
               Email
               <input
                 type="email"
+                name="email"
+                autoComplete="email"
                 required
+                value={email}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setErrorMessage("");
+                }}
+                aria-invalid={Boolean(email) && !isEmailValid}
+                aria-describedby={email && !isEmailValid ? "login-email-error" : undefined}
                 placeholder="you@example.com"
                 className="h-10 rounded-xl border border-[#cbd5e1] px-3 text-xs text-[#0f172a] outline-none focus:border-[#0aa4b4] sm:h-11 sm:text-sm"
               />
+              {email && !isEmailValid ? (
+                <span id="login-email-error" className="text-xs font-normal text-[#b91c1c]">Enter a valid email address.</span>
+              ) : null}
             </label>
 
             <label className="grid gap-1.5 text-xs font-medium text-[#001b5e] sm:gap-2 sm:text-sm">
               Password
-              <input
-                type="password"
-                required
-                placeholder="Enter your password"
-                className="h-10 rounded-xl border border-[#cbd5e1] px-3 text-xs text-[#0f172a] outline-none focus:border-[#0aa4b4] sm:h-11 sm:text-sm"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  autoComplete="current-password"
+                  minLength={8}
+                  required
+                  value={password}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    setErrorMessage("");
+                  }}
+                  aria-invalid={Boolean(password) && !isPasswordValid}
+                  aria-describedby="login-password-help"
+                  placeholder="Enter your password"
+                  className="h-10 w-full rounded-xl border border-[#cbd5e1] px-3 pr-10 text-xs text-[#0f172a] outline-none focus:border-[#0aa4b4] sm:h-11 sm:pr-11 sm:text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  className="absolute right-0 top-0 grid h-10 w-10 place-items-center text-[#64748b] hover:text-[#001b5e] sm:h-11 sm:w-11"
+                >
+                  <span className="material-symbols-outlined text-[19px]">{showPassword ? "visibility_off" : "visibility"}</span>
+                </button>
+              </div>
+              <span
+                id="login-password-help"
+                className={`text-xs font-normal ${password && !isPasswordValid ? "text-[#b91c1c]" : "text-[#64748b]"}`}
+              >
+                Password must be at least 8 characters.
+              </span>
             </label>
 
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:gap-3 sm:text-sm">
               <label className="inline-flex items-center gap-2 text-[#475569]">
-                <input type="checkbox" className="h-4 w-4 accent-[#16b46f]" />
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(event) => setRememberMe(event.target.checked)}
+                  className="h-4 w-4 accent-[#16b46f]"
+                />
                 Remember me
               </label>
               <Link href="/login/patient/forgot-password" className="font-medium text-[#0aa4b4]">
@@ -82,11 +177,18 @@ function PatientLoginContent() {
               </Link>
             </div>
 
+            {errorMessage ? (
+              <p role="alert" aria-live="polite" className="rounded-xl border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs text-[#b91c1c] sm:text-sm">
+                {errorMessage}
+              </p>
+            ) : null}
+
             <button
               type="submit"
-              className="mt-1 h-10 rounded-xl bg-[#16b46f] text-xs font-semibold text-white hover:brightness-95 sm:h-11 sm:text-sm"
+              disabled={!isLoginFormValid || isSubmitting}
+              className="mt-1 h-10 rounded-xl bg-[#16b46f] text-xs font-semibold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:bg-[#94a3b8] disabled:hover:brightness-100 sm:h-11 sm:text-sm"
             >
-              Login as Patient
+              {isSubmitting ? "Signing in..." : "Login as Patient"}
             </button>
           </form>
 

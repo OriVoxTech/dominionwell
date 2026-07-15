@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import SignInModal from "../components/sign-in-modal";
-
-const PATIENT_AUTH_KEY = "dwPatientLoggedIn";
+import { isPatientSessionActive } from "@/lib/patient-session";
 
 export default function Home() {
   const router = useRouter();
@@ -18,7 +17,7 @@ export default function Home() {
       return false;
     }
 
-    return window.localStorage.getItem(PATIENT_AUTH_KEY) === "true";
+    return isPatientSessionActive();
   };
 
   const requirePatientLogin = (nextAction: () => void) => {

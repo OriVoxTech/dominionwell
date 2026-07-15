@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import PatientMobileNav from "@/components/patient-mobile-nav";
+import PatientLogoutButton from "@/components/patient-logout-button";
 
 type FaqItem = {
     question: string;
@@ -95,10 +96,7 @@ export default function PatientHelpCenterPage() {
                         <span className="material-symbols-outlined text-[20px]">help</span>
                         <span>Help Center</span>
                     </div>
-                    <Link className="flex items-center gap-3 px-3 py-2 hover:bg-white/10" href="/">
-                        <span className="material-symbols-outlined text-[20px]">logout</span>
-                        <span>Logout</span>
-                    </Link>
+                    <PatientLogoutButton className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60" />
                 </div>
             </aside>
 

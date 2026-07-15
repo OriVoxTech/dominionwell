@@ -4,8 +4,20 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { getApiErrorMessage, getApiResponseMessage, patientAuthApi } from "@/lib/api";
 
-const PATIENT_AUTH_KEY = "dwPatientLoggedIn";
+type RegistrationField =
+  | "firstName"
+  | "lastName"
+  | "email"
+  | "phone"
+  | "password"
+  | "confirmPassword";
+
+type RegistrationErrors = Partial<Record<RegistrationField, string>>;
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^\+?[0-9\s()-]{7,20}$/;
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -16,30 +28,133 @@ export default function RegisterPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [otpCode, setOtpCode] = useState("");
+  const [errors, setErrors] = useState<RegistrationErrors>({});
+  const [apiError, setApiError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [otpError, setOtpError] = useState("");
+  const [otpMessage, setOtpMessage] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const isRegistrationValid =
+    Boolean(firstName.trim()) &&
+    Boolean(lastName.trim()) &&
+    EMAIL_PATTERN.test(email.trim()) &&
+    PHONE_PATTERN.test(phone.trim()) &&
+    password.length >= 8 &&
+    confirmPassword === password;
 
-  const handleCreateAccount = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const validateRegistration = () => {
+    const nextErrors: RegistrationErrors = {};
 
-    if (password !== confirmPassword) {
-      return;
+    if (!firstName.trim()) nextErrors.firstName = "First name is required.";
+    if (!lastName.trim()) nextErrors.lastName = "Last name is required.";
+
+    if (!email.trim()) {
+      nextErrors.email = "Email address is required.";
+    } else if (!EMAIL_PATTERN.test(email.trim())) {
+      nextErrors.email = "Enter a valid email address.";
     }
 
-    setStep("verify");
+    if (!phone.trim()) {
+      nextErrors.phone = "Phone number is required.";
+    } else if (!PHONE_PATTERN.test(phone.trim())) {
+      nextErrors.phone = "Enter a valid phone number.";
+    }
+
+    if (!password) {
+      nextErrors.password = "Password is required.";
+    } else if (password.length < 8) {
+      nextErrors.password = "Password must be at least 8 characters.";
+    }
+
+    if (!confirmPassword) {
+      nextErrors.confirmPassword = "Please confirm your password.";
+    } else if (password !== confirmPassword) {
+      nextErrors.confirmPassword = "Passwords do not match.";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
-  const handleVerifyOtp = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const clearFieldError = (field: RegistrationField) => {
+    setErrors((current) => ({ ...current, [field]: undefined }));
+    setApiError("");
+  };
 
-    if (otpCode.trim().length !== 6) {
+  const handleCreateAccount = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setApiError("");
+
+    if (!validateRegistration()) {
       return;
     }
 
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(PATIENT_AUTH_KEY, "true");
+    setIsSubmitting(true);
+
+    try {
+      await patientAuthApi.register({
+        email: email.trim().toLowerCase(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        password,
+        confirmPassword,
+        phone: phone.trim(),
+        role: "PATIENT",
+      });
+      setStep("verify");
+    } catch (error) {
+      setApiError(getApiErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleVerifyOtp = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setOtpError("");
+    setOtpMessage("");
+
+    if (otpCode.trim().length !== 6) {
+      setOtpError("Enter the complete 6-digit OTP code.");
+      return;
     }
 
-    router.push("/dashboard/patient");
+    setIsVerifying(true);
+
+    try {
+      await patientAuthApi.verify({
+        email: email.trim().toLowerCase(),
+        otp: otpCode,
+      });
+
+      router.push("/login/patient?verified=success");
+    } catch (error) {
+      setOtpError(getApiErrorMessage(error));
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setOtpError("");
+    setOtpMessage("");
+    setIsResending(true);
+
+    try {
+      const response = await patientAuthApi.resendOtp({
+        email: email.trim().toLowerCase(),
+      });
+
+      setOtpMessage(getApiResponseMessage(response.data, "A new OTP has been sent to your email."));
+    } catch (error) {
+      setOtpError(getApiErrorMessage(error));
+    } finally {
+      setIsResending(false);
+    }
   };
 
   return (
@@ -99,69 +214,151 @@ export default function RegisterPage() {
                 <input
                   className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 text-xs outline-none focus:border-[#0aa4b4] sm:text-sm"
                   type="text"
+                  name="firstName"
+                  autoComplete="given-name"
                   required
+                  aria-invalid={Boolean(errors.firstName)}
+                  aria-describedby={errors.firstName ? "first-name-error" : undefined}
                   value={firstName}
-                  onChange={(event) => setFirstName(event.target.value)}
+                  onChange={(event) => {
+                    setFirstName(event.target.value);
+                    clearFieldError("firstName");
+                  }}
                 />
+                {errors.firstName ? <span id="first-name-error" className="mt-1 block text-xs text-[#b91c1c]">{errors.firstName}</span> : null}
               </label>
               <label className="block text-xs sm:text-sm">
                 <span className="mb-1 block font-medium text-[#334155]">Last Name</span>
                 <input
                   className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 text-xs outline-none focus:border-[#0aa4b4] sm:text-sm"
                   type="text"
+                  name="lastName"
+                  autoComplete="family-name"
                   required
+                  aria-invalid={Boolean(errors.lastName)}
+                  aria-describedby={errors.lastName ? "last-name-error" : undefined}
                   value={lastName}
-                  onChange={(event) => setLastName(event.target.value)}
+                  onChange={(event) => {
+                    setLastName(event.target.value);
+                    clearFieldError("lastName");
+                  }}
                 />
+                {errors.lastName ? <span id="last-name-error" className="mt-1 block text-xs text-[#b91c1c]">{errors.lastName}</span> : null}
               </label>
               <label className="block text-xs sm:text-sm md:col-span-2">
                 <span className="mb-1 block font-medium text-[#334155]">Email Address</span>
                 <input
                   className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 text-xs outline-none focus:border-[#0aa4b4] sm:text-sm"
                   type="email"
+                  name="email"
+                  autoComplete="email"
                   required
+                  aria-invalid={Boolean(errors.email)}
+                  aria-describedby={errors.email ? "email-error" : undefined}
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    clearFieldError("email");
+                  }}
                 />
+                {errors.email ? <span id="email-error" className="mt-1 block text-xs text-[#b91c1c]">{errors.email}</span> : null}
               </label>
               <label className="block text-xs sm:text-sm md:col-span-2">
                 <span className="mb-1 block font-medium text-[#334155]">Phone Number</span>
                 <input
                   className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 text-xs outline-none focus:border-[#0aa4b4] sm:text-sm"
-                  type="text"
+                  type="tel"
+                  name="phone"
+                  autoComplete="tel"
                   required
+                  aria-invalid={Boolean(errors.phone)}
+                  aria-describedby={errors.phone ? "phone-error" : undefined}
                   value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
+                  onChange={(event) => {
+                    setPhone(event.target.value);
+                    clearFieldError("phone");
+                  }}
                 />
+                {errors.phone ? <span id="phone-error" className="mt-1 block text-xs text-[#b91c1c]">{errors.phone}</span> : null}
               </label>
               <label className="block text-xs sm:text-sm">
                 <span className="mb-1 block font-medium text-[#334155]">Password</span>
-                <input
-                  className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 text-xs outline-none focus:border-[#0aa4b4] sm:text-sm"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                />
+                <div className="relative">
+                  <input
+                    className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 pr-10 text-xs outline-none focus:border-[#0aa4b4] sm:text-sm"
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                    aria-invalid={Boolean(errors.password)}
+                    aria-describedby={errors.password ? "password-error" : "password-help"}
+                    value={password}
+                    onChange={(event) => {
+                      setPassword(event.target.value);
+                      clearFieldError("password");
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    className="absolute right-0 top-0 grid h-10 w-10 place-items-center text-[#64748b] hover:text-[#001b5e]"
+                  >
+                    <span className="material-symbols-outlined text-[19px]">{showPassword ? "visibility_off" : "visibility"}</span>
+                  </button>
+                </div>
+                {errors.password ? (
+                  <span id="password-error" className="mt-1 block text-xs text-[#b91c1c]">{errors.password}</span>
+                ) : (
+                  <span id="password-help" className="mt-1 block text-xs text-[#64748b]">Use at least 8 characters.</span>
+                )}
               </label>
               <label className="block text-xs sm:text-sm">
                 <span className="mb-1 block font-medium text-[#334155]">Confirm Password</span>
-                <input
-                  className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 text-xs outline-none focus:border-[#0aa4b4] sm:text-sm"
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                />
+                <div className="relative">
+                  <input
+                    className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 pr-10 text-xs outline-none focus:border-[#0aa4b4] sm:text-sm"
+                    type={showConfirmPassword ? "text" : "password"}
+                    name="confirmPassword"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                    aria-invalid={Boolean(errors.confirmPassword)}
+                    aria-describedby={errors.confirmPassword ? "confirm-password-error" : undefined}
+                    value={confirmPassword}
+                    onChange={(event) => {
+                      setConfirmPassword(event.target.value);
+                      clearFieldError("confirmPassword");
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((current) => !current)}
+                    aria-label={showConfirmPassword ? "Hide confirmed password" : "Show confirmed password"}
+                    aria-pressed={showConfirmPassword}
+                    className="absolute right-0 top-0 grid h-10 w-10 place-items-center text-[#64748b] hover:text-[#001b5e]"
+                  >
+                    <span className="material-symbols-outlined text-[19px]">{showConfirmPassword ? "visibility_off" : "visibility"}</span>
+                  </button>
+                </div>
+                {errors.confirmPassword ? <span id="confirm-password-error" className="mt-1 block text-xs text-[#b91c1c]">{errors.confirmPassword}</span> : null}
               </label>
 
-              {password && confirmPassword && password !== confirmPassword ? (
-                <p className="md:col-span-2 text-xs text-[#b91c1c] sm:text-sm">Passwords do not match.</p>
+              {apiError ? (
+                <p role="alert" aria-live="polite" className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs text-[#b91c1c] sm:text-sm md:col-span-2">
+                  {apiError}
+                </p>
               ) : null}
 
               <div className="mt-2 md:col-span-2">
-                <button className="w-full rounded-lg bg-[#16b46f] py-2.5 text-xs font-semibold text-white hover:bg-[#149660] sm:text-sm" type="submit">
-                  Register as Patient
+                <button
+                  className="w-full rounded-lg bg-[#16b46f] py-2.5 text-xs font-semibold text-white hover:bg-[#149660] disabled:cursor-not-allowed disabled:bg-[#94a3b8] disabled:hover:bg-[#94a3b8] sm:text-sm"
+                  type="submit"
+                  disabled={isSubmitting || !isRegistrationValid}
+                >
+                  {isSubmitting ? "Creating account..." : "Register as Patient"}
                 </button>
               </div>
 
@@ -187,32 +384,54 @@ export default function RegisterPage() {
                   autoComplete="one-time-code"
                   maxLength={6}
                   required
+                  aria-invalid={Boolean(otpError)}
+                  aria-describedby={otpError ? "otp-error" : otpMessage ? "otp-message" : undefined}
                   value={otpCode}
-                  onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, ""))}
+                  onChange={(event) => {
+                    setOtpCode(event.target.value.replace(/\D/g, ""));
+                    setOtpError("");
+                    setOtpMessage("");
+                  }}
                 />
               </label>
+
+              {otpError ? (
+                <p id="otp-error" role="alert" aria-live="polite" className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs text-[#b91c1c] sm:text-sm">
+                  {otpError}
+                </p>
+              ) : null}
+
+              {otpMessage ? (
+                <p id="otp-message" role="status" aria-live="polite" className="rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-xs text-[#15803d] sm:text-sm">
+                  {otpMessage}
+                </p>
+              ) : null}
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
                   onClick={() => setStep("create")}
-                  className="h-10 flex-1 rounded-lg border border-[#c6c6cf] text-xs font-semibold text-[#334155] hover:bg-[#f8fafc] sm:text-sm"
+                  disabled={isVerifying || isResending}
+                  className="h-10 flex-1 rounded-lg border border-[#c6c6cf] text-xs font-semibold text-[#334155] hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
                 >
                   Back to Edit Details
                 </button>
                 <button
                   type="submit"
-                  className="h-10 flex-1 rounded-lg bg-[#16b46f] text-xs font-semibold text-white hover:bg-[#149660] sm:text-sm"
+                  disabled={otpCode.length !== 6 || isVerifying || isResending}
+                  className="h-10 flex-1 rounded-lg bg-[#16b46f] text-xs font-semibold text-white hover:bg-[#149660] disabled:cursor-not-allowed disabled:bg-[#94a3b8] disabled:hover:bg-[#94a3b8] sm:text-sm"
                 >
-                  Verify OTP
+                  {isVerifying ? "Verifying..." : "Verify OTP"}
                 </button>
               </div>
 
               <button
                 type="button"
-                className="justify-self-center text-xs font-semibold text-[#0aa4b4] hover:underline sm:text-sm"
+                onClick={handleResendOtp}
+                disabled={isVerifying || isResending}
+                className="justify-self-center text-xs font-semibold text-[#0aa4b4] hover:underline disabled:cursor-not-allowed disabled:text-[#94a3b8] disabled:no-underline sm:text-sm"
               >
-                Resend OTP
+                {isResending ? "Resending OTP..." : "Resend OTP"}
               </button>
             </form>
           )}

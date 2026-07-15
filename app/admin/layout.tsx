@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { clearAdminSession, isAdminSessionActive } from "@/lib/admin-session";
 
 const links = [
   { href: "/admin/dashboard", label: "Dashboard" },
@@ -13,8 +14,6 @@ const links = [
   { href: "/admin/payments", label: "Payments" },
   { href: "/admin/reports", label: "Reports" },
 ];
-
-const ADMIN_SESSION_KEY = "dwAdminSession";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -27,9 +26,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       return;
     }
 
-    const session = window.localStorage.getItem(ADMIN_SESSION_KEY);
-
-    if (!session) {
+    if (!isAdminSessionActive()) {
       router.replace("/admin/login");
     }
   }, [isLoginRoute, router]);
@@ -81,7 +78,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               className="rounded-lg bg-[#001b5e] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0b2b75]"
               onClick={() => {
                 setIsMobileMenuOpen(false);
-                window.localStorage.removeItem(ADMIN_SESSION_KEY);
+                clearAdminSession();
                 router.replace("/admin/login");
               }}
             >
@@ -127,7 +124,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 className="rounded-lg bg-[#001b5e] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0b2b75]"
                 onClick={() => {
                   setIsMobileMenuOpen(false);
-                  window.localStorage.removeItem(ADMIN_SESSION_KEY);
+                  clearAdminSession();
                   router.replace("/admin/login");
                 }}
               >

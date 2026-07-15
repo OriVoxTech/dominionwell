@@ -15,6 +15,7 @@ export type AdminStatus = "Whitelisted" | "Blacklisted";
 
 export type AdminDoctor = {
   id: string;
+  userId?: string;
   name: string;
   specialization: string;
   rating: number;
@@ -27,15 +28,23 @@ export type AdminDoctor = {
   joinedAt: string;
   walletPoints: number;
   walletBalance: number;
+  walletPointValue?: number;
+  isEmailVerified?: boolean;
+  verifiedAt?: string | null;
+  bio?: string | null;
+  sessionCount?: number;
 };
 
 export type AdminPatient = {
   id: string;
+  userId?: string;
   name: string;
   email: string;
   phone: string;
   status: AdminStatus;
   joinedAt: string;
+  isEmailVerified?: boolean;
+  consultationBalance?: number;
 };
 
 export type SubscriptionPlan = {

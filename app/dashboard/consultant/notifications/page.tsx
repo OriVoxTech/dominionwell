@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
+import DoctorLogoutButton from "@/components/doctor-logout-button";
 
 type NotificationItem = {
   id: string;
@@ -167,10 +168,7 @@ export default function ConsultantNotificationsPage() {
             <span className="material-symbols-outlined">help</span>
             <span>Help Center</span>
           </a>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/">
-            <span className="material-symbols-outlined">logout</span>
-            <span>Logout</span>
-          </Link>
+          <DoctorLogoutButton className="flex w-full items-center gap-3 p-3 text-left text-[#7784ac]/85 hover:bg-[#00020d]/10" />
         </div>
       </aside>
 

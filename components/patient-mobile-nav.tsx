@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import PatientLogoutButton from "@/components/patient-logout-button";
 
 type PatientNavKey = "dashboard" | "appointments" | "notifications" | "doctors" | "settings" | "help";
 
@@ -123,14 +124,10 @@ export default function PatientMobileNav({ active }: PatientMobileNavProps) {
             </nav>
 
             <div className="mt-6 border-t border-white/15 pt-4">
-              <Link
-                href="/"
-                onClick={() => setIsOpen(false)}
-                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-[#d8e2ff]"
-              >
-                <span className="material-symbols-outlined text-[18px]">logout</span>
-                <span>Logout</span>
-              </Link>
+              <PatientLogoutButton
+                iconClassName="text-[18px]"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#d8e2ff] disabled:cursor-not-allowed disabled:opacity-60"
+              />
             </div>
           </aside>
         </div>

@@ -2,16 +2,47 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, type FormEvent, useState } from "react";
+import { doctorAuthApi, getApiErrorMessage } from "@/lib/api";
 
 function DoctorResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const email = searchParams.get("email") ?? "your physician account";
+  const email = searchParams.get("email")?.trim().toLowerCase() ?? "";
   const [verificationCode, setVerificationCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isFormValid =
+    Boolean(email) &&
+    verificationCode.length === 6 &&
+    newPassword.length >= 8 &&
+    confirmPassword === newPassword;
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isFormValid) return;
+
+    setErrorMessage("");
+    setIsSubmitting(true);
+
+    try {
+      await doctorAuthApi.resetPassword({
+        email,
+        otp: verificationCode,
+        newPassword,
+        confirmPassword,
+      });
+      router.push("/login/doctor?reset=success");
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[#f7f9fc] px-4 py-7 sm:py-10 md:px-8">
@@ -28,7 +59,7 @@ function DoctorResetPasswordContent() {
             <h1 className="text-2xl font-bold text-[#001b5e] sm:text-3xl">Reset Password</h1>
           </div>
           <p className="mt-1.5 text-xs text-[#475569] sm:mt-2 sm:text-sm">
-            Enter the verification code and choose a new password for <span className="font-semibold">{email}</span>.
+            Enter the verification code and choose a new password for <span className="font-semibold">{email || "your physician account"}</span>.
           </p>
 
           {errorMessage ? (
@@ -39,30 +70,21 @@ function DoctorResetPasswordContent() {
 
           <form
             className="mt-6 grid gap-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-
-              if (newPassword !== confirmPassword) {
-                setErrorMessage("Passwords do not match.");
-                return;
-              }
-
-              if (verificationCode.trim().length < 6) {
-                setErrorMessage("Enter a valid verification code.");
-                return;
-              }
-
-              setErrorMessage("");
-              router.push("/login/doctor?reset=success");
-            }}
+            onSubmit={handleSubmit}
           >
             <label className="grid gap-2 text-xs font-medium text-[#001b5e] sm:text-sm">
               Verification Code
               <input
                 type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
                 required
                 value={verificationCode}
-                onChange={(event) => setVerificationCode(event.target.value)}
+                onChange={(event) => {
+                  setVerificationCode(event.target.value.replace(/\D/g, ""));
+                  setErrorMessage("");
+                }}
                 placeholder="Enter the 6-digit code"
                 className="h-11 rounded-xl border border-[#cbd5e1] px-3 text-sm text-[#0f172a] outline-none focus:border-[#0aa4b4]"
               />
@@ -70,33 +92,65 @@ function DoctorResetPasswordContent() {
 
             <label className="grid gap-2 text-xs font-medium text-[#001b5e] sm:text-sm">
               New Password
-              <input
-                type="password"
-                required
-                value={newPassword}
-                onChange={(event) => setNewPassword(event.target.value)}
-                placeholder="Create a new password"
-                className="h-11 rounded-xl border border-[#cbd5e1] px-3 text-sm text-[#0f172a] outline-none focus:border-[#0aa4b4]"
-              />
+              <div className="relative">
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  value={newPassword}
+                  onChange={(event) => {
+                    setNewPassword(event.target.value);
+                    setErrorMessage("");
+                  }}
+                  placeholder="Create a new password"
+                  className="h-11 w-full rounded-xl border border-[#cbd5e1] px-3 pr-11 text-sm text-[#0f172a] outline-none focus:border-[#0aa4b4]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((current) => !current)}
+                  aria-label={showNewPassword ? "Hide new password" : "Show new password"}
+                  className="absolute right-0 top-0 grid h-11 w-11 place-items-center text-[#64748b] hover:text-[#001b5e]"
+                >
+                  <span className="material-symbols-outlined text-[19px]">{showNewPassword ? "visibility_off" : "visibility"}</span>
+                </button>
+              </div>
+              <span className="text-xs font-normal text-[#64748b]">Use at least 8 characters.</span>
             </label>
 
             <label className="grid gap-2 text-xs font-medium text-[#001b5e] sm:text-sm">
               Confirm Password
-              <input
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                placeholder="Re-enter your new password"
-                className="h-11 rounded-xl border border-[#cbd5e1] px-3 text-sm text-[#0f172a] outline-none focus:border-[#0aa4b4]"
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  value={confirmPassword}
+                  onChange={(event) => {
+                    setConfirmPassword(event.target.value);
+                    setErrorMessage("");
+                  }}
+                  placeholder="Re-enter your new password"
+                  className="h-11 w-full rounded-xl border border-[#cbd5e1] px-3 pr-11 text-sm text-[#0f172a] outline-none focus:border-[#0aa4b4]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((current) => !current)}
+                  aria-label={showConfirmPassword ? "Hide confirmed password" : "Show confirmed password"}
+                  className="absolute right-0 top-0 grid h-11 w-11 place-items-center text-[#64748b] hover:text-[#001b5e]"
+                >
+                  <span className="material-symbols-outlined text-[19px]">{showConfirmPassword ? "visibility_off" : "visibility"}</span>
+                </button>
+              </div>
             </label>
 
             <button
               type="submit"
-              className="h-11 rounded-xl bg-[#16b46f] text-sm font-semibold text-white hover:bg-[#149660]"
+              disabled={!isFormValid || isSubmitting}
+              className="h-11 rounded-xl bg-[#16b46f] text-sm font-semibold text-white hover:bg-[#149660] disabled:cursor-not-allowed disabled:bg-[#94a3b8] disabled:hover:bg-[#94a3b8]"
             >
-              Reset Password
+              {isSubmitting ? "Resetting password..." : "Reset Password"}
             </button>
           </form>
 

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import PatientMobileNav from "@/components/patient-mobile-nav";
+import PatientLogoutButton from "@/components/patient-logout-button";
 
 type NotificationItem = {
   id: string;
@@ -163,10 +164,7 @@ export default function PatientNotificationsPage() {
             <span className="material-symbols-outlined text-[20px]">help</span>
             <span>Help Center</span>
           </Link>
-          <Link className="flex items-center gap-3 px-3 py-2 hover:bg-white/10" href="/">
-            <span className="material-symbols-outlined text-[20px]">logout</span>
-            <span>Logout</span>
-          </Link>
+          <PatientLogoutButton className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60" />
         </div>
       </aside>
 

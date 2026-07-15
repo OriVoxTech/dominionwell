@@ -2,18 +2,65 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
-import { getAdminDoctorByUsername } from "@/lib/admin-portal";
+import { Suspense, type FormEvent, useState } from "react";
+import { doctorAuthApi, getApiErrorMessage } from "@/lib/api";
+import { clearDoctorSession, saveDoctorSession } from "@/lib/doctor-session";
 
-const DOCTOR_SESSION_KEY = "dwDoctorSession";
+const REMEMBERED_DOCTOR_USERNAME_KEY = "dwRememberedDoctorUsername";
+
+function getRememberedDoctorUsername() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(REMEMBERED_DOCTOR_USERNAME_KEY) ?? "";
+}
 
 function DoctorLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isPasswordResetComplete = searchParams.get("reset") === "success";
-  const [username, setUsername] = useState("");
+  const isSessionExpired = searchParams.get("session") === "expired";
+  const [username, setUsername] = useState(getRememberedDoctorUsername);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => Boolean(getRememberedDoctorUsername()));
   const [loginError, setLoginError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isLoginValid = Boolean(username.trim()) && password.length >= 8;
+
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isLoginValid) return;
+
+    setLoginError("");
+    setIsSubmitting(true);
+    clearDoctorSession();
+
+    try {
+      const normalizedUsername = username.trim();
+      const response = await doctorAuthApi.login({
+        username: normalizedUsername,
+        password,
+      });
+
+      if (!response.data.accessToken) {
+        setLoginError("The login response did not include an access token.");
+        return;
+      }
+
+      saveDoctorSession(response.data, rememberMe);
+
+      if (rememberMe) {
+        window.localStorage.setItem(REMEMBERED_DOCTOR_USERNAME_KEY, normalizedUsername);
+      } else {
+        window.localStorage.removeItem(REMEMBERED_DOCTOR_USERNAME_KEY);
+      }
+
+      router.push("/dashboard/doctor");
+    } catch (error) {
+      setLoginError(getApiErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[#f7f9fc] px-4 py-7 sm:py-10 md:px-8">
@@ -39,61 +86,75 @@ function DoctorLoginContent() {
             </div>
           ) : null}
 
+          {isSessionExpired ? (
+            <div className="mt-4 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-xs font-medium text-[#92400e] sm:text-sm">
+              Your session has expired. Please sign in again.
+            </div>
+          ) : null}
+
           <form
             className="mt-5 grid gap-3 sm:mt-7 sm:gap-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-
-              const doctor = getAdminDoctorByUsername(username);
-
-              if (!doctor || doctor.password !== password) {
-                setLoginError("Invalid doctor username or password.");
-                return;
-              }
-
-              if (doctor.status === "Blacklisted") {
-                setLoginError("This doctor account is currently blacklisted. Contact admin.");
-                return;
-              }
-
-              window.localStorage.setItem(
-                DOCTOR_SESSION_KEY,
-                JSON.stringify({ doctorId: doctor.id, doctorName: doctor.name, loggedInAt: new Date().toISOString() })
-              );
-
-              setLoginError("");
-              router.push("/dashboard/doctor");
-            }}
+            onSubmit={handleLogin}
           >
             <label className="grid gap-1.5 text-xs font-medium text-[#001b5e] sm:gap-2 sm:text-sm">
-              Username(richardson)
+              Username
               <input
                 type="text"
+                name="username"
+                autoComplete="username"
                 required
                 placeholder="doctor.username"
                 value={username}
-                onChange={(event) => setUsername(event.target.value)}
+                onChange={(event) => {
+                  setUsername(event.target.value);
+                  setLoginError("");
+                }}
                 className="h-10 rounded-xl border border-[#cbd5e1] px-3 text-xs text-[#0f172a] outline-none focus:border-[#0aa4b4] sm:h-11 sm:text-sm"
               />
             </label>
 
             <label className="grid gap-1.5 text-xs font-medium text-[#001b5e] sm:gap-2 sm:text-sm">
-              Password(Doctor@123)
-              <input
-                type="password"
-                required
-                placeholder="Enter your password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="h-10 rounded-xl border border-[#cbd5e1] px-3 text-xs text-[#0f172a] outline-none focus:border-[#0aa4b4] sm:h-11 sm:text-sm"
-              />
+              Password
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  autoComplete="current-password"
+                  minLength={8}
+                  required
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    setLoginError("");
+                  }}
+                  className="h-10 w-full rounded-xl border border-[#cbd5e1] px-3 pr-10 text-xs text-[#0f172a] outline-none focus:border-[#0aa4b4] sm:h-11 sm:pr-11 sm:text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  className="absolute right-0 top-0 grid h-10 w-10 place-items-center text-[#64748b] hover:text-[#001b5e] sm:h-11 sm:w-11"
+                >
+                  <span className="material-symbols-outlined text-[19px]">{showPassword ? "visibility_off" : "visibility"}</span>
+                </button>
+              </div>
+              <span className={`text-xs font-normal ${password && password.length < 8 ? "text-[#b91c1c]" : "text-[#64748b]"}`}>
+                Password must be at least 8 characters.
+              </span>
             </label>
 
             {loginError ? <p className="text-xs font-medium text-[#b91c1c] sm:text-sm">{loginError}</p> : null}
 
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:gap-3 sm:text-sm">
               <label className="inline-flex items-center gap-2 text-[#475569]">
-                <input type="checkbox" className="h-4 w-4 accent-[#16b46f]" />
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(event) => setRememberMe(event.target.checked)}
+                  className="h-4 w-4 accent-[#16b46f]"
+                />
                 Remember me
               </label>
               <Link href="/login/doctor/forgot-password" className="font-medium text-[#0aa4b4]">
@@ -103,9 +164,10 @@ function DoctorLoginContent() {
 
             <button
               type="submit"
-              className="mt-1 h-10 rounded-xl bg-[#16b46f] text-xs font-semibold text-white hover:brightness-95 sm:mt-2 sm:h-11 sm:text-sm"
+              disabled={!isLoginValid || isSubmitting}
+              className="mt-1 h-10 rounded-xl bg-[#16b46f] text-xs font-semibold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:bg-[#94a3b8] disabled:hover:brightness-100 sm:mt-2 sm:h-11 sm:text-sm"
             >
-              Login as Doctor
+              {isSubmitting ? "Signing in..." : "Login as Doctor"}
             </button>
           </form>
         </section>

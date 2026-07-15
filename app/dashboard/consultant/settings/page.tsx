@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
+import DoctorChangePasswordModal from "@/components/doctor-change-password-modal";
+import DoctorLogoutButton from "@/components/doctor-logout-button";
 import {
   APPOINTMENT_REQUESTS_UPDATED_EVENT,
   readAppointmentRequests,
@@ -161,6 +163,8 @@ export default function ConsultantSettingsPage() {
   const [availabilityToastMessage, setAvailabilityToastMessage] = useState("");
   const [slotErrorMessage, setSlotErrorMessage] = useState("");
   const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [securityMessage, setSecurityMessage] = useState("");
 
   const saveProfile = () => {
     updateDoctorBankDetails(CURRENT_DOCTOR_ID, bankDetails);
@@ -375,10 +379,7 @@ export default function ConsultantSettingsPage() {
             <span className="material-symbols-outlined">notifications</span>
             <span>Notifications</span>
           </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/">
-            <span className="material-symbols-outlined">logout</span>
-            <span>Logout</span>
-          </Link>
+          <DoctorLogoutButton className="flex w-full items-center gap-3 p-3 text-left text-[#7784ac]/85 hover:bg-[#00020d]/10" />
         </div>
       </aside>
 
@@ -600,6 +601,27 @@ export default function ConsultantSettingsPage() {
           </div>
         </section>
 
+        <section className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-[#00020d]">Security</h2>
+              <p className="mt-1 text-xs text-[#64748b] sm:text-sm">Update the password used to access your doctor account.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSecurityMessage("");
+                setIsChangePasswordOpen(true);
+              }}
+              className="flex h-10 items-center justify-center gap-2 rounded-lg border border-[#c6c6cf] px-4 text-sm font-semibold text-[#001b5e] hover:bg-[#f8fafc]"
+            >
+              <span className="material-symbols-outlined text-[18px]">lock_reset</span>
+              Change Password
+            </button>
+          </div>
+          {securityMessage ? <p role="status" className="mt-3 rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm text-[#15803d]">{securityMessage}</p> : null}
+        </section>
+
         <section className="rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
           <h2 className="mb-4 text-base font-semibold text-[#00020d]">Update Profile</h2>
 
@@ -707,6 +729,16 @@ export default function ConsultantSettingsPage() {
           </div>
         </section>
       </main>
+
+      {isChangePasswordOpen ? (
+        <DoctorChangePasswordModal
+          onClose={() => setIsChangePasswordOpen(false)}
+          onSuccess={(message) => {
+            setSecurityMessage(message);
+            setIsChangePasswordOpen(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

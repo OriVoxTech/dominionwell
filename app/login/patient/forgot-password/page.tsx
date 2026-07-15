@@ -1,13 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
+import { getApiErrorMessage, getApiResponseMessage, patientAuthApi } from "@/lib/api";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function PatientForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const normalizedEmail = email.trim().toLowerCase();
+  const isEmailValid = EMAIL_PATTERN.test(normalizedEmail);
 
-  const resetLink = `/login/patient/reset-password?email=${encodeURIComponent(email)}`;
+  const resetLink = `/login/patient/reset-password?email=${encodeURIComponent(normalizedEmail)}`;
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setErrorMessage("");
+    setIsSubmitting(true);
+
+    try {
+      const response = await patientAuthApi.forgotPassword({ email: normalizedEmail });
+      setSuccessMessage(getApiResponseMessage(response.data, "A password reset OTP has been sent to your email."));
+      setIsSubmitted(true);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[#f7f9fc] px-4 py-7 sm:py-10 md:px-8">
@@ -29,12 +53,15 @@ export default function PatientForgotPasswordPage() {
 
           {isSubmitted ? (
             <div className="mt-6 rounded-2xl border border-[#16b46f]/30 bg-[#16b46f]/10 p-4 sm:p-5">
-              <h2 className="text-sm font-semibold text-[#166534] sm:text-base">Reset link prepared</h2>
+              <h2 className="text-sm font-semibold text-[#166534] sm:text-base">Reset OTP sent</h2>
               <p className="mt-2 text-xs text-[#166534] sm:text-sm">
-                Password reset instructions have been prepared for <span className="font-semibold">{email}</span>.
+                {successMessage}
+              </p>
+              <p className="mt-1 text-xs text-[#166534] sm:text-sm">
+                Sent to <span className="font-semibold">{normalizedEmail}</span>.
               </p>
               <p className="mt-2 text-xs text-[#475569] sm:text-sm">
-                Continue to the reset screen to set a new password for this demo flow.
+                Continue to the reset screen and enter the OTP to choose a new password.
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link href={resetLink} className="rounded-xl bg-[#16b46f] px-4 py-2 text-xs font-semibold text-white hover:bg-[#149660] sm:text-sm">
@@ -42,7 +69,10 @@ export default function PatientForgotPasswordPage() {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => setIsSubmitted(false)}
+                  onClick={() => {
+                    setIsSubmitted(false);
+                    setSuccessMessage("");
+                  }}
                   className="rounded-xl border border-[#c6c6cf] px-4 py-2 text-xs font-semibold text-[#475569] hover:bg-[#f8fafc] sm:text-sm"
                 >
                   Use a Different Email
@@ -52,10 +82,7 @@ export default function PatientForgotPasswordPage() {
           ) : (
             <form
               className="mt-6 grid gap-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                setIsSubmitted(true);
-              }}
+              onSubmit={handleSubmit}
             >
               <label className="grid gap-2 text-xs font-medium text-[#001b5e] sm:text-sm">
                 Email Address
@@ -63,17 +90,27 @@ export default function PatientForgotPasswordPage() {
                   type="email"
                   required
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    setErrorMessage("");
+                  }}
                   placeholder="you@example.com"
                   className="h-11 rounded-xl border border-[#cbd5e1] px-3 text-sm text-[#0f172a] outline-none focus:border-[#0aa4b4]"
                 />
               </label>
 
+              {errorMessage ? (
+                <p role="alert" aria-live="polite" className="rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-xs text-[#b91c1c] sm:text-sm">
+                  {errorMessage}
+                </p>
+              ) : null}
+
               <button
                 type="submit"
-                className="h-11 rounded-xl bg-[#16b46f] text-sm font-semibold text-white hover:bg-[#149660]"
+                disabled={!isEmailValid || isSubmitting}
+                className="h-11 rounded-xl bg-[#16b46f] text-sm font-semibold text-white hover:bg-[#149660] disabled:cursor-not-allowed disabled:bg-[#94a3b8] disabled:hover:bg-[#94a3b8]"
               >
-                Send Reset Instructions
+                {isSubmitting ? "Sending OTP..." : "Send Reset OTP"}
               </button>
             </form>
           )}

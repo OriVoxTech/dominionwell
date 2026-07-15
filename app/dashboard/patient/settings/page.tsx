@@ -2,8 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import PatientMobileNav from "@/components/patient-mobile-nav";
+import PatientLogoutButton from "@/components/patient-logout-button";
+import { getApiErrorMessage, getApiResponseMessage, patientAuthApi } from "@/lib/api";
 
 type PaymentRecord = {
     planName?: string;
@@ -108,6 +110,20 @@ export default function PatientSettingsPage() {
     const [emailNotifications, setEmailNotifications] = useState(true);
     const [saveMessage, setSaveMessage] = useState("");
     const [subscription, setSubscription] = useState<CurrentSubscription>(() => getSubscriptionSnapshot());
+    const [isChangingPassword, setIsChangingPassword] = useState(false);
+    const [currentPassword, setCurrentPassword] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [passwordError, setPasswordError] = useState("");
+    const [passwordMessage, setPasswordMessage] = useState("");
+    const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
+    const isPasswordFormValid =
+        Boolean(currentPassword) &&
+        newPassword.length >= 8 &&
+        confirmPassword === newPassword;
 
     const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
         const selectedFile = event.target.files?.[0];
@@ -122,6 +138,47 @@ export default function PatientSettingsPage() {
 
     const handleSave = () => {
         setSaveMessage("Settings updated successfully.");
+    };
+
+    const closePasswordModal = () => {
+        setIsChangingPassword(false);
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setShowCurrentPassword(false);
+        setShowNewPassword(false);
+        setShowConfirmPassword(false);
+        setPasswordError("");
+    };
+
+    const handleChangePassword = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        setPasswordError("");
+        setPasswordMessage("");
+
+        if (!isPasswordFormValid) {
+            setPasswordError("Complete all password fields, use at least 8 characters, and ensure the new passwords match.");
+            return;
+        }
+
+        setIsPasswordSubmitting(true);
+
+        try {
+            const response = await patientAuthApi.changePassword({
+                currentPassword,
+                newPassword,
+                confirmPassword,
+            });
+            setCurrentPassword("");
+            setNewPassword("");
+            setConfirmPassword("");
+            setPasswordMessage(getApiResponseMessage(response.data, "Your password was changed successfully."));
+            closePasswordModal();
+        } catch (error) {
+            setPasswordError(getApiErrorMessage(error));
+        } finally {
+            setIsPasswordSubmitting(false);
+        }
     };
 
     useEffect(() => {
@@ -190,10 +247,7 @@ export default function PatientSettingsPage() {
                         <span className="material-symbols-outlined text-[20px]">help</span>
                         <span>Help Center</span>
                     </Link>
-                    <Link className="flex items-center gap-3 px-3 py-2 hover:bg-white/10" href="/">
-                        <span className="material-symbols-outlined text-[20px]">logout</span>
-                        <span>Logout</span>
-                    </Link>
+                    <PatientLogoutButton className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60" />
                 </div>
             </aside>
 
@@ -267,17 +321,29 @@ export default function PatientSettingsPage() {
                         <div className="space-y-3 text-sm">
                             <button
                                 type="button"
-                                className="w-full rounded-lg border border-[#c6c6cf] px-3 py-2 text-left font-semibold text-[#001b5e] hover:bg-[#f8fafc]"
+                                onClick={() => {
+                                    setIsChangingPassword(true);
+                                    setPasswordError("");
+                                    setPasswordMessage("");
+                                }}
+                                className="flex w-full items-center justify-between gap-2 rounded-lg border border-[#c6c6cf] px-3 py-2 text-left font-semibold text-[#001b5e] hover:bg-[#f8fafc]"
                             >
-                                Change Password
+                                <span>Change Password</span>
+                                <span className="material-symbols-outlined text-[18px]">chevron_right</span>
                             </button>
-                            <button
-                                type="button"
-                                className="w-full rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 px-3 py-2 text-left font-semibold text-[#dc2626]"
-                            >
-                                Sign Out from All Devices
-                            </button>
+                            <PatientLogoutButton
+                                label="Sign Out"
+                                iconClassName="text-[18px] leading-none"
+                                className="flex w-full items-center gap-2 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 px-3 py-2 text-left font-semibold text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-60"
+                            />
                         </div>
+
+                        {passwordMessage ? (
+                            <p role="status" className="mt-3 rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-xs text-[#15803d]">
+                                {passwordMessage}
+                            </p>
+                        ) : null}
+
                     </section>
 
                     <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm lg:col-span-3">
@@ -372,6 +438,148 @@ export default function PatientSettingsPage() {
                     </section>
                 </div>
             </main>
+
+            {isChangingPassword ? (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-6">
+                    <button
+                        type="button"
+                        aria-label="Close change password dialog"
+                        disabled={isPasswordSubmitting}
+                        onClick={closePasswordModal}
+                        className="absolute inset-0 bg-[#0f172a]/55 backdrop-blur-[2px] disabled:cursor-wait"
+                    />
+                    <section
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="change-password-title"
+                        className="relative z-10 max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl sm:max-h-[90vh] sm:p-6"
+                    >
+                        <div className="mb-5 flex items-start justify-between gap-3">
+                            <div>
+                                <h2 id="change-password-title" className="text-lg font-bold text-[#001b5e] sm:text-xl">Change Password</h2>
+                                <p className="mt-1 text-xs text-[#64748b] sm:text-sm">Enter your current password and choose a new one.</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={closePasswordModal}
+                                disabled={isPasswordSubmitting}
+                                aria-label="Close change password dialog"
+                                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#c6c6cf] text-[#475569] hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <span className="material-symbols-outlined text-[19px]">close</span>
+                            </button>
+                        </div>
+
+                        <form className="grid gap-4" onSubmit={handleChangePassword}>
+                            <label className="grid gap-1.5 text-xs font-medium text-[#334155] sm:text-sm">
+                                Current Password
+                                <div className="relative">
+                                    <input
+                                        autoFocus
+                                        type={showCurrentPassword ? "text" : "password"}
+                                        autoComplete="current-password"
+                                        required
+                                        value={currentPassword}
+                                        onChange={(event) => {
+                                            setCurrentPassword(event.target.value);
+                                            setPasswordError("");
+                                        }}
+                                        className="h-11 w-full rounded-lg border border-[#c6c6cf] px-3 pr-11 outline-none focus:border-[#0aa4b4]"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCurrentPassword((current) => !current)}
+                                        aria-label={showCurrentPassword ? "Hide current password" : "Show current password"}
+                                        aria-pressed={showCurrentPassword}
+                                        className="absolute right-0 top-0 grid h-11 w-11 place-items-center text-[#64748b] hover:text-[#001b5e]"
+                                    >
+                                        <span className="material-symbols-outlined text-[19px]">{showCurrentPassword ? "visibility_off" : "visibility"}</span>
+                                    </button>
+                                </div>
+                            </label>
+
+                            <label className="grid gap-1.5 text-xs font-medium text-[#334155] sm:text-sm">
+                                New Password
+                                <div className="relative">
+                                    <input
+                                        type={showNewPassword ? "text" : "password"}
+                                        autoComplete="new-password"
+                                        minLength={8}
+                                        required
+                                        value={newPassword}
+                                        onChange={(event) => {
+                                            setNewPassword(event.target.value);
+                                            setPasswordError("");
+                                        }}
+                                        className="h-11 w-full rounded-lg border border-[#c6c6cf] px-3 pr-11 outline-none focus:border-[#0aa4b4]"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowNewPassword((current) => !current)}
+                                        aria-label={showNewPassword ? "Hide new password" : "Show new password"}
+                                        aria-pressed={showNewPassword}
+                                        className="absolute right-0 top-0 grid h-11 w-11 place-items-center text-[#64748b] hover:text-[#001b5e]"
+                                    >
+                                        <span className="material-symbols-outlined text-[19px]">{showNewPassword ? "visibility_off" : "visibility"}</span>
+                                    </button>
+                                </div>
+                                <span className="font-normal text-[#64748b]">Use at least 8 characters.</span>
+                            </label>
+
+                            <label className="grid gap-1.5 text-xs font-medium text-[#334155] sm:text-sm">
+                                Confirm New Password
+                                <div className="relative">
+                                    <input
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        autoComplete="new-password"
+                                        minLength={8}
+                                        required
+                                        value={confirmPassword}
+                                        onChange={(event) => {
+                                            setConfirmPassword(event.target.value);
+                                            setPasswordError("");
+                                        }}
+                                        className="h-11 w-full rounded-lg border border-[#c6c6cf] px-3 pr-11 outline-none focus:border-[#0aa4b4]"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword((current) => !current)}
+                                        aria-label={showConfirmPassword ? "Hide confirmed password" : "Show confirmed password"}
+                                        aria-pressed={showConfirmPassword}
+                                        className="absolute right-0 top-0 grid h-11 w-11 place-items-center text-[#64748b] hover:text-[#001b5e]"
+                                    >
+                                        <span className="material-symbols-outlined text-[19px]">{showConfirmPassword ? "visibility_off" : "visibility"}</span>
+                                    </button>
+                                </div>
+                            </label>
+
+                            {passwordError ? (
+                                <p role="alert" aria-live="polite" className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs text-[#b91c1c] sm:text-sm">
+                                    {passwordError}
+                                </p>
+                            ) : null}
+
+                            <div className="mt-1 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                <button
+                                    type="button"
+                                    onClick={closePasswordModal}
+                                    disabled={isPasswordSubmitting}
+                                    className="h-11 rounded-lg border border-[#c6c6cf] px-4 text-sm font-semibold text-[#475569] hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-50 sm:h-10"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={!isPasswordFormValid || isPasswordSubmitting}
+                                    className="h-11 rounded-lg bg-[#16b46f] px-4 text-sm font-semibold text-white hover:bg-[#149660] disabled:cursor-not-allowed disabled:bg-[#94a3b8] disabled:hover:bg-[#94a3b8] sm:h-10"
+                                >
+                                    {isPasswordSubmitting ? "Changing password..." : "Save New Password"}
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+                </div>
+            ) : null}
         </div>
     );
 }

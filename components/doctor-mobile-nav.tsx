@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import DoctorLogoutButton from "@/components/doctor-logout-button";
 
 const menuItems = [
   { label: "Dashboard", icon: "dashboard", href: "/dashboard/doctor" },
@@ -146,14 +147,10 @@ export default function DoctorMobileNav() {
             </nav>
 
             <div className="mt-6 border-t border-white/15 pt-4">
-              <Link
-                href="/"
-                onClick={() => setIsOpen(false)}
-                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-[#d7dbeb]"
-              >
-                <span className="material-symbols-outlined text-[18px]">logout</span>
-                <span>Logout</span>
-              </Link>
+              <DoctorLogoutButton
+                iconClassName="text-[18px]"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-[#d7dbeb]"
+              />
             </div>
           </aside>
         </div>

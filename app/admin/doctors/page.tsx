@@ -1,56 +1,156 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ADMIN_UPDATED_EVENT,
-  addAdminDoctor,
-  readAdminDoctors,
   readAdminPatients,
   readDoctorWithdrawalRequests,
   updateDoctorWithdrawalRequestStatus,
-  updateDoctorStatus,
   type AdminPatient,
   type AdminDoctor,
   type DoctorWithdrawalRequest,
 } from "@/lib/admin-portal";
 import { APPOINTMENT_REQUESTS_UPDATED_EVENT, readAppointmentRequests } from "@/lib/appointments";
+import { adminApiService, getApiErrorMessage, type AdminDoctorUser } from "@/lib/api";
 
 type NewDoctorForm = {
-  name: string;
+  firstName: string;
+  lastName: string;
   specialization: string;
   email: string;
   phone: string;
   username: string;
-  password: string;
 };
 
 const defaultForm: NewDoctorForm = {
-  name: "",
-  specialization: "",
+  firstName: "",
+  lastName: "",
+  specialization: "GENERAL_PRACTICE",
   email: "",
   phone: "",
   username: "",
-  password: "Doctor@123",
 };
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^\+?[0-9\s()-]{7,20}$/;
+const SPECIALIZATION_PATTERN = /^[A-Z][A-Z_]*$/;
+const SPECIALIZATION_OPTIONS = [
+  "GENERAL_PRACTICE",
+  "CARDIOLOGY",
+  "DERMATOLOGY",
+  "ENDOCRINOLOGY",
+  "GASTROENTEROLOGY",
+  "GYNECOLOGY",
+  "NEUROLOGY",
+  "ONCOLOGY",
+  "OPHTHALMOLOGY",
+  "ORTHOPEDICS",
+  "PEDIATRICS",
+  "PSYCHIATRY",
+  "UROLOGY",
+] as const;
+
+function mapApiUserToDoctor(user: AdminDoctorUser): AdminDoctor {
+  const rawSpecialization = user.doctor?.specializations[0] ?? "GENERAL_PRACTICE";
+  const firstName = user.firstName.trim();
+  const lastName = user.lastName.trim();
+  const username = user.username?.trim() || user.email.split("@")[0];
+
+  return {
+    id: user.doctor?.id ?? user.id,
+    userId: user.id,
+    name: `Dr. ${[firstName, lastName].filter(Boolean).join(" ") || username}`,
+    specialization: rawSpecialization.replaceAll("_", " "),
+    rating: 0,
+    profileImage: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16e?auto=format&fit=crop&w=300&q=80",
+    email: user.email,
+    phone: user.phone ?? "Not provided",
+    username,
+    password: "",
+    status: user.deletedAt || user.doctor?.deletedAt ? "Blacklisted" : "Whitelisted",
+    joinedAt: user.createdAt,
+    walletPoints: 0,
+    walletBalance: 0,
+    walletPointValue: 0,
+    isEmailVerified: user.isEmailVerified,
+    verifiedAt: user.doctor?.verifiedAt ?? null,
+    bio: user.doctor?.bio ?? null,
+    sessionCount: 0,
+  };
+}
+
 export default function AdminDoctorsPage() {
-  const [doctors, setDoctors] = useState<AdminDoctor[]>(readAdminDoctors());
+  const [doctors, setDoctors] = useState<AdminDoctor[]>([]);
   const [patients, setPatients] = useState<AdminPatient[]>(readAdminPatients());
   const [withdrawalRequests, setWithdrawalRequests] = useState<DoctorWithdrawalRequest[]>(readDoctorWithdrawalRequests());
   const [appointments, setAppointments] = useState(readAppointmentRequests());
-  const [selectedDoctorId, setSelectedDoctorId] = useState<string>(readAdminDoctors()[0]?.id ?? "");
+  const [selectedDoctorId, setSelectedDoctorId] = useState("");
   const [form, setForm] = useState<NewDoctorForm>(defaultForm);
+  const [createError, setCreateError] = useState("");
+  const [createMessage, setCreateMessage] = useState("");
+  const [isCreatingDoctor, setIsCreatingDoctor] = useState(false);
+  const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
+  const [directoryError, setDirectoryError] = useState("");
+  const [doctorTotal, setDoctorTotal] = useState(0);
+  const [statusUpdatingUserId, setStatusUpdatingUserId] = useState("");
+  const isCreateDoctorValid =
+    Boolean(form.firstName.trim()) &&
+    Boolean(form.lastName.trim()) &&
+    EMAIL_PATTERN.test(form.email.trim()) &&
+    PHONE_PATTERN.test(form.phone.trim()) &&
+    SPECIALIZATION_PATTERN.test(form.specialization.trim()) &&
+    Boolean(form.username.trim());
+
+  const loadDoctors = useCallback(async () => {
+    setDirectoryError("");
+    setIsLoadingDoctors(true);
+
+    try {
+      const response = await adminApiService.listDoctors();
+      const nextDoctors = response.data.data.map(mapApiUserToDoctor);
+      setDoctors(nextDoctors);
+      setDoctorTotal(response.data.meta.total);
+      setSelectedDoctorId((current) => nextDoctors.some((doctor) => doctor.id === current) ? current : nextDoctors[0]?.id ?? "");
+    } catch (error) {
+      setDirectoryError(getApiErrorMessage(error));
+    } finally {
+      setIsLoadingDoctors(false);
+    }
+  }, []);
+
+  const handleDoctorStatusChange = async (doctor: AdminDoctor) => {
+    if (!doctor.userId || statusUpdatingUserId) return;
+
+    setDirectoryError("");
+    setStatusUpdatingUserId(doctor.userId);
+
+    try {
+      if (doctor.status === "Whitelisted") {
+        await adminApiService.deactivateUser(doctor.userId);
+      } else {
+        await adminApiService.restoreUser(doctor.userId);
+      }
+      await loadDoctors();
+    } catch (error) {
+      setDirectoryError(getApiErrorMessage(error));
+    } finally {
+      setStatusUpdatingUserId("");
+    }
+  };
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadDoctors();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadDoctors]);
 
   useEffect(() => {
     const sync = () => {
-      const nextDoctors = readAdminDoctors();
-      setDoctors(nextDoctors);
       setPatients(readAdminPatients());
       setWithdrawalRequests(readDoctorWithdrawalRequests());
       setAppointments(readAppointmentRequests());
-      if (!nextDoctors.some((doctor) => doctor.id === selectedDoctorId)) {
-        setSelectedDoctorId(nextDoctors[0]?.id ?? "");
-      }
     };
 
     sync();
@@ -63,9 +163,48 @@ export default function AdminDoctorsPage() {
       window.removeEventListener(ADMIN_UPDATED_EVENT, sync);
       window.removeEventListener(APPOINTMENT_REQUESTS_UPDATED_EVENT, sync);
     };
-  }, [selectedDoctorId]);
+  }, []);
 
   const selectedDoctor = doctors.find((doctor) => doctor.id === selectedDoctorId) ?? null;
+
+  useEffect(() => {
+    const userId = selectedDoctor?.userId;
+    const doctorId = selectedDoctor?.id;
+    if (!userId || !doctorId) return;
+
+    let isCancelled = false;
+
+    void adminApiService.getUser(userId).then((response) => {
+      const detail = response.data;
+      const doctorDetail = detail.doctor;
+      if (isCancelled || !doctorDetail) return;
+
+      const wallet = doctorDetail.wallet;
+      setDoctors((current) =>
+        current.map((doctor) =>
+          doctor.id === doctorId
+            ? {
+                ...doctor,
+                bio: doctorDetail.bio ?? null,
+                verifiedAt: doctorDetail.verifiedAt ?? null,
+                isEmailVerified: detail.isEmailVerified,
+                sessionCount: detail.sessions.length,
+                walletPoints: wallet?.lifetimePoints ?? 0,
+                walletBalance: wallet?.currentBalance ?? 0,
+                walletPointValue: wallet?.pointValue ?? 0,
+              }
+            : doctor,
+        ),
+      );
+    }).catch(() => {
+      // The directory remains usable if optional profile details cannot load.
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedDoctor?.id, selectedDoctor?.userId]);
+
   const selectedDoctorPendingWithdrawal = useMemo(() => {
     if (!selectedDoctor) {
       return null;
@@ -115,39 +254,46 @@ export default function AdminDoctorsPage() {
     return Array.from(patientMap.values());
   }, [patients, selectedDoctorConsultationHistory]);
 
-  const pendingWithdrawalCount = useMemo(() => {
-    return withdrawalRequests.filter((request) => request.status === "Pending").length;
-  }, [withdrawalRequests]);
-
   const whitelistedDoctorsCount = useMemo(() => {
     return doctors.filter((doctor) => doctor.status === "Whitelisted").length;
   }, [doctors]);
 
-  const averageDoctorRating = useMemo(() => {
-    if (doctors.length === 0) {
-      return 0;
-    }
-
-    return doctors.reduce((total, doctor) => total + doctor.rating, 0) / doctors.length;
+  const verifiedDoctorsCount = useMemo(() => {
+    return doctors.filter((doctor) => doctor.isEmailVerified).length;
   }, [doctors]);
 
-  const handleAddDoctor = (event: FormEvent<HTMLFormElement>) => {
+  const specializationCount = useMemo(
+    () => new Set(doctors.map((doctor) => doctor.specialization)).size,
+    [doctors],
+  );
+
+  const handleAddDoctor = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!isCreateDoctorValid) return;
 
-    if (!form.name.trim() || !form.username.trim() || !form.password.trim()) {
-      return;
+    setCreateError("");
+    setCreateMessage("");
+    setIsCreatingDoctor(true);
+
+    try {
+      const payload = {
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim().toLowerCase(),
+        phone: form.phone.trim(),
+        specialization: form.specialization.trim().toUpperCase(),
+        username: form.username.trim(),
+      };
+      const response = await adminApiService.createDoctor(payload);
+
+      setCreateMessage(`Dr. ${response.data.user.firstName} ${response.data.user.lastName} was created successfully.`);
+      setForm(defaultForm);
+      await loadDoctors();
+    } catch (error) {
+      setCreateError(getApiErrorMessage(error));
+    } finally {
+      setIsCreatingDoctor(false);
     }
-
-    addAdminDoctor({
-      name: form.name,
-      specialization: form.specialization || "General Practice",
-      email: form.email || `${form.username.trim().toLowerCase()}@dominionwell.com`,
-      phone: form.phone || "+1 (202) 555-0100",
-      username: form.username,
-      password: form.password,
-    });
-
-    setForm(defaultForm);
   };
 
   return (
@@ -157,49 +303,80 @@ export default function AdminDoctorsPage() {
         <p className="mt-1 text-sm text-[#475569]">Manage doctor accounts, monitor consultations, and process wallet withdrawals.</p>
       </div>
 
+      {directoryError ? (
+        <div role="alert" className="flex flex-col gap-3 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c] sm:flex-row sm:items-center sm:justify-between">
+          <span>{directoryError}</span>
+          <button type="button" onClick={() => void loadDoctors()} className="rounded-lg border border-[#fca5a5] px-3 py-1.5 text-xs font-semibold hover:bg-white">Try Again</button>
+        </div>
+      ) : null}
+
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Total Doctors</p>
-          <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{doctors.length}</p>
+          <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{isLoadingDoctors ? "—" : doctorTotal}</p>
         </article>
         <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Whitelisted</p>
           <p className="mt-2 text-2xl font-semibold text-[#166534]">{whitelistedDoctorsCount}</p>
         </article>
         <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Pending Withdrawals</p>
-          <p className="mt-2 text-2xl font-semibold text-[#b45309]">{pendingWithdrawalCount}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Email Verified</p>
+          <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{verifiedDoctorsCount}</p>
         </article>
         <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Average Rating</p>
-          <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{averageDoctorRating.toFixed(1)} / 5</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Specializations</p>
+          <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{specializationCount}</p>
         </article>
       </section>
 
       <section className="rounded-2xl border border-[#dbe4f0] bg-gradient-to-br from-white to-[#f8fbff] p-4 shadow-sm sm:p-5">
         <h3 className="text-base font-semibold text-[#001b5e]">Add Doctor Login Account</h3>
         <form className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" onSubmit={handleAddDoctor}>
-          <input value={form.name} onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm" placeholder="Doctor name" required />
-          <input value={form.specialization} onChange={(e) => setForm((current) => ({ ...current, specialization: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm" placeholder="Specialization" />
-          <input value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm" placeholder="Email" type="email" />
-          <input value={form.phone} onChange={(e) => setForm((current) => ({ ...current, phone: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm" placeholder="Phone" />
-          <input value={form.username} onChange={(e) => setForm((current) => ({ ...current, username: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm" placeholder="Login username" required />
-          <input value={form.password} onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm" placeholder="Temporary password" required />
-          <button type="submit" className="h-10 rounded-lg bg-[#001b5e] px-4 text-sm font-semibold text-white hover:bg-[#0b2b75] md:col-span-2 xl:col-span-3">
-            Add Doctor
+          <input value={form.firstName} onChange={(e) => setForm((current) => ({ ...current, firstName: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="First name" autoComplete="given-name" required />
+          <input value={form.lastName} onChange={(e) => setForm((current) => ({ ...current, lastName: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Last name" autoComplete="family-name" required />
+          <select
+            value={form.specialization}
+            onChange={(event) => setForm((current) => ({ ...current, specialization: event.target.value }))}
+            className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]"
+            required
+          >
+            {SPECIALIZATION_OPTIONS.map((specialization) => (
+              <option key={specialization} value={specialization}>
+                {specialization.replaceAll("_", " ")}
+              </option>
+            ))}
+          </select>
+          <input value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Email" type="email" autoComplete="email" required />
+          <input value={form.phone} onChange={(e) => setForm((current) => ({ ...current, phone: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Phone" type="tel" autoComplete="tel" required />
+          <input value={form.username} onChange={(e) => setForm((current) => ({ ...current, username: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Login username" autoComplete="username" required />
+
+          {createError ? <p role="alert" className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-sm text-[#b91c1c] md:col-span-2 xl:col-span-3">{createError}</p> : null}
+          {createMessage ? <p role="status" className="rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm text-[#15803d] md:col-span-2 xl:col-span-3">{createMessage}</p> : null}
+
+          <button type="submit" disabled={!isCreateDoctorValid || isCreatingDoctor} className="h-10 rounded-lg bg-[#001b5e] px-4 text-sm font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8] md:col-span-2 xl:col-span-3">
+            {isCreatingDoctor ? "Creating doctor..." : "Add Doctor"}
           </button>
         </form>
       </section>
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_1.4fr]">
         <article className="rounded-2xl border border-[#dbe4f0] bg-white p-4 shadow-sm sm:p-5">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between gap-2">
             <h3 className="text-base font-semibold text-[#001b5e]">Doctor Directory</h3>
-            <span className="rounded-full bg-[#e2e8f0] px-2.5 py-1 text-xs font-semibold text-[#334155]">{doctors.length} doctors</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => void loadDoctors()} disabled={isLoadingDoctors} className="grid h-8 w-8 place-items-center rounded-lg border border-[#cbd5e1] text-[#001b5e] hover:bg-[#f8fafc] disabled:cursor-wait disabled:opacity-50" aria-label="Refresh doctor directory">
+                <span className="material-symbols-outlined text-[17px]">refresh</span>
+              </button>
+              <span className="rounded-full bg-[#e2e8f0] px-2.5 py-1 text-xs font-semibold text-[#334155]">{doctorTotal} doctors</span>
+            </div>
           </div>
 
           <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
-            {doctors.map((doctor) => {
+            {isLoadingDoctors ? (
+              <div role="status" className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4 text-sm text-[#64748b]">Loading doctors...</div>
+            ) : doctors.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[#cbd5e1] p-4 text-sm text-[#64748b]">No doctors were found.</div>
+            ) : doctors.map((doctor) => {
               const hasPendingWithdrawal = withdrawalRequests.some((request) => request.doctorId === doctor.id && request.status === "Pending");
               const isActive = selectedDoctorId === doctor.id;
 
@@ -243,13 +420,18 @@ export default function AdminDoctorsPage() {
                     )}
                     <button
                       type="button"
-                      className="rounded-lg border border-[#cbd5e1] px-2 py-1 text-[11px] font-semibold text-[#334155] hover:bg-[#f8fafc]"
+                      disabled={statusUpdatingUserId === doctor.userId}
+                      className={`rounded-lg px-2 py-1 text-[11px] font-semibold disabled:cursor-wait disabled:opacity-60 ${doctor.status === "Whitelisted" ? "border border-[#fecaca] text-[#b91c1c] hover:bg-[#fef2f2]" : "border border-[#bbf7d0] text-[#166534] hover:bg-[#f0fdf4]"}`}
                       onClick={(event) => {
                         event.stopPropagation();
-                        updateDoctorStatus(doctor.id, doctor.status === "Whitelisted" ? "Blacklisted" : "Whitelisted");
+                        void handleDoctorStatusChange(doctor);
                       }}
                     >
-                      Toggle Status
+                      {statusUpdatingUserId === doctor.userId
+                        ? "Updating..."
+                        : doctor.status === "Whitelisted"
+                          ? "Blacklist"
+                          : "Whitelist"}
                     </button>
                   </div>
                 </div>
@@ -270,7 +452,10 @@ export default function AdminDoctorsPage() {
                   <p>{selectedDoctor.phone}</p>
                   <p>Username: {selectedDoctor.username}</p>
                   <p>Joined: {new Date(selectedDoctor.joinedAt).toLocaleDateString()}</p>
+                  <p>Email: {selectedDoctor.isEmailVerified ? "Verified" : "Not verified"}</p>
+                  <p>Doctor verified: {selectedDoctor.verifiedAt ? new Date(selectedDoctor.verifiedAt).toLocaleDateString() : "Pending"}</p>
                 </div>
+                <p className="mt-3 text-xs text-[#475569]">{selectedDoctor.bio || "No biography has been added."}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -289,6 +474,21 @@ export default function AdminDoctorsPage() {
                 <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
                   <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Patients</p>
                   <p className="mt-1 text-lg font-semibold text-[#001b5e]">{selectedDoctorPatients.length}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Wallet balance</p>
+                  <p className="mt-1 text-base font-semibold text-[#001b5e]">NGN {selectedDoctor.walletBalance.toLocaleString()}</p>
+                </div>
+                <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Lifetime points</p>
+                  <p className="mt-1 text-base font-semibold text-[#001b5e]">{selectedDoctor.walletPoints.toLocaleString()}</p>
+                </div>
+                <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Point value / Sessions</p>
+                  <p className="mt-1 text-base font-semibold text-[#001b5e]">NGN {(selectedDoctor.walletPointValue ?? 0).toLocaleString()} / {selectedDoctor.sessionCount ?? 0}</p>
                 </div>
               </div>
 

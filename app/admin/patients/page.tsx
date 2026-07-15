@@ -1,36 +1,100 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ADMIN_UPDATED_EVENT,
   readPaymentRecords,
   readSubscriptionPlans,
-  readAdminPatients,
-  updatePatientStatus,
   type PaymentRecord,
   type SubscriptionPlan,
   type AdminPatient,
 } from "@/lib/admin-portal";
 import { APPOINTMENT_REQUESTS_UPDATED_EVENT, readAppointmentRequests } from "@/lib/appointments";
+import { adminApiService, getApiErrorMessage, type AdminPatientUser } from "@/lib/api";
+
+function mapApiUserToPatient(user: AdminPatientUser): AdminPatient {
+  const fullName = [user.firstName.trim(), user.lastName.trim()]
+    .filter(Boolean)
+    .join(" ");
+
+  return {
+    id: user.patient?.id ?? user.id,
+    userId: user.id,
+    name: fullName || user.email,
+    email: user.email,
+    phone: user.phone ?? "Not provided",
+    status: user.deletedAt || user.patient?.deletedAt ? "Blacklisted" : "Whitelisted",
+    joinedAt: user.createdAt,
+    isEmailVerified: user.isEmailVerified,
+    consultationBalance: user.patient?.consultationBalance ?? 0,
+  };
+}
 
 export default function AdminPatientsPage() {
-  const [patients, setPatients] = useState<AdminPatient[]>(readAdminPatients());
+  const [patients, setPatients] = useState<AdminPatient[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>(readPaymentRecords());
   const [plans, setPlans] = useState<SubscriptionPlan[]>(readSubscriptionPlans());
   const [appointments, setAppointments] = useState(readAppointmentRequests());
-  const [selectedPatientId, setSelectedPatientId] = useState<string>(readAdminPatients()[0]?.id ?? "");
+  const [selectedPatientId, setSelectedPatientId] = useState("");
+  const [patientTotal, setPatientTotal] = useState(0);
+  const [isLoadingPatients, setIsLoadingPatients] = useState(true);
+  const [directoryError, setDirectoryError] = useState("");
+  const [statusUpdatingUserId, setStatusUpdatingUserId] = useState("");
+
+  const loadPatients = useCallback(async () => {
+    setDirectoryError("");
+    setIsLoadingPatients(true);
+
+    try {
+      const response = await adminApiService.listPatients();
+      const nextPatients = response.data.data.map(mapApiUserToPatient);
+      setPatients(nextPatients);
+      setPatientTotal(response.data.meta.total);
+      setSelectedPatientId((current) =>
+        nextPatients.some((patient) => patient.id === current)
+          ? current
+          : nextPatients[0]?.id ?? "",
+      );
+    } catch (error) {
+      setDirectoryError(getApiErrorMessage(error));
+    } finally {
+      setIsLoadingPatients(false);
+    }
+  }, []);
+
+  const handlePatientStatusChange = async (patient: AdminPatient) => {
+    if (!patient.userId || statusUpdatingUserId) return;
+
+    setDirectoryError("");
+    setStatusUpdatingUserId(patient.userId);
+
+    try {
+      if (patient.status === "Whitelisted") {
+        await adminApiService.deactivateUser(patient.userId);
+      } else {
+        await adminApiService.restoreUser(patient.userId);
+      }
+      await loadPatients();
+    } catch (error) {
+      setDirectoryError(getApiErrorMessage(error));
+    } finally {
+      setStatusUpdatingUserId("");
+    }
+  };
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadPatients();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadPatients]);
 
   useEffect(() => {
     const sync = () => {
-      const nextPatients = readAdminPatients();
-      setPatients(nextPatients);
       setPayments(readPaymentRecords());
       setPlans(readSubscriptionPlans());
       setAppointments(readAppointmentRequests());
-
-      if (!nextPatients.some((patient) => patient.id === selectedPatientId)) {
-        setSelectedPatientId(nextPatients[0]?.id ?? "");
-      }
     };
 
     sync();
@@ -43,9 +107,40 @@ export default function AdminPatientsPage() {
       window.removeEventListener(ADMIN_UPDATED_EVENT, sync);
       window.removeEventListener(APPOINTMENT_REQUESTS_UPDATED_EVENT, sync);
     };
-  }, [selectedPatientId]);
+  }, []);
 
   const selectedPatient = patients.find((patient) => patient.id === selectedPatientId) ?? null;
+
+  useEffect(() => {
+    const userId = selectedPatient?.userId;
+    const patientId = selectedPatient?.id;
+    if (!userId || !patientId) return;
+
+    let isCancelled = false;
+
+    void adminApiService.getUser(userId).then((response) => {
+      if (isCancelled) return;
+
+      setPatients((current) =>
+        current.map((patient) =>
+          patient.id === patientId
+            ? {
+                ...patient,
+                isEmailVerified: response.data.isEmailVerified,
+                consultationBalance:
+                  response.data.patient?.consultationBalance ?? 0,
+              }
+            : patient,
+        ),
+      );
+    }).catch(() => {
+      // The directory remains usable if optional profile details cannot load.
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedPatient?.id, selectedPatient?.userId]);
 
   const patientAppointments = useMemo(() => {
     if (!selectedPatient) {
@@ -96,10 +191,18 @@ export default function AdminPatientsPage() {
     return patients.filter((patient) => patient.status === "Whitelisted").length;
   }, [patients]);
 
-  const patientsWithSubscriptionsCount = useMemo(() => {
-    const subscribedPatientIds = new Set(payments.filter((payment) => payment.status === "Paid").map((payment) => payment.patientId));
-    return subscribedPatientIds.size;
-  }, [payments]);
+  const verifiedPatientsCount = useMemo(
+    () => patients.filter((patient) => patient.isEmailVerified).length,
+    [patients],
+  );
+
+  const totalConsultationBalance = useMemo(
+    () => patients.reduce(
+      (total, patient) => total + (patient.consultationBalance ?? 0),
+      0,
+    ),
+    [patients],
+  );
 
   return (
     <div className="space-y-6">
@@ -108,22 +211,29 @@ export default function AdminPatientsPage() {
         <p className="mt-1 text-sm text-[#475569]">Review patient accounts, appointments, consultations, and subscription activity in one workspace.</p>
       </div>
 
+      {directoryError ? (
+        <div role="alert" className="flex flex-col gap-3 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c] sm:flex-row sm:items-center sm:justify-between">
+          <span>{directoryError}</span>
+          <button type="button" onClick={() => void loadPatients()} className="rounded-lg border border-[#fca5a5] px-3 py-1.5 text-xs font-semibold hover:bg-white">Try Again</button>
+        </div>
+      ) : null}
+
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Total Patients</p>
-          <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{patients.length}</p>
+          <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{isLoadingPatients ? "—" : patientTotal}</p>
         </article>
         <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Whitelisted</p>
           <p className="mt-2 text-2xl font-semibold text-[#166534]">{whitelistedPatientsCount}</p>
         </article>
         <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">With Subscriptions</p>
-          <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{patientsWithSubscriptionsCount}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Email Verified</p>
+          <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{verifiedPatientsCount}</p>
         </article>
         <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Total Payments</p>
-          <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{payments.length}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Consultation Balance</p>
+          <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{totalConsultationBalance}</p>
         </article>
       </section>
 
@@ -131,10 +241,13 @@ export default function AdminPatientsPage() {
         <article className="rounded-2xl border border-[#dbe4f0] bg-white p-4 shadow-sm sm:p-5">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-base font-semibold text-[#001b5e]">Patient Directory</h3>
-            <span className="rounded-full bg-[#e2e8f0] px-2.5 py-1 text-xs font-semibold text-[#334155]">{patients.length} patients</span>
+            <span className="rounded-full bg-[#e2e8f0] px-2.5 py-1 text-xs font-semibold text-[#334155]">{isLoadingPatients ? "Loading…" : `${patientTotal} patients`}</span>
           </div>
 
           <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
+            {!isLoadingPatients && !directoryError && patients.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-[#cbd5e1] p-4 text-center text-sm text-[#64748b]">No patients found.</p>
+            ) : null}
             {patients.map((patient) => {
               const isActive = selectedPatientId === patient.id;
 
@@ -172,15 +285,21 @@ export default function AdminPatientsPage() {
                   <div className="mt-3 flex justify-end">
                     <button
                       type="button"
-                      className="rounded-lg border border-[#cbd5e1] px-2 py-1 text-[11px] font-semibold text-[#334155] hover:bg-[#f8fafc]"
+                      disabled={statusUpdatingUserId === patient.userId}
+                      className={`rounded-lg px-2 py-1 text-[11px] font-semibold disabled:cursor-wait disabled:opacity-60 ${patient.status === "Whitelisted" ? "border border-[#fecaca] text-[#b91c1c] hover:bg-[#fef2f2]" : "border border-[#bbf7d0] text-[#166534] hover:bg-[#f0fdf4]"}`}
                       onClick={(event) => {
                         event.stopPropagation();
-                        updatePatientStatus(patient.id, patient.status === "Whitelisted" ? "Blacklisted" : "Whitelisted");
+                        void handlePatientStatusChange(patient);
                       }}
                     >
-                      Toggle Status
+                      {statusUpdatingUserId === patient.userId
+                        ? "Updating..."
+                        : patient.status === "Whitelisted"
+                          ? "Blacklist"
+                          : "Whitelist"}
                     </button>
                   </div>
+
                 </div>
               );
             })}
@@ -198,6 +317,8 @@ export default function AdminPatientsPage() {
                   <p>{selectedPatient.phone}</p>
                   <p>Patient ID: {selectedPatient.id}</p>
                   <p>Joined: {new Date(selectedPatient.joinedAt).toLocaleDateString()}</p>
+                  <p>Email: {selectedPatient.isEmailVerified ? "Verified" : "Not verified"}</p>
+                  <p>Consultation balance: {selectedPatient.consultationBalance ?? 0}</p>
                 </div>
               </div>
 
