@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
+import DoctorProfileSummary from "@/components/doctor-profile-summary";
 import DoctorLogoutButton from "@/components/doctor-logout-button";
 import {
   ADMIN_UPDATED_EVENT,
@@ -16,6 +17,11 @@ import {
   updateAppointmentRequestStatus,
   type AppointmentRequest,
 } from "@/lib/appointments";
+import {
+  getDoctorDisplayName,
+  useDoctorProfile,
+} from "@/lib/use-doctor-profile";
+import { doctorApiService } from "@/lib/api";
 
 const DOCTOR_NOTIFICATIONS_KEY = "dwDoctorNotifications";
 
@@ -62,7 +68,7 @@ const patientReviews = [
     id: "pr-1",
     patient: "Tina Cole",
     rating: "5.0",
-    comment: "Dr. Richardson explained everything clearly and followed up promptly.",
+    comment: "The doctor explained everything clearly and followed up promptly.",
   },
   {
     id: "pr-2",
@@ -88,9 +94,11 @@ function getInitials(name: string) {
 }
 
 export default function ConsultantDashboardPage() {
+  const doctorProfile = useDoctorProfile();
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
+  const [appointmentTotals, setAppointmentTotals] = useState<{ all: number; completed: number } | null>(null);
   const [walletSummary, setWalletSummary] = useState(() => readDoctorWalletSummary("dr-richardson"));
   const today = useMemo(() => new Date(), []);
   const currentYear = today.getFullYear();
@@ -136,6 +144,24 @@ export default function ConsultantDashboardPage() {
 
     return cells;
   }, [currentMonth, currentYear, today]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void Promise.all([
+        doctorApiService.listAppointments({ page: 1, limit: 1 }),
+        doctorApiService.listAppointments({ status: "COMPLETED", page: 1, limit: 1 }),
+      ]).then(([allResponse, completedResponse]) => {
+        setAppointmentTotals({
+          all: allResponse.data.meta.total,
+          completed: completedResponse.data.meta.total,
+        });
+      }).catch(() => {
+        // The authenticated API client handles session errors and redirects.
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   useEffect(() => {
     const refreshUnreadCount = () => {
@@ -225,17 +251,14 @@ export default function ConsultantDashboardPage() {
           <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#16b36c] bg-[#e0e3e6]">
             <Image
               className="object-cover"
-              alt="Dr. Richardson"
+              alt="Doctor profile"
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuBveWw5sJYO4vcFdjWVdbuGQDlC0JKaMeg6jsjDDSJkIwdRjG_4H_Ao7x2stxD6kTx4oY4DP80Tf-kMczLWJQqZw7ajzN4HpSFJ0W7qcoFs9bxbSpMN7PrAqivavfdvvECjYhZNcT_25wMoRamMlavt1GZ5bU5v1LXmZRreRkSDQzcoG5jXyD19NtcvpsAZFGHlPJkNdm6Vme6nV5SmbMT-CGGHwt91t_aHyC2bbT4qoU6rYhO4t232jYBYnX0OKrxpnI_i4VeK-yJ_"
               fill
               sizes="48px"
               unoptimized
             />
           </div>
-          <div>
-            <p className="font-semibold text-[#7784ac]">Dr. Richardson</p>
-            <p className="text-xs text-[#7784ac]/80">Senior Cardiologist</p>
-          </div>
+          <DoctorProfileSummary />
         </div>
 
         <div className="flex-grow space-y-2 text-sm">
@@ -278,7 +301,7 @@ export default function ConsultantDashboardPage() {
         <header className="mb-6 flex flex-col justify-between gap-3 sm:mb-8 sm:gap-4 md:flex-row md:items-end">
           <div>
             <h1 className="text-xl font-semibold text-[#00020d] sm:text-2xl mb-2">Physician Dashboard</h1>
-            <p className="text-xs text-[#45464e] sm:text-[13px]">Welcome back, Dr. Richardson. You have 8 appointments today.</p>
+            <p className="text-xs text-[#45464e] sm:text-[13px]">Welcome back, {getDoctorDisplayName(doctorProfile)}. You have {appointmentTotals?.all ?? "—"} total appointments.</p>
           </div>
           <div className="hidden items-center gap-4 md:flex">
             <div className="rounded-lg border border-[#c6c6cf] bg-[#f7f9fc] px-3 py-2 text-right">
@@ -320,10 +343,10 @@ export default function ConsultantDashboardPage() {
               <div className="rounded-lg bg-[#16b36c]/10 p-2">
                 <span className="material-symbols-outlined text-[#16b36c]">event_available</span>
               </div>
-              <span className="text-xs font-bold text-[#16b36c]">+12%</span>
+              <span className="text-xs font-bold text-[#16b36c]">Live</span>
             </div>
-            <h3 className="text-xs text-[#45464e] sm:text-[13px] mb-2">Appointments Today</h3>
-            <p className="text-xl font-semibold text-[#00020d] sm:text-1xl">14</p>
+            <h3 className="text-xs text-[#45464e] sm:text-[13px] mb-2">All Appointments</h3>
+            <p className="text-xl font-semibold text-[#00020d] sm:text-1xl">{appointmentTotals?.all ?? "—"}</p>
           </div>
 
           <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">
@@ -331,10 +354,10 @@ export default function ConsultantDashboardPage() {
               <div className="rounded-lg bg-[#67d6e7]/20 p-2">
                 <span className="material-symbols-outlined text-[#0093a2]">pending_actions</span>
               </div>
-              <span className="text-xs font-bold text-[#16b36c]">+12%</span>
+              <span className="text-xs font-bold text-[#16b36c]">Live</span>
             </div>
             <h3 className="text-xs text-[#45464e] sm:text-[13px] mb-2">Completed Consultations</h3>
-            <p className="text-xl font-semibold text-[#00020d] sm:text-1xl">06</p>
+            <p className="text-xl font-semibold text-[#00020d] sm:text-1xl">{appointmentTotals?.completed ?? "—"}</p>
           </div>
 
           <div className="rounded-xl border border-[#eaecf0] bg-white/80 p-4 shadow-sm backdrop-blur-sm">

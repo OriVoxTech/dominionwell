@@ -47,6 +47,20 @@ const doctorApi = axios.create({
   timeout: 15_000,
 });
 
+const doctorGatewayApi = axios.create({
+  headers: {
+    Accept: "application/json",
+  },
+  timeout: 15_000,
+});
+
+const publicGatewayApi = axios.create({
+  headers: {
+    Accept: "application/json",
+  },
+  timeout: 15_000,
+});
+
 const adminApi = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -70,6 +84,12 @@ doctorApi.interceptors.request.use((config) => {
     config.headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
+  return config;
+});
+
+doctorGatewayApi.interceptors.request.use((config) => {
+  const accessToken = getDoctorAccessToken();
+  if (accessToken) config.headers.set("Authorization", `Bearer ${accessToken}`);
   return config;
 });
 
@@ -115,24 +135,31 @@ const PUBLIC_DOCTOR_AUTH_ENDPOINTS = new Set([
   "/doctors/auth/reset-password",
 ]);
 
+function handleExpiredDoctorSession(error: AxiosError) {
+  const requestPath = error.config?.url ?? "";
+
+  if (
+    error.response?.status === 401 &&
+    !PUBLIC_DOCTOR_AUTH_ENDPOINTS.has(requestPath)
+  ) {
+    clearDoctorSession();
+
+    if (typeof window !== "undefined") {
+      window.location.assign("/login/doctor?session=expired");
+    }
+  }
+
+  return Promise.reject(error);
+}
+
 doctorApi.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
-    const requestPath = error.config?.url ?? "";
+  handleExpiredDoctorSession,
+);
 
-    if (
-      error.response?.status === 401 &&
-      !PUBLIC_DOCTOR_AUTH_ENDPOINTS.has(requestPath)
-    ) {
-      clearDoctorSession();
-
-      if (typeof window !== "undefined") {
-        window.location.assign("/login/doctor?session=expired");
-      }
-    }
-
-    return Promise.reject(error);
-  },
+doctorGatewayApi.interceptors.response.use(
+  (response) => response,
+  handleExpiredDoctorSession,
 );
 
 api.interceptors.request.use((config) => {
@@ -218,6 +245,127 @@ export interface DoctorResetPasswordPayload {
   otp: string;
   newPassword: string;
   confirmPassword: string;
+}
+
+export interface DoctorProfile {
+  id: string;
+  userId: string;
+  bio: string | null;
+  specializations: string[];
+  verifiedAt: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+    phone: string | null;
+    createdAt: string;
+  };
+}
+
+export interface UpdateDoctorProfilePayload {
+  bio: string;
+  specializations: string[];
+  firstName: string;
+  lastName: string;
+  phone: string;
+}
+
+export type DoctorAppointmentStatus =
+  | "BOOKED"
+  | "CANCELLED"
+  | "COMPLETED"
+  | "VERIFIED";
+
+export interface DoctorAppointmentsQuery {
+  status?: DoctorAppointmentStatus;
+  page?: number;
+  limit?: number;
+}
+
+export interface DoctorAppointment extends Record<string, unknown> {
+  id: string;
+  status: DoctorAppointmentStatus;
+}
+
+export interface DoctorAppointmentsResponse {
+  data: DoctorAppointment[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface CreateDoctorAvailabilityPayload {
+  date: string;
+  startTimes: string[];
+  slotDurationMinutes: number;
+  timezoneOffsetMinutes: number;
+}
+
+export interface DoctorAvailabilitySlot {
+  id: string;
+  monthId: string;
+  doctorId: string;
+  startsAt: string;
+  endsAt: string;
+  isBooked: boolean;
+  createdAt: string;
+}
+
+export interface DoctorAvailabilityCalendarResponse {
+  year: number;
+  month: number;
+  days: Array<{
+    date: string;
+    slotCount: number;
+    bookedCount: number;
+    slots: DoctorAvailabilitySlot[];
+  }>;
+}
+
+export interface CreateDoctorAvailabilityResponse {
+  date: string;
+  slotCount: number;
+  slots: DoctorAvailabilitySlot[];
+}
+
+export interface PublicDoctor {
+  id: string;
+  bio: string | null;
+  specializations: string[];
+  verifiedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    firstName: string;
+    lastName: string;
+    username: string;
+    createdAt: string;
+  };
+}
+
+export interface PublicDoctorsQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  specialization?: string;
+}
+
+export interface PublicDoctorsResponse {
+  data: PublicDoctor[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export interface AdminLoginPayload {
@@ -480,6 +628,47 @@ export const doctorAuthApi = {
     doctorApi.post<ApiResponse>("/doctors/auth/reset-password", payload),
   changePassword: (payload: ChangePasswordPayload) =>
     doctorApi.post<ApiResponse>("/doctors/auth/change-password", payload),
+};
+
+export const doctorApiService = {
+  getProfile: () => doctorGatewayApi.get<DoctorProfile>("/api/doctors/me"),
+  updateProfile: (payload: UpdateDoctorProfilePayload) =>
+    doctorGatewayApi.patch<DoctorProfile>("/api/doctors/me", payload),
+  listAppointments: (params: DoctorAppointmentsQuery = {}) =>
+    doctorGatewayApi.get<DoctorAppointmentsResponse>(
+      "/api/appointments/doctor",
+      { params: { page: 1, limit: 20, ...params } },
+    ),
+  createAvailability: (payload: CreateDoctorAvailabilityPayload) =>
+    doctorGatewayApi.put<CreateDoctorAvailabilityResponse>(
+      "/api/doctors/me/availability/day",
+      payload,
+    ),
+  getAvailabilityCalendar: (year: number, month: number) =>
+    doctorGatewayApi.get<DoctorAvailabilityCalendarResponse>(
+      "/api/doctors/me/availability/calendar",
+      { params: { year, month, timezoneOffsetMinutes: 0 } },
+    ),
+  deleteAvailabilitySlot: (slotId: string) =>
+    doctorGatewayApi.delete<ApiResponse>(
+      `/api/doctors/me/availability/${encodeURIComponent(slotId)}`,
+    ),
+  clearDayAvailability: (date: string) =>
+    doctorGatewayApi.delete<ApiResponse>(
+      `/api/doctors/me/availability/day/${encodeURIComponent(date)}`,
+      { params: { timezoneOffsetMinutes: 0 } },
+    ),
+};
+
+export const patientDoctorsApiService = {
+  list: (params: PublicDoctorsQuery = {}) =>
+    publicGatewayApi.get<PublicDoctorsResponse>("/api/doctors", {
+      params: { page: 1, limit: 20, ...params },
+    }),
+  getById: (id: string) =>
+    publicGatewayApi.get<PublicDoctor>(
+      `/api/doctors/${encodeURIComponent(id)}`,
+    ),
 };
 
 export const adminApiService = {

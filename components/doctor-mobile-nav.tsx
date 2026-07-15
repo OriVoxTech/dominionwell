@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import DoctorLogoutButton from "@/components/doctor-logout-button";
+import DoctorProfileSummary from "@/components/doctor-profile-summary";
 
 const menuItems = [
   { label: "Dashboard", icon: "dashboard", href: "/dashboard/doctor" },
@@ -119,6 +120,11 @@ export default function DoctorMobileNav() {
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
+            </div>
+
+            <div className="mb-5 rounded-xl border border-white/15 bg-white/5 px-3 py-3">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[#d7dbeb]/70">Signed in as</p>
+              <DoctorProfileSummary />
             </div>
 
             <nav className="space-y-1 text-sm">

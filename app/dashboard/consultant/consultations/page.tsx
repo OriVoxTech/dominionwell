@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
+import DoctorProfileSummary from "@/components/doctor-profile-summary";
 import DoctorLogoutButton from "@/components/doctor-logout-button";
 import {
   APPOINTMENT_REQUESTS_UPDATED_EVENT,
@@ -13,6 +14,12 @@ import {
   type AppointmentRequest,
 } from "@/lib/appointments";
 import { creditDoctorForCompletedConsultation } from "@/lib/admin-portal";
+import {
+  doctorApiService,
+  getApiErrorMessage,
+  type DoctorAppointment,
+  type DoctorAppointmentStatus,
+} from "@/lib/api";
 
 type ConsultationStatus = "Completed" | "Pending" | "Cancelled" | "Ongoing";
 
@@ -24,37 +31,13 @@ type ConsultationItem = {
   status: ConsultationStatus;
 };
 
-const initialConsultations: ConsultationItem[] = [
-  {
-    id: "CNS-1001",
-    patient: "Arthur Morgan",
-    concern: "Chest pain follow-up",
-    status: "Completed",
-  },
-  {
-    id: "CNS-1002",
-    patient: "Sarah Williams",
-    concern: "Post-op recovery check",
-    status: "Ongoing",
-  },
-  {
-    id: "CNS-1003",
-    patient: "Daniel Okafor",
-    concern: "Hypertension medication review",
-    status: "Pending",
-  },
-  {
-    id: "CNS-1004",
-    patient: "Grace Bennett",
-    concern: "Cardiac screening consult",
-    status: "Cancelled",
-  },
-  {
-    id: "CNS-1005",
-    patient: "Rita Adeyemi",
-    concern: "Routine wellness consultation",
-    status: "Completed",
-  },
+const initialConsultations: ConsultationItem[] = [];
+
+const doctorAppointmentStatuses: DoctorAppointmentStatus[] = [
+  "BOOKED",
+  "VERIFIED",
+  "COMPLETED",
+  "CANCELLED",
 ];
 
 const statusClassMap: Record<ConsultationStatus, string> = {
@@ -99,8 +82,41 @@ export default function ConsultantConsultationsPage() {
   const [completionReport, setCompletionReport] = useState("");
   const [completionStep, setCompletionStep] = useState<"concern" | "reportPrompt" | "reportInput">("concern");
   const [completionError, setCompletionError] = useState("");
+  const [doctorAppointments, setDoctorAppointments] = useState<DoctorAppointment[]>([]);
+  const [appointmentStatus, setAppointmentStatus] = useState<DoctorAppointmentStatus | "">("");
+  const [appointmentPage, setAppointmentPage] = useState(1);
+  const [appointmentMeta, setAppointmentMeta] = useState({ total: 0, page: 1, limit: 20, totalPages: 0 });
+  const [isLoadingDoctorAppointments, setIsLoadingDoctorAppointments] = useState(true);
+  const [doctorAppointmentsError, setDoctorAppointmentsError] = useState("");
 
   const activeCompletionConsultation = consultations.find((item) => item.id === completionConsultationId) ?? null;
+
+  const loadDoctorAppointments = useCallback(async () => {
+    setDoctorAppointmentsError("");
+    setIsLoadingDoctorAppointments(true);
+
+    try {
+      const response = await doctorApiService.listAppointments({
+        status: appointmentStatus || undefined,
+        page: appointmentPage,
+        limit: 20,
+      });
+      setDoctorAppointments(response.data.data);
+      setAppointmentMeta(response.data.meta);
+    } catch (error) {
+      setDoctorAppointmentsError(getApiErrorMessage(error));
+    } finally {
+      setIsLoadingDoctorAppointments(false);
+    }
+  }, [appointmentPage, appointmentStatus]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadDoctorAppointments();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadDoctorAppointments]);
 
   useEffect(() => {
     const syncAppointmentRequests = () => {
@@ -257,17 +273,14 @@ export default function ConsultantConsultationsPage() {
           <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#16b36c] bg-[#e0e3e6]">
             <Image
               className="object-cover"
-              alt="Dr. Richardson"
+              alt="Doctor profile"
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuBveWw5sJYO4vcFdjWVdbuGQDlC0JKaMeg6jsjDDSJkIwdRjG_4H_Ao7x2stxD6kTx4oY4DP80Tf-kMczLWJQqZw7ajzN4HpSFJ0W7qcoFs9bxbSpMN7PrAqivavfdvvECjYhZNcT_25wMoRamMlavt1GZ5bU5v1LXmZRreRkSDQzcoG5jXyD19NtcvpsAZFGHlPJkNdm6Vme6nV5SmbMT-CGGHwt91t_aHyC2bbT4qoU6rYhO4t232jYBYnX0OKrxpnI_i4VeK-yJ_"
               fill
               sizes="48px"
               unoptimized
             />
           </div>
-          <div>
-            <p className="font-semibold text-[#7784ac]">Dr. Richardson</p>
-            <p className="text-xs text-[#7784ac]/80">Senior Cardiologist</p>
-          </div>
+          <DoctorProfileSummary />
         </div>
 
         <div className="flex-grow space-y-2 text-sm">
@@ -320,6 +333,81 @@ export default function ConsultantConsultationsPage() {
           </div>
           <p className="text-xs text-[#45464e] sm:text-sm">View all consultations and their current status.</p>
         </header>
+
+        <section className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-[#00020d]">Doctor Appointments</h2>
+              <p className="mt-1 text-xs text-[#64748b]">Total: {isLoadingDoctorAppointments ? "—" : appointmentMeta.total}</p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <select
+                value={appointmentStatus}
+                onChange={(event) => {
+                  setAppointmentStatus(event.target.value as DoctorAppointmentStatus | "");
+                  setAppointmentPage(1);
+                }}
+                className="h-10 rounded-lg border border-[#c6c6cf] bg-white px-3 text-sm text-[#334155] outline-none focus:border-[#0aa4b4]"
+                aria-label="Filter appointments by status"
+              >
+                <option value="">All statuses</option>
+                {doctorAppointmentStatuses.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => void loadDoctorAppointments()}
+                disabled={isLoadingDoctorAppointments}
+                className="h-10 rounded-lg border border-[#c6c6cf] px-3 text-sm font-semibold text-[#001b5e] hover:bg-[#f8fafc] disabled:cursor-wait disabled:opacity-60"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          {doctorAppointmentsError ? (
+            <div role="alert" className="mt-4 flex flex-col gap-2 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-sm text-[#b91c1c] sm:flex-row sm:items-center sm:justify-between">
+              <span>{doctorAppointmentsError}</span>
+              <button type="button" onClick={() => void loadDoctorAppointments()} className="rounded-md border border-[#fca5a5] px-2 py-1 text-xs font-semibold hover:bg-white">Try Again</button>
+            </div>
+          ) : null}
+
+          {isLoadingDoctorAppointments ? (
+            <p className="mt-4 rounded-lg bg-[#f8fafc] p-4 text-sm text-[#64748b]">Loading appointments...</p>
+          ) : doctorAppointments.length === 0 && !doctorAppointmentsError ? (
+            <p className="mt-4 rounded-lg border border-dashed border-[#c6c6cf] bg-[#f8fafc] p-4 text-sm text-[#64748b]">No appointments found.</p>
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="bg-[#f2f4f7] text-[11px] uppercase tracking-wide text-[#64748b]">
+                    <th className="rounded-l-lg px-3 py-3">Appointment ID</th>
+                    <th className="rounded-r-lg px-3 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {doctorAppointments.map((appointment) => (
+                    <tr key={appointment.id} className="border-b border-[#e2e8f0] last:border-b-0">
+                      <td className="px-3 py-3 font-medium text-[#001b5e]">{appointment.id}</td>
+                      <td className="px-3 py-3">
+                        <span className="rounded-full bg-[#e2e8f0] px-2 py-1 text-[10px] font-semibold text-[#334155]">{appointment.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {appointmentMeta.totalPages > 1 ? (
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <button type="button" disabled={appointmentPage <= 1 || isLoadingDoctorAppointments} onClick={() => setAppointmentPage((page) => Math.max(1, page - 1))} className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#001b5e] disabled:cursor-not-allowed disabled:opacity-50">Previous</button>
+              <p className="text-xs text-[#64748b]">Page {appointmentMeta.page} of {appointmentMeta.totalPages}</p>
+              <button type="button" disabled={appointmentPage >= appointmentMeta.totalPages || isLoadingDoctorAppointments} onClick={() => setAppointmentPage((page) => page + 1)} className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#001b5e] disabled:cursor-not-allowed disabled:opacity-50">Next</button>
+            </div>
+          ) : null}
+        </section>
 
         <section id="verify-consultation" className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm scroll-mt-24">
           <h2 className="mb-3 text-base font-semibold text-[#00020d]">Verify Consultation</h2>

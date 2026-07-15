@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
+import DoctorProfileSummary from "@/components/doctor-profile-summary";
 import DoctorLogoutButton from "@/components/doctor-logout-button";
 
 type PatientConsultationSummary = {
@@ -65,17 +66,14 @@ export default function ConsultantPatientsPage() {
           <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#16b36c] bg-[#e0e3e6]">
             <Image
               className="object-cover"
-              alt="Dr. Richardson"
+              alt="Doctor profile"
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuBveWw5sJYO4vcFdjWVdbuGQDlC0JKaMeg6jsjDDSJkIwdRjG_4H_Ao7x2stxD6kTx4oY4DP80Tf-kMczLWJQqZw7ajzN4HpSFJ0W7qcoFs9bxbSpMN7PrAqivavfdvvECjYhZNcT_25wMoRamMlavt1GZ5bU5v1LXmZRreRkSDQzcoG5jXyD19NtcvpsAZFGHlPJkNdm6Vme6nV5SmbMT-CGGHwt91t_aHyC2bbT4qoU6rYhO4t232jYBYnX0OKrxpnI_i4VeK-yJ_"
               fill
               sizes="48px"
               unoptimized
             />
           </div>
-          <div>
-            <p className="font-semibold text-[#7784ac]">Dr. Richardson</p>
-            <p className="text-xs text-[#7784ac]/80">Senior Cardiologist</p>
-          </div>
+          <DoctorProfileSummary />
         </div>
 
         <div className="flex-grow space-y-2 text-sm">
