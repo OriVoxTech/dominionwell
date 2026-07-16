@@ -3,14 +3,94 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SignInModal from "../components/sign-in-modal";
+import {
+  getApiErrorMessage,
+  patientDoctorsApiService,
+  type PublicDoctor,
+} from "@/lib/api";
 import { isPatientSessionActive } from "@/lib/patient-session";
+
+const FEATURED_DOCTOR_COUNT = 4;
+
+function getDoctorName(doctor: PublicDoctor) {
+  const name = [doctor.user.firstName, doctor.user.lastName]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return name ? `Dr. ${name}` : `Dr. ${doctor.user.username}`;
+}
+
+function getDoctorInitials(doctor: PublicDoctor) {
+  return (
+    [doctor.user.firstName, doctor.user.lastName]
+      .map((part) => part.trim().charAt(0).toUpperCase())
+      .filter(Boolean)
+      .join("") || "DR"
+  );
+}
+
+function formatSpecialization(value: string) {
+  return value
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function pickRandomDoctors(doctors: PublicDoctor[]) {
+  const shuffledDoctors = [...doctors];
+
+  for (let index = shuffledDoctors.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffledDoctors[index], shuffledDoctors[randomIndex]] = [
+      shuffledDoctors[randomIndex],
+      shuffledDoctors[index],
+    ];
+  }
+
+  return shuffledDoctors.slice(0, FEATURED_DOCTOR_COUNT);
+}
 
 export default function Home() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [featuredDoctors, setFeaturedDoctors] = useState<PublicDoctor[]>([]);
+  const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
+  const [doctorsError, setDoctorsError] = useState("");
+
+  useEffect(() => {
+    let shouldUpdate = true;
+
+    const loadFeaturedDoctors = async () => {
+      try {
+        const response = await patientDoctorsApiService.list({
+          page: 1,
+          limit: 100,
+        });
+
+        if (shouldUpdate) {
+          setFeaturedDoctors(pickRandomDoctors(response.data.data));
+        }
+      } catch (error) {
+        if (shouldUpdate) {
+          setDoctorsError(getApiErrorMessage(error));
+        }
+      } finally {
+        if (shouldUpdate) {
+          setIsLoadingDoctors(false);
+        }
+      }
+    };
+
+    void loadFeaturedDoctors();
+
+    return () => {
+      shouldUpdate = false;
+    };
+  }, []);
 
   const isPatientLoggedIn = () => {
     if (typeof window === "undefined") {
@@ -156,9 +236,9 @@ export default function Home() {
                 <p className="text-sm text-[#45464e] sm:text-base">
                   Browse our curated network of board-certified specialists. Filter by rating, language, or availability.
                 </p>
-                <div className="mt-auto flex items-center gap-1 pt-4 text-sm font-medium text-[#16b46f]">
+                <Link href="/login/patient" className="mt-auto flex items-center gap-1 pt-4 text-sm font-medium text-[#16b46f]">
                   Browse Network <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </div>
+                </Link>
               </div>
 
               <div className="col-span-12 flex flex-col items-start gap-3 rounded-2xl bg-[#001b5e] p-6 shadow-xl sm:gap-4 sm:p-8 md:col-span-4">
@@ -169,9 +249,9 @@ export default function Home() {
                 <p className="text-sm text-[#b9c5f1] sm:text-base">
                   Secure your slot in seconds. No more waiting on hold, choose a time that works for your schedule.
                 </p>
-                <div className="mt-auto flex items-center gap-1 pt-4 text-sm font-medium text-[#16b46f]">
+                <Link href="/login/patient" className="mt-auto flex items-center gap-1 pt-4 text-sm font-medium text-[#16b46f]">
                   View Availability <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </div>
+                </Link>
               </div>
 
               <div className="glass-card col-span-12 flex flex-col items-start gap-3 rounded-2xl border border-[#c6c6cf] p-6 sm:gap-4 sm:p-8 md:col-span-4">
@@ -182,9 +262,9 @@ export default function Home() {
                 <p className="text-sm text-[#45464e] sm:text-base">
                   Consult via HD video or in-person. Access your digital records and prescriptions immediately after.
                 </p>
-                <div className="mt-auto flex items-center gap-1 pt-4 text-sm font-medium text-[#16b46f]">
+                <Link href="/login/patient" className="mt-auto flex items-center gap-1 pt-4 text-sm font-medium text-[#16b46f]">
                   Learn More <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </div>
+                </Link>
               </div>
             </div>
           </div>
@@ -199,88 +279,61 @@ export default function Home() {
                   Meet our top-rated medical professionals who are setting new standards in clinical excellence and patient care.
                 </p>
               </div>
-              <button className="hidden items-center gap-2 rounded-lg border-2 border-[#16b46f] px-6 py-2 text-sm font-medium text-[#16b46f] md:flex" type="button">
+              <Link href="/login/patient" className="hidden items-center gap-2 rounded-lg border-2 border-[#16b46f] px-6 py-2 text-sm font-medium text-[#16b46f] md:flex">
                 View All Doctors
-              </button>
+              </Link>
             </div>
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-8 lg:grid-cols-4">
-              <article className="group overflow-hidden rounded-2xl border border-[#c6c6cf] bg-white transition-all duration-300 hover:shadow-xl">
-                <div className="relative h-64 overflow-hidden">
-                  <Image className="object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdVENcuEGku3lbM2PPqI4t1CqMjy5CB31TeEL_xUOLUl8ClPRkzQhs2oxl-Md3qLt72L0_lcWVsb4YIBvatXsZ_Osb-RR_KA_rKjvKAoTTghpVJPrhWLIpyc8NwD3K3d2EaDZnrL9pZQ_krsOryzAEyIQ5mO4Cwa5OqcRG3wOEJwTXEoh3Mep8Mtg5Kju7AWH2IQ1xZLkkb9wVwEJHoom_VDqlDoSEXZK5wRQuVDetFt3g6krqKFpWXf6MrBDjYLkgUqYNGO8o-97d" alt="Dr. Sarah Jenkins" fill sizes="(max-width: 1024px) 100vw, 25vw" unoptimized />
-                  <div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-[#16b46f] px-3 py-1 text-xs font-semibold text-white">
-                    <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      star
-                    </span>
-                    4.9
-                  </div>
-                </div>
-                <div className="p-5 sm:p-6">
-                  <h4 className="mb-1 text-1xl font-semibold text-[#001b5e]">Dr. Sarah Jenkins</h4>
-                  <p className="mb-4 text-sm text-[#45464e]">Senior Cardiologist</p>
-                  <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button" onClick={handleBookConsultation}>
-                    Book Consultation
-                  </button>
-                </div>
-              </article>
+              {isLoadingDoctors
+                ? Array.from({ length: FEATURED_DOCTOR_COUNT }, (_, index) => (
+                    <div key={index} className="h-[390px] animate-pulse rounded-2xl border border-[#e2e8f0] bg-white">
+                      <div className="h-64 bg-[#e2e8f0]" />
+                      <div className="space-y-3 p-6">
+                        <div className="h-5 w-2/3 rounded bg-[#e2e8f0]" />
+                        <div className="h-4 w-1/2 rounded bg-[#f1f5f9]" />
+                        <div className="h-11 rounded-lg bg-[#f1f5f9]" />
+                      </div>
+                    </div>
+                  ))
+                : featuredDoctors.map((doctor) => {
+                    const doctorName = getDoctorName(doctor);
+                    const specialization = doctor.specializations[0]
+                      ? formatSpecialization(doctor.specializations[0])
+                      : "Medical Specialist";
 
-              <article className="group overflow-hidden rounded-2xl border border-[#c6c6cf] bg-white transition-all duration-300 hover:shadow-xl">
-                <div className="relative h-64 overflow-hidden">
-                  <Image className="object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuADFuaVYzu4xfvRjN6OI0agehpArk2-F5bPsvXCo4R4Pm2C_Y3jf0Ho0kB6LxjRWz0GX5ojZAYIzWMk4PWMHzQQ7N__YE8_WFOkiqalOC0fCy23IM7vi9xabG1l0apWq_pz7O74SqmT9ZXndePOUKl8HUpSn0uaKgTZFgUTX2OGmq8go75XZv-1u5e3wPcn727UGXslJIqJhEwO9S_ABNt0_6sn8tAXR2LMAqBb2nP4Myxnc8Ts-VsgA-YyJ5Yk6037hzQRsf5mP9_3" alt="Dr. Michael Chen" fill sizes="(max-width: 1024px) 100vw, 25vw" unoptimized />
-                  <div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-[#16b46f] px-3 py-1 text-xs font-semibold text-white">
-                    <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      star
-                    </span>
-                    5.0
-                  </div>
-                </div>
-                <div className="p-6">
-                  <h4 className="mb-1 text-1xl font-semibold text-[#001b5e]">Dr. Michael Chen</h4>
-                  <p className="mb-4 text-sm text-[#45464e]">Pediatric Specialist</p>
-                  <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button" onClick={handleBookConsultation}>
-                    Book Consultation
-                  </button>
-                </div>
-              </article>
-
-              <article className="group overflow-hidden rounded-2xl border border-[#c6c6cf] bg-white transition-all duration-300 hover:shadow-xl">
-                <div className="relative h-64 overflow-hidden">
-                  <Image className="object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC25sw_gICQG5nUJgb_PzGHdVreboISlxs_vniy40Z1LHsTyFlhmXocw8eRdx5dMAzSNoheRbkowynsyyiBfyFkfy6bXDZ2HhIH8q_J5SXKy8XBHT5Z2VRn1NxS1RDzIt_R4zk6u64-5smighKYHASUGWyfSnGE8NvxEZZ6b65qaHxMwLpHUNRtCieMj1EfysHms-2cKiuCbXx5v3fu9IGtstLCSksFNFzLmAmyLWi8ghlUK06XdbEpUGIUSZn0O5z59i6g1GXA1Gqw" alt="Dr. Elena Rodriguez" fill sizes="(max-width: 1024px) 100vw, 25vw" unoptimized />
-                  <div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-[#16b46f] px-3 py-1 text-xs font-semibold text-white">
-                    <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      star
-                    </span>
-                    4.8
-                  </div>
-                </div>
-                <div className="p-6">
-                  <h4 className="mb-1 text-1xl font-semibold text-[#001b5e]">Dr. Elena Rodriguez</h4>
-                  <p className="mb-4 text-sm text-[#45464e]">Neurology &amp; Sleep</p>
-                  <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button" onClick={handleBookConsultation}>
-                    Book Consultation
-                  </button>
-                </div>
-              </article>
-
-              <article className="group overflow-hidden rounded-2xl border border-[#c6c6cf] bg-white transition-all duration-300 hover:shadow-xl">
-                <div className="relative h-64 overflow-hidden">
-                  <Image className="object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYFUtMxwiPHOcqAbO8vdXbKTQAFa9DdY4yXLN0kUA-XI5QHiYVuBL8cTrfLl35_m0bWc6gCAvrKgM2g96nCm_jvowlbOJPaGlLEbSlTi1OnUYy85ft3ZEthpLktCziuH5rdT6ZhbthRNCQC7Y0XCwisCeuLHkyGi6mgzKExG9_YpJtoZKAvHXrsiWdkYpf5m6Pml0vBK1HeScObFbB3JDAkSkfTRomb15MJ1PcWdEYn0AamuPiEGs7eYe4b3Lb8gkXWl7ANaJ9RDkf" alt="Dr. James Wilson" fill sizes="(max-width: 1024px) 100vw, 25vw" unoptimized />
-                  <div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-[#16b46f] px-3 py-1 text-xs font-semibold text-white">
-                    <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      star
-                    </span>
-                    4.9
-                  </div>
-                </div>
-                <div className="p-6">
-                  <h4 className="mb-1 text-1xl font-semibold text-[#001b5e]">Dr. James Wilson</h4>
-                  <p className="mb-4 text-sm text-[#45464e]">Dermatology</p>
-                  <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button" onClick={handleBookConsultation}>
-                    Book Consultation
-                  </button>
-                </div>
-              </article>
+                    return (
+                      <article key={doctor.id} className="group overflow-hidden rounded-2xl border border-[#c6c6cf] bg-white transition-all duration-300 hover:shadow-xl">
+                        <div className="relative flex h-64 items-center justify-center overflow-hidden bg-gradient-to-br from-[#001b5e] via-[#07327d] to-[#0aa4b4]">
+                          <span className="text-6xl font-bold tracking-wide text-white/95 transition-transform duration-500 group-hover:scale-105">
+                            {getDoctorInitials(doctor)}
+                          </span>
+                          <div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-[#16b46f] px-3 py-1 text-xs font-semibold text-white">
+                            <span className="material-symbols-outlined text-[14px]">verified</span>
+                            Verified
+                          </div>
+                        </div>
+                        <div className="p-5 sm:p-6">
+                          <h4 className="mb-1 truncate text-1xl font-semibold text-[#001b5e]">{doctorName}</h4>
+                          <p className="mb-4 truncate text-sm text-[#45464e]">{specialization}</p>
+                          <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button" onClick={handleBookConsultation}>
+                            Book Consultation
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
             </div>
+
+            {!isLoadingDoctors && doctorsError ? (
+              <p role="alert" className="mt-6 text-center text-sm text-[#b91c1c]">
+                {doctorsError}
+              </p>
+            ) : null}
+
+            {!isLoadingDoctors && !doctorsError && featuredDoctors.length === 0 ? (
+              <p className="mt-6 text-center text-sm text-[#45464e]">No doctors are available right now.</p>
+            ) : null}
           </div>
         </section>
 
@@ -319,16 +372,12 @@ export default function Home() {
               <h5 className="mb-6 text-sm font-bold text-[#001b5e]">Platform</h5>
               <ul className="space-y-4 text-[#45464e]">
                 <li><a className="hover:text-[#16b46f]" href="#">Find Doctors</a></li>
-                <li><a className="hover:text-[#16b46f]" href="#">Specialties</a></li>
-                <li><a className="hover:text-[#16b46f]" href="#">Telehealth</a></li>
-                <li><Link className="hover:text-[#16b46f]" href="/services">Services</Link></li>
               </ul>
             </div>
             <div>
               <h5 className="mb-6 text-sm font-bold text-[#001b5e]">Company</h5>
               <ul className="space-y-4 text-[#45464e]">
                 <li><Link className="hover:text-[#16b46f]" href="/about">About Us</Link></li>
-                <li><a className="hover:text-[#16b46f]" href="#">Careers</a></li>
                 <li><Link className="hover:text-[#16b46f]" href="/contact">Contact</Link></li>
                 <li><Link className="hover:text-[#16b46f]" href="/admin/login">Admin Portal</Link></li>
                 <li><a className="hover:text-[#16b46f]" href="#">Privacy</a></li>
