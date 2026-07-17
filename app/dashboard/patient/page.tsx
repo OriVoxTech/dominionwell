@@ -1,73 +1,138 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import PatientAvatar from "@/components/patient-avatar";
 import PatientMobileNav from "@/components/patient-mobile-nav";
 import PatientLogoutButton from "@/components/patient-logout-button";
+import PatientProfileSummary from "@/components/patient-profile-summary";
+import {
+    getApiErrorMessage,
+    patientApiService,
+    type PatientDashboardResponse,
+    type PatientProfile,
+    type PublicDoctor,
+} from "@/lib/api";
+import {
+    getPatientFirstName,
+    setCachedPatientProfile,
+    usePatientProfile,
+} from "@/lib/use-patient-profile";
 
 const TimeOfDayGreeting = dynamic(() => import("../../../components/time-of-day-greeting"), {
     ssr: false,
     loading: () => <span>Hello</span>,
 });
 
-const recentDoctors = [
-    {
-        name: "Dr. Sarah Weaver",
-        specialty: "General Physician",
-        status: "Available",
-        statusClass: "bg-[#16b46f]/15 text-[#16b46f]",
-        lastVisit: "Sept 12, 2023",
-        image:
-            "https://lh3.googleusercontent.com/aida-public/AB6AXuAJY-tBxmDI_cCDafVuF2NnfF8U6zT5YzQzv5Hv_Lb4-IqYGlCB50KfkGkrU9ZuRmzZR37a-8V3FmgIZqaa9s5nY47OrwfXqetdUfu8Pgvkd5iUKIo3Rv3yKeiBuGToBeX-3LVJjNL8nhI0nRnsWtKrA9elsvcy_-pjlXmfn00V9ypYkSr7TMM4OJGeS_OkxKCwmtq-hqr-V6UFa22plogSG4TwCviMqlTHI6G0wHkgcQ-j4lI2z_-lshE2SWYuHP0M-QHIM2IjDKtt",
-    },
-    {
-        name: "Dr. Richardson",
-        specialty: "Cardiologist",
-        status: "In Consultation",
-        statusClass: "bg-[#ef4444]/12 text-[#dc2626]",
-        lastVisit: "Aug 28, 2023",
-        image:
-            "https://lh3.googleusercontent.com/aida-public/AB6AXuDM_6TzRlZyvWMUGLqyDv1_NZ6nD9NmyP3_B0yYtIdNozvzDisylezl9Z0qehAMIwlX49gdYJp10UDLPHaP3AGyK-WFlBzEPrMoArVKT825rmhezpRaCs3QykZG5MUGQWTRJmZDzPOOW3BQFB6lhtw26gvXWsc5pTY_v4sCBXFy33jj-nV4wF3hYb2INB-EhQ3VeuWSmjoIEhjdMGDg2N6avJ9Sp2OC6Jnij_tciHEWQnSxWISrv6OFhkMcVl3sKz0t0zYXB9kc0gpS",
-    },
-    {
-        name: "Dr. Emily Stone",
-        specialty: "Dermatologist",
-        status: "Offline",
-        statusClass: "bg-[#64748b]/15 text-[#64748b]",
-        lastVisit: "July 15, 2023",
-        image:
-            "https://lh3.googleusercontent.com/aida-public/AB6AXuDz8rH_oEcTbUduUHKl2BOYi6oJi89VzeoqNXfyENzI8ywKPX4k7uinA2c-bP2UkHHRuoHlpILQL7x7KKAM1fG5dmK6y9ACkw9LWINQxMBB02FYS1Dldr0wOJtUC7SG8KUTK3tOpLMpVyFNVl3urdnjFueuoUYfjw_8tvHtiM9Y-f-EFahNsl1HrIx6LVlQoCupwJ5R5fLRNJihR5rmzzt_yjmRnc4nAKUGH6_-eQ1ZTb6ydrCZyMtqusej4KIVCj5fvXS9ox38bfPI",
-    },
-];
-
-const CONSULTATION_BALANCE_KEY = "dwConsultationBalance";
 const PATIENT_NOTIFICATIONS_KEY = "dwPatientNotifications";
 
+function getDoctorName(doctor: PublicDoctor) {
+    const name = [doctor.user.firstName, doctor.user.lastName]
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .join(" ");
+
+    return name ? `Dr. ${name}` : `Dr. ${doctor.user.username}`;
+}
+
+function getDoctorSpecialty(doctor: PublicDoctor) {
+    return doctor.specializations[0]
+        ? doctor.specializations[0].toLowerCase().replaceAll("_", " ")
+        : "Medical specialist";
+}
+
+function getDoctorVerifiedDate(doctor: PublicDoctor) {
+    return doctor.verifiedAt
+        ? new Date(doctor.verifiedAt).toLocaleDateString()
+        : "Verified";
+}
+
+function getSubscriptionValue(
+    subscription: Record<string, unknown> | null | undefined,
+    keys: string[],
+) {
+    for (const key of keys) {
+        const value = subscription?.[key];
+        if (typeof value === "string" || typeof value === "number") {
+            return String(value);
+        }
+    }
+
+    return "";
+}
+
+function getSubscriptionRecord(value: unknown) {
+    return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function getActivePlanName(subscription: Record<string, unknown> | null | undefined) {
+    const plan = getSubscriptionRecord(subscription?.plan);
+
+    return (
+        getSubscriptionValue(plan, ["name"]) ||
+        getSubscriptionValue(subscription, ["planName", "name"]) ||
+        (subscription ? "Active Plan" : "No Active Plan")
+    );
+}
+
+function formatBadgeLabel(value: string) {
+    return value
+        .toLowerCase()
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 export default function PatientDashboardPage() {
-    const consultationsBooked = 4;
-    const nextBadgeTarget = 10;
-    const progressPercent = Math.min((consultationsBooked / nextBadgeTarget) * 100, 100);
-    const [remainingConsultations, setRemainingConsultations] = useState(48);
+    const profile = usePatientProfile();
+    const [dashboard, setDashboard] = useState<PatientDashboardResponse | null>(null);
+    const [dashboardError, setDashboardError] = useState("");
+    const dashboardProfile: PatientProfile | null = dashboard?.profile ?? profile;
+    const remainingConsultations = dashboardProfile?.consultationBalance ?? 0;
     const [unreadNotifications, setUnreadNotifications] = useState(0);
+    const subscriptionName = getActivePlanName(dashboard?.currentSubscription);
+    const subscriptionStatus =
+        getSubscriptionValue(dashboard?.currentSubscription, ["status"]) ||
+        (dashboard?.currentSubscription ? "Active" : "No Active Plan");
+    const subscriptionExpiry = getSubscriptionValue(dashboard?.currentSubscription, [
+        "expiresAt",
+        "endsAt",
+    ]);
+    const recentDoctors = dashboard?.recentDoctors ?? [];
+    const badges = dashboard?.badges ?? [];
+
+    const loadDashboard = useCallback(async () => {
+        try {
+            const response = await patientApiService.getDashboard();
+            setDashboardError("");
+            setDashboard(response.data);
+            setCachedPatientProfile(response.data.profile);
+        } catch (error) {
+            setDashboardError(getApiErrorMessage(error));
+        }
+    }, []);
 
     useEffect(() => {
-        const syncConsultationBalance = () => {
-            const storedBalance = Number(window.localStorage.getItem(CONSULTATION_BALANCE_KEY));
-            const resolved = Number.isFinite(storedBalance) ? Math.max(0, Math.floor(storedBalance)) : 48;
-            setRemainingConsultations(resolved);
-        };
-
-        syncConsultationBalance();
-        window.addEventListener("storage", syncConsultationBalance);
-        window.addEventListener("dw-subscription-updated", syncConsultationBalance);
+        const timeoutId = window.setTimeout(() => {
+            void loadDashboard();
+        }, 0);
 
         return () => {
-            window.removeEventListener("storage", syncConsultationBalance);
-            window.removeEventListener("dw-subscription-updated", syncConsultationBalance);
+            window.clearTimeout(timeoutId);
         };
-    }, []);
+    }, [loadDashboard]);
+
+    useEffect(() => {
+        const refreshDashboard = () => {
+            void loadDashboard();
+        };
+
+        window.addEventListener("dw-subscription-updated", refreshDashboard);
+
+        return () => {
+            window.removeEventListener("dw-subscription-updated", refreshDashboard);
+        };
+    }, [loadDashboard]);
 
     useEffect(() => {
         const refreshUnreadCount = () => {
@@ -107,20 +172,8 @@ export default function PatientDashboardPage() {
                 </div>
 
                 <div className="mb-6 flex items-center gap-3 px-2">
-                    <div className="relative h-11 w-11 overflow-hidden rounded-full border-2 border-[#16b46f]/40">
-                        <Image
-                            className="object-cover"
-                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAPurUR2thld9ARCgQv5h5zzRrmbx5VzEhRhGSj-4R3LQBMFeO5bA8OOCajuwGXXWPjtINjhw8-RqL2BIwlmrOkDz58EbqhMGjnRdrjEPNB6wMXEYirVhXLKHukNRiuOjWAxDoEcMTG9A2c2wKRcRRN4U7gxeFEPhJ7G7sLUQezeiulcTpl6y2fsYeeLmQHBuYLxYwyY3mOhVegyEsvP846S3aiHmWvjDLrjKsx9yBY9vkJssTPuipSUEY4d1WwN6dlulgSFUQpfRjW"
-                            alt="Alex Johnson"
-                            fill
-                            sizes="44px"
-                            unoptimized
-                        />
-                    </div>
-                    <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">Alex Johnson</p>
-                        <p className="text-xs text-[#d8e2ff]">ID: DW-98231</p>
-                    </div>
+                    <PatientAvatar profile={dashboardProfile} />
+                    <PatientProfileSummary />
                 </div>
 
                 <nav className="flex-1 space-y-1 text-sm">
@@ -135,6 +188,14 @@ export default function PatientDashboardPage() {
                     <Link className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10" href="/dashboard/patient/doctors">
                         <span className="material-symbols-outlined text-[20px]">medical_services</span>
                         <span>Browse Doctors</span>
+                    </Link>
+                    <Link href="/dashboard/patient/subscription" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
+                        <span className="material-symbols-outlined text-[20px]">card_membership</span>
+                        <span>Subscription</span>
+                    </Link>
+                    <Link href="/dashboard/patient/payments" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
+                        <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+                        <span>Payments</span>
                     </Link>
                     <Link href="/dashboard/patient/settings" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
                         <span className="material-symbols-outlined text-[20px]">settings</span>
@@ -158,7 +219,7 @@ export default function PatientDashboardPage() {
             <main className="min-h-screen p-4 sm:p-6 md:p-8 lg:ml-[250px]">
                 <header className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
                     <div>
-                        <h2 className="text-2xl font-semibold text-[#001b5e]"><TimeOfDayGreeting />, Alex</h2>
+                        <h2 className="text-2xl font-semibold text-[#001b5e]"><TimeOfDayGreeting />, {getPatientFirstName(dashboardProfile)}</h2>
                         <p className="mt-2 text-xs text-[#475569]">How are you feeling today?</p>
                     </div>
 
@@ -188,6 +249,12 @@ export default function PatientDashboardPage() {
                     </div>
                 </header>
 
+                {dashboardError ? (
+                    <p role="alert" className="mb-4 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c]">
+                        {dashboardError}
+                    </p>
+                ) : null}
+
                 <div className="grid grid-cols-12 gap-6">
                     <div className="col-span-12 mb-2 grid grid-cols-1 gap-4 md:grid-cols-2 lg:col-span-8">
                         <div className="rounded-xl border border-[#c6c6cf] bg-white p-5">
@@ -198,7 +265,7 @@ export default function PatientDashboardPage() {
                             </div>
                             <p className="text-[12px] uppercase tracking-wider text-[#64748b] font-bold">Remaining Consultations</p>
                             <h3 className="mt-1 text-1xl font-semibold text-[#001b5e]">{remainingConsultations}</h3>
-                            <p className="mt-1 text-[9px] text-[#475569]">for this billing cycle</p>
+                            <p className="mt-1 text-[9px] text-[#475569]">available on your account</p>
                         </div>
 
                         <div className="rounded-xl border border-[#c6c6cf] bg-white p-5">
@@ -209,8 +276,11 @@ export default function PatientDashboardPage() {
                                 <span className="text-[11px] font-semibold text-[#16b46f]">Active</span>
                             </div>
                             <p className="text-[12px] uppercase tracking-wider text-[#64748b] font-bold">Current Subscription</p>
-                            <h3 className="mt-1 text-1xl font-semibold text-[#001b5e]">Premium Care</h3>
-                            <p className="mt-1 text-[9px] text-[#475569]">Expires on Nov 24, 2026</p>
+                            <h3 className="mt-1 text-1xl font-semibold text-[#001b5e]">{subscriptionName}</h3>
+                            <p className="mt-1 text-[9px] uppercase tracking-wide text-[#64748b]">Expiry Date</p>
+                            <p className="mt-1 text-xs font-semibold text-[#475569]">
+                                {subscriptionExpiry ? new Date(subscriptionExpiry).toLocaleDateString() : subscriptionStatus}
+                            </p>
                         </div>
                     </div>
 
@@ -267,31 +337,34 @@ export default function PatientDashboardPage() {
                                     </thead>
                                     <tbody>
                                         {recentDoctors.map((doctor) => (
-                                            <tr key={doctor.name} className="border-b border-[#e2e8f0] last:border-b-0 hover:bg-[#f8fafc]">
+                                            <tr key={doctor.id} className="border-b border-[#e2e8f0] last:border-b-0 hover:bg-[#f8fafc]">
                                                 <td className="px-3 py-3">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="relative h-9 w-9 overflow-hidden rounded-full bg-[#e2e8f0]">
-                                                            <Image className="object-cover" src={doctor.image} alt={doctor.name} fill sizes="36px" unoptimized />
+                                                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e0f2fe] text-xs font-bold text-[#0369a1]">
+                                                            {doctor.user.firstName?.charAt(0) || doctor.user.username.charAt(0)}
                                                         </div>
-                                                        <span className="font-medium text-[13px] text-[#001b5e]">{doctor.name}</span>
+                                                        <span className="font-medium text-[13px] text-[#001b5e]">{getDoctorName(doctor)}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-3 py-3 text-[13px] text-[#475569]">{doctor.specialty}</td>
+                                                <td className="px-3 py-3 text-[13px] capitalize text-[#475569]">{getDoctorSpecialty(doctor)}</td>
                                                 <td className="px-3 py-3">
-                                                    <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${doctor.statusClass}`}>
-                                                        {doctor.status}
+                                                    <span className="rounded-full bg-[#16b46f]/15 px-2 py-1 text-[10px] font-semibold uppercase text-[#16b46f]">
+                                                        Verified
                                                     </span>
                                                 </td>
-                                                <td className="px-3 py-3 text-[#475569] text-[13px]">{doctor.lastVisit}</td>
+                                                <td className="px-3 py-3 text-[#475569] text-[13px]">{getDoctorVerifiedDate(doctor)}</td>
                                                 <td className="px-3 py-3">
-                                                    <button className="text-[#16b46f]">
-                                                        <span className="material-symbols-outlined text-[18px]">more_vert</span>
-                                                    </button>
+                                                    <Link href={`/dashboard/patient/doctors/${doctor.id}`} className="text-[#16b46f]">
+                                                        View
+                                                    </Link>
                                                 </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
+                                {recentDoctors.length === 0 ? (
+                                    <p className="py-6 text-center text-sm text-[#64748b]">No recently visited doctors yet.</p>
+                                ) : null}
                             </div>
                         </div>
                     </div>
@@ -300,55 +373,32 @@ export default function PatientDashboardPage() {
                         <div className="rounded-2xl border border-[#c6c6cf] bg-white/80 p-6 backdrop-blur-sm">
                             <div className="mb-5 flex items-start justify-between gap-4">
                                 <div>
-                                    <h3 className="text-md font-semibold text-[#001b5e]">Earn a Badge</h3>
+                                    <h3 className="text-md font-semibold text-[#001b5e]">Badges</h3>
                                     <p className="text-sm mt-3 text-[#475569] text-[12px]">
-                                        The more consultations you book, the faster you unlock your next badge.
+                                        Your active account achievements from DominionWell+.
                                     </p>
                                 </div>
-                                <div className="rounded-lg bg-[#16b46f]/15 px-3 py-2 text-xs font-semibold text-[#16b46f]">Consultation Streak</div>
+                                <div className="rounded-lg bg-[#16b46f]/15 px-3 py-2 text-xs font-semibold text-[#16b46f]">
+                                    {badges.length} earned
+                                </div>
                             </div>
 
                             <div className="rounded-xl border border-[#e2e8f0] bg-white p-4">
-                                <div className="mb-2 flex items-center justify-between gap-3">
-                                    <p className="text-sm font-semibold text-[#001b5e]">Progress to Silver Care Badge</p>
-                                    <p className="text-xs font-semibold text-[#0aa4b4]">
-                                        {consultationsBooked}/{nextBadgeTarget} bookings
-                                    </p>
-                                </div>
-
-                                <div className="mb-3 h-2.5 w-full overflow-hidden rounded-full bg-[#e2e8f0]">
-                                    <div className="h-full rounded-full bg-gradient-to-r from-[#16b46f] to-[#0aa4b4]" style={{ width: `${progressPercent}%` }} />
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                                    <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
-                                        <div className="mb-1 flex items-center gap-2 text-[#64748b]">
-                                            <span className="material-symbols-outlined text-[16px]">workspace_premium</span>
-                                            <span className="text-[11px] font-semibold uppercase tracking-wide">Bronze</span>
-                                        </div>
-                                        <p className="text-xs text-[#475569]">3 consultations</p>
+                                {badges.length === 0 ? (
+                                    <p className="text-sm text-[#64748b]">No badges yet.</p>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                        {badges.map((badge) => (
+                                            <div key={badge} className="rounded-lg border border-[#16b46f]/25 bg-[#16b46f]/10 p-3">
+                                                <div className="mb-1 flex items-center gap-2 text-[#16b46f]">
+                                                    <span className="material-symbols-outlined text-[16px]">workspace_premium</span>
+                                                    <span className="text-[11px] font-semibold uppercase tracking-wide">{formatBadgeLabel(badge)}</span>
+                                                </div>
+                                                <p className="text-xs text-[#475569]">Earned from your account activity.</p>
+                                            </div>
+                                        ))}
                                     </div>
-
-                                    <div className="rounded-lg border border-[#0aa4b4]/30 bg-[#0aa4b4]/10 p-3">
-                                        <div className="mb-1 flex items-center gap-2 text-[#0aa4b4]">
-                                            <span className="material-symbols-outlined text-[16px]">workspace_premium</span>
-                                            <span className="text-[11px] font-semibold uppercase tracking-wide">Silver</span>
-                                        </div>
-                                        <p className="text-xs text-[#475569]">10 consultations</p>
-                                    </div>
-
-                                    <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
-                                        <div className="mb-1 flex items-center gap-2 text-[#64748b]">
-                                            <span className="material-symbols-outlined text-[16px]">workspace_premium</span>
-                                            <span className="text-[11px] font-semibold uppercase tracking-wide">Gold</span>
-                                        </div>
-                                        <p className="text-xs text-[#475569]">20 consultations</p>
-                                    </div>
-                                </div>
-
-                                <p className="mt-3 text-xs text-[#475569]">
-                                    Book {Math.max(nextBadgeTarget - consultationsBooked, 0)} more consultations to unlock your next badge.
-                                </p>
+                                )}
                             </div>
                         </div>
                     </div>

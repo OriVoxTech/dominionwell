@@ -322,7 +322,7 @@ export default function AboutPage() {
         </div>
 
         <div className="mx-auto mt-14 flex w-full max-w-[1440px] flex-col justify-between gap-4 border-t border-white/10 pt-8 text-xs text-[#bfd2ff] md:flex-row">
-          <p>© 2024 DominionWell+ Inc. All rights reserved.</p>
+          <p>© 2026 DominionWell+ Inc. All rights reserved.</p>
           <div className="flex gap-8">
             <a className="hover:text-white" href="#">Privacy Policy</a>
             <a className="hover:text-white" href="#">Terms of Service</a>

@@ -8,32 +8,38 @@ const API_BASE_URL =
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
-  const authorization = request.headers.get("authorization");
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
 
-  if (!authorization?.startsWith("Bearer ")) {
+  if (!id) {
     return Response.json(
-      {
-        statusCode: 401,
-        error: {
-          message: "Admin authentication is required. Please log in again.",
-          error: "Unauthorized",
-          statusCode: 401,
-        },
-      },
-      { status: 401 },
+      { error: { message: "A doctor ID is required." } },
+      { status: 400 },
     );
   }
 
+  const authorization = request.headers.get("authorization");
+  const headers: HeadersInit = {
+    Accept: "*/*",
+    "ngrok-skip-browser-warning": "true",
+  };
+
+  if (authorization?.startsWith("Bearer ")) {
+    headers.Authorization = authorization;
+  }
+
   try {
-    const upstreamResponse = await fetch(`${API_BASE_URL}/admin/overview`, {
-      method: "GET",
-      headers: {
-        Accept: "*/*",
-        Authorization: authorization,
+    const upstreamResponse = await fetch(
+      `${API_BASE_URL}/doctors/${encodeURIComponent(id)}/availability`,
+      {
+        method: "GET",
+        headers,
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+    );
     const responseBody = await upstreamResponse.text();
 
     return new Response(responseBody || null, {
@@ -49,7 +55,7 @@ export async function GET(request: Request) {
       {
         statusCode: 502,
         error: {
-          message: "The admin overview could not be reached. Please try again.",
+          message: "Doctor availability could not be reached. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },

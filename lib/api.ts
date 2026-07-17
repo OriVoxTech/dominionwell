@@ -17,7 +17,7 @@ import {
 } from "@/lib/admin-session";
 
 const DEFAULT_API_BASE_URL =
-  "https://f9ee-102-88-54-189.ngrok-free.app/api";
+  "https://cf7f-105-127-10-124.ngrok-free.app/api";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
 export const api = axios.create({
@@ -55,6 +55,13 @@ const doctorGatewayApi = axios.create({
 });
 
 const publicGatewayApi = axios.create({
+  headers: {
+    Accept: "application/json",
+  },
+  timeout: 15_000,
+});
+
+const patientGatewayApi = axios.create({
   headers: {
     Accept: "application/json",
   },
@@ -172,6 +179,16 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+patientGatewayApi.interceptors.request.use((config) => {
+  const accessToken = getPatientAccessToken();
+
+  if (accessToken) {
+    config.headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  return config;
+});
+
 export interface LoginPayload {
   email: string;
   password: string;
@@ -275,6 +292,44 @@ export interface UpdateDoctorProfilePayload {
   phone: string;
 }
 
+export interface PatientProfile {
+  id: string;
+  userId: string;
+  avatarFileId: string | null;
+  consultationBalance: number;
+  preferences: Record<string, unknown> | null;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: string;
+    email: string;
+    username: string | null;
+    firstName: string;
+    lastName: string;
+    phone: string | null;
+    createdAt: string;
+  };
+}
+
+export interface UpdatePatientProfilePayload {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  preferences?: Record<string, unknown> | null;
+}
+
+export interface PatientDashboardResponse {
+  profile: PatientProfile;
+  appointmentStats: {
+    upcoming: number;
+    completed: number;
+  };
+  recentDoctors: PublicDoctor[];
+  currentSubscription: Record<string, unknown> | null;
+  badges: string[];
+}
+
 export type DoctorAppointmentStatus =
   | "BOOKED"
   | "CANCELLED"
@@ -299,6 +354,109 @@ export interface DoctorAppointmentsResponse {
     page: number;
     limit: number;
     totalPages: number;
+  };
+}
+
+export interface PatientAppointmentsQuery {
+  page?: number;
+  limit?: number;
+}
+
+export interface PatientAppointment extends Record<string, unknown> {
+  id: string;
+  status?: string;
+}
+
+export interface PatientAppointmentsResponse {
+  data: PatientAppointment[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  description: string;
+  priceCents: number;
+  consultationCredits: number;
+  consultationMinutes: number;
+  durationDays: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  currency: string;
+  priceNaira: number;
+}
+
+export interface PatientSubscriptionSummary {
+  consultationBalance: number;
+  currentSubscription: Record<string, unknown> | null;
+  subscriptions: Array<Record<string, unknown>>;
+}
+
+export interface SubscriptionPayment extends Record<string, unknown> {
+  id?: string;
+  reference?: string;
+  status?: string;
+  createdAt?: string;
+}
+
+export interface SubscriptionPaymentsResponse {
+  data: SubscriptionPayment[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface InitializeSubscriptionCheckoutPayload {
+  planId: string;
+}
+
+export interface InitializeSubscriptionCheckoutResponse
+  extends Record<string, unknown> {
+  paymentId?: string;
+  authorizationUrl?: string;
+  authorization_url?: string;
+  checkoutUrl?: string;
+  checkout_url?: string;
+  accessCode?: string;
+  access_code?: string;
+  amountCents?: number;
+  currency?: string;
+  plan?: SubscriptionPlan;
+  url?: string;
+  reference?: string;
+}
+
+export interface VerifySubscriptionPaymentResponse {
+  payment: {
+    id: string;
+    patientId: string;
+    provider: string;
+    providerRef: string;
+    amountCents: number;
+    currency: string;
+    status: string;
+    metadata: Record<string, unknown>;
+    createdAt: string;
+    updatedAt: string;
+  };
+  subscription: {
+    id: string;
+    patientId: string;
+    planId: string;
+    paymentId: string;
+    startsAt: string;
+    expiresAt: string;
+    createdAt: string;
+    plan: SubscriptionPlan;
   };
 }
 
@@ -535,9 +693,7 @@ const PUBLIC_AUTH_ENDPOINTS = new Set([
 
 let refreshRequest: Promise<string> | null = null;
 
-api.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
+async function handlePatientApiError(error: AxiosError) {
     const originalRequest = error.config as RetriableRequestConfig | undefined;
     const requestPath = originalRequest?.url ?? "";
     const refreshToken = getPatientRefreshToken();
@@ -553,7 +709,7 @@ api.interceptors.response.use(
       clearPatientSession();
 
       if (typeof window !== "undefined") {
-        window.location.assign("/login/patient?session=expired");
+        window.location.assign("/");
       }
 
       return Promise.reject(error);
@@ -586,17 +742,28 @@ api.interceptors.response.use(
 
       const accessToken = await refreshRequest;
       originalRequest.headers.set("Authorization", `Bearer ${accessToken}`);
-      return api(originalRequest);
+      const retryClient =
+        originalRequest.baseURL === API_BASE_URL ? api : patientGatewayApi;
+      return retryClient(originalRequest);
     } catch (refreshError) {
       clearPatientSession();
 
       if (typeof window !== "undefined") {
-        window.location.assign("/login/patient?session=expired");
+        window.location.assign("/");
       }
 
       return Promise.reject(refreshError);
     }
-  },
+}
+
+api.interceptors.response.use(
+  (response) => response,
+  handlePatientApiError,
+);
+
+patientGatewayApi.interceptors.response.use(
+  (response) => response,
+  handlePatientApiError,
 );
 
 export const patientAuthApi = {
@@ -617,6 +784,57 @@ export const patientAuthApi = {
     api.post<ApiResponse>("/auth/forgot-password", payload),
   resetPassword: (payload: ResetPasswordPayload) =>
     api.post<ApiResponse>("/auth/reset-password", payload),
+};
+
+export const patientApiService = {
+  getProfile: () => patientGatewayApi.get<PatientProfile>("/api/patients/me"),
+  updateProfile: (payload: UpdatePatientProfilePayload) =>
+    patientGatewayApi.patch<PatientProfile>("/api/patients/me", payload),
+  getDashboard: () =>
+    patientGatewayApi.get<PatientDashboardResponse>(
+      "/api/patients/me/dashboard",
+    ),
+  uploadProfileImage: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    return patientGatewayApi.post<PatientProfile>(
+      "/api/patients/me/profile-image",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
+  },
+  listAppointments: (params: PatientAppointmentsQuery = {}) =>
+    patientGatewayApi.get<PatientAppointmentsResponse>(
+      "/api/appointments/patient",
+      { params: { page: 1, limit: 20, ...params } },
+    ),
+  listDoctorAvailability: (doctorId: string) =>
+    patientGatewayApi.get<DoctorAvailabilitySlot[]>(
+      `/api/doctors/${encodeURIComponent(doctorId)}/availability`,
+    ),
+  listSubscriptionPlans: () =>
+    patientGatewayApi.get<SubscriptionPlan[]>("/api/subscriptions/plans"),
+  getMySubscription: () =>
+    patientGatewayApi.get<PatientSubscriptionSummary>("/api/subscriptions/me"),
+  listSubscriptionPayments: (params: PatientAppointmentsQuery = {}) =>
+    patientGatewayApi.get<SubscriptionPaymentsResponse>(
+      "/api/subscriptions/payments",
+      { params: { page: 1, limit: 20, ...params } },
+    ),
+  initializeSubscriptionCheckout: (
+    payload: InitializeSubscriptionCheckoutPayload,
+  ) =>
+    patientGatewayApi.post<InitializeSubscriptionCheckoutResponse>(
+      "/api/subscriptions/initialize",
+      payload,
+    ),
+  verifySubscriptionPayment: (reference: string) =>
+    patientGatewayApi.get<VerifySubscriptionPaymentResponse>(
+      `/api/subscriptions/verify/${encodeURIComponent(reference)}`,
+    ),
 };
 
 export const doctorAuthApi = {

@@ -13,35 +13,31 @@ export async function GET(request: Request) {
 
   if (!authorization?.startsWith("Bearer ")) {
     return Response.json(
-      { error: { message: "Doctor authentication is required. Please log in again." } },
+      {
+        statusCode: 401,
+        error: {
+          message: "Patient authentication is required. Please log in again.",
+          error: "Unauthorized",
+          statusCode: 401,
+        },
+      },
       { status: 401 },
     );
   }
 
-  const incomingUrl = new URL(request.url);
-  const year = incomingUrl.searchParams.get("year");
-  const month = incomingUrl.searchParams.get("month");
-  const timezoneOffsetMinutes =
-    incomingUrl.searchParams.get("timezoneOffsetMinutes") ?? "0";
-
-  if (!year || !month) {
-    return Response.json(
-      { error: { message: "year and month are required." } },
-      { status: 400 },
-    );
-  }
-
-  const upstreamUrl = new URL(
-    `${API_BASE_URL}/doctors/me/availability/calendar`,
-  );
-  upstreamUrl.searchParams.set("year", year);
-  upstreamUrl.searchParams.set("month", month);
-  upstreamUrl.searchParams.set("timezoneOffsetMinutes", timezoneOffsetMinutes);
+  const requestUrl = new URL(request.url);
+  const upstreamUrl = new URL(`${API_BASE_URL}/appointments/patient`);
+  upstreamUrl.searchParams.set("page", requestUrl.searchParams.get("page") ?? "1");
+  upstreamUrl.searchParams.set("limit", requestUrl.searchParams.get("limit") ?? "20");
 
   try {
     const upstreamResponse = await fetch(upstreamUrl, {
       method: "GET",
-      headers: { Accept: "*/*", Authorization: authorization },
+      headers: {
+        Accept: "*/*",
+        Authorization: authorization,
+        "ngrok-skip-browser-warning": "true",
+      },
       cache: "no-store",
     });
     const responseBody = await upstreamResponse.text();
@@ -56,7 +52,14 @@ export async function GET(request: Request) {
     });
   } catch {
     return Response.json(
-      { error: { message: "The availability calendar could not be reached." } },
+      {
+        statusCode: 502,
+        error: {
+          message: "Patient appointments could not be reached. Please try again.",
+          error: "Bad Gateway",
+          statusCode: 502,
+        },
+      },
       { status: 502 },
     );
   }

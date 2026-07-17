@@ -1,16 +1,23 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import PatientAvatar from "@/components/patient-avatar";
 import PatientMobileNav from "@/components/patient-mobile-nav";
 import PatientLogoutButton from "@/components/patient-logout-button";
+import PatientProfileSummary from "@/components/patient-profile-summary";
+import {
+    getApiErrorMessage,
+    patientApiService,
+    type PatientAppointment,
+} from "@/lib/api";
 import {
     APPOINTMENT_REQUESTS_UPDATED_EVENT,
     isConsultationInviteWindow,
     readAppointmentRequests,
     type AppointmentRequest,
 } from "@/lib/appointments";
+import { usePatientProfile } from "@/lib/use-patient-profile";
 
 type AppointmentStatus = "Completed" | "Follow-up" | "Canceled";
 type AppointmentsTab = "upcoming" | "history";
@@ -75,9 +82,94 @@ const consultationHistory: Appointment[] = [
     },
 ];
 
+function asRecord(value: unknown) {
+    return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function getStringValue(record: Record<string, unknown> | null, keys: string[], fallback = "-") {
+    if (!record) return fallback;
+
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === "string" && value.trim()) return value;
+        if (typeof value === "number") return String(value);
+    }
+
+    return fallback;
+}
+
+function getNestedStringValue(record: Record<string, unknown> | null, path: string[], fallback = "-") {
+    let current: unknown = record;
+
+    for (const key of path) {
+        const currentRecord = asRecord(current);
+        if (!currentRecord) return fallback;
+        current = currentRecord[key];
+    }
+
+    return typeof current === "string" && current.trim() ? current : fallback;
+}
+
+function formatAppointmentDate(value: string) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function getPatientAppointmentDoctor(appointment: PatientAppointment) {
+    const record = asRecord(appointment);
+    const doctor = asRecord(record?.doctor);
+    const doctorUser = asRecord(doctor?.user);
+    const firstName = getStringValue(doctorUser, ["firstName"], "");
+    const lastName = getStringValue(doctorUser, ["lastName"], "");
+    const fullName = [firstName, lastName].filter(Boolean).join(" ");
+
+    return fullName
+        ? `Dr. ${fullName}`
+        : getNestedStringValue(record, ["doctor", "user", "username"], "Doctor");
+}
+
+function getPatientAppointmentSpecialty(appointment: PatientAppointment) {
+    const doctor = asRecord(asRecord(appointment)?.doctor);
+    const specializations = doctor?.specializations;
+
+    if (Array.isArray(specializations) && typeof specializations[0] === "string") {
+        return specializations[0].toLowerCase().replaceAll("_", " ");
+    }
+
+    return getStringValue(asRecord(appointment), ["specialization", "specialty"], "Medical specialist");
+}
+
+function getPatientAppointmentDate(appointment: PatientAppointment) {
+    const record = asRecord(appointment);
+    const startsAt = getStringValue(record, ["startsAt", "startTime", "appointmentAt", "scheduledAt"], "");
+
+    return startsAt ? formatAppointmentDate(startsAt) : getStringValue(record, ["date"], "-");
+}
+
+function getPatientAppointmentTime(appointment: PatientAppointment) {
+    const record = asRecord(appointment);
+    const startsAt = getStringValue(record, ["startsAt", "startTime", "appointmentAt", "scheduledAt"], "");
+    const endsAt = getStringValue(record, ["endsAt", "endTime"], "");
+
+    if (startsAt && endsAt) {
+        return `${new Date(startsAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} - ${new Date(endsAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+    }
+
+    return getStringValue(record, ["timeSlot", "time"], "-");
+}
+
+function getServerAppointmentStatus(appointment: PatientAppointment) {
+    return appointment.status ?? getStringValue(asRecord(appointment), ["appointmentStatus"], "Booked");
+}
+
 export default function PatientAppointmentsPage() {
+    const profile = usePatientProfile();
     const [activeTab, setActiveTab] = useState<AppointmentsTab>("upcoming");
     const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
+    const [patientAppointments, setPatientAppointments] = useState<PatientAppointment[]>([]);
+    const [appointmentsMeta, setAppointmentsMeta] = useState({ total: 0, page: 1, limit: 20, totalPages: 0 });
+    const [isLoadingPatientAppointments, setIsLoadingPatientAppointments] = useState(true);
+    const [appointmentsError, setAppointmentsError] = useState("");
 
     useEffect(() => {
         const syncRequests = () => {
@@ -95,6 +187,39 @@ export default function PatientAppointmentsPage() {
         };
     }, []);
 
+    useEffect(() => {
+        let isCancelled = false;
+
+        const loadPatientAppointments = async () => {
+            setAppointmentsError("");
+            setIsLoadingPatientAppointments(true);
+
+            try {
+                const response = await patientApiService.listAppointments({ page: 1, limit: 20 });
+                if (isCancelled) return;
+
+                setPatientAppointments(response.data.data);
+                setAppointmentsMeta(response.data.meta);
+            } catch (error) {
+                if (!isCancelled) {
+                    setAppointmentsError(getApiErrorMessage(error));
+                }
+            } finally {
+                if (!isCancelled) {
+                    setIsLoadingPatientAppointments(false);
+                }
+            }
+        };
+
+        void loadPatientAppointments();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, []);
+
+    const upcomingCount = appointmentRequests.length + patientAppointments.length;
+
     return (
         <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
             <PatientMobileNav active="appointments" />
@@ -105,20 +230,8 @@ export default function PatientAppointmentsPage() {
                 </div>
 
                 <div className="mb-6 flex items-center gap-3 px-2">
-                    <div className="relative h-11 w-11 overflow-hidden rounded-full border-2 border-[#16b46f]/40">
-                        <Image
-                            className="object-cover"
-                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAPurUR2thld9ARCgQv5h5zzRrmbx5VzEhRhGSj-4R3LQBMFeO5bA8OOCajuwGXXWPjtINjhw8-RqL2BIwlmrOkDz58EbqhMGjnRdrjEPNB6wMXEYirVhXLKHukNRiuOjWAxDoEcMTG9A2c2wKRcRRN4U7gxeFEPhJ7G7sLUQezeiulcTpl6y2fsYeeLmQHBuYLxYwyY3mOhVegyEsvP846S3aiHmWvjDLrjKsx9yBY9vkJssTPuipSUEY4d1WwN6dlulgSFUQpfRjW"
-                            alt="Alex Johnson"
-                            fill
-                            sizes="44px"
-                            unoptimized
-                        />
-                    </div>
-                    <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">Alex Johnson</p>
-                        <p className="text-xs text-[#d8e2ff]">ID: DW-98231</p>
-                    </div>
+                    <PatientAvatar profile={profile} />
+                    <PatientProfileSummary />
                 </div>
 
                 <nav className="flex-1 space-y-1 text-sm">
@@ -133,6 +246,14 @@ export default function PatientAppointmentsPage() {
                     <Link href="/dashboard/patient/doctors" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
                         <span className="material-symbols-outlined text-[20px]">medical_services</span>
                         <span>Browse Doctors</span>
+                    </Link>
+                    <Link href="/dashboard/patient/subscription" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
+                        <span className="material-symbols-outlined text-[20px]">card_membership</span>
+                        <span>Subscription</span>
+                    </Link>
+                    <Link href="/dashboard/patient/payments" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
+                        <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+                        <span>Payments</span>
                     </Link>
                     <Link href="/dashboard/patient/settings" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
                         <span className="material-symbols-outlined text-[20px]">settings</span>
@@ -177,7 +298,7 @@ export default function PatientAppointmentsPage() {
                             }`}
                             onClick={() => setActiveTab("upcoming")}
                         >
-                            Upcoming ({appointmentRequests.length})
+                            Upcoming ({upcomingCount})
                         </button>
                         <button
                             type="button"
@@ -197,10 +318,18 @@ export default function PatientAppointmentsPage() {
                     <section className="mb-6 rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
                         <div className="mb-4 flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-[#001b5e]">Upcoming Appointments</h3>
-                            <p className="text-xs text-[#64748b]">{appointmentRequests.length} request(s)</p>
+                            <p className="text-xs text-[#64748b]">
+                                {isLoadingPatientAppointments ? "Loading..." : `${upcomingCount} appointment(s)`}
+                            </p>
                         </div>
 
-                        {appointmentRequests.length === 0 ? (
+                        {appointmentsError ? (
+                            <div role="alert" className="mb-4 rounded-lg border border-[#fecaca] bg-[#fef2f2] p-3 text-sm text-[#b91c1c]">
+                                {appointmentsError}
+                            </div>
+                        ) : null}
+
+                        {!isLoadingPatientAppointments && upcomingCount === 0 ? (
                             <div className="rounded-lg border border-dashed border-[#c6c6cf] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
                                 You have no upcoming appointments yet. Book from the doctors page.
                             </div>
@@ -239,8 +368,26 @@ export default function PatientAppointmentsPage() {
                                                 </td>
                                             </tr>
                                         ))}
+                                        {patientAppointments.map((appointment) => (
+                                            <tr key={`server-${appointment.id}`} className="border-b border-[#e2e8f0] last:border-b-0">
+                                                <td className="px-3 py-3 font-medium text-[#001b5e]">{getPatientAppointmentDoctor(appointment)}</td>
+                                                <td className="px-3 py-3 capitalize text-[#475569]">{getPatientAppointmentSpecialty(appointment)}</td>
+                                                <td className="whitespace-nowrap px-3 py-3 text-[#475569]">{getPatientAppointmentDate(appointment)}</td>
+                                                <td className="px-3 py-3 text-[#475569]">{getPatientAppointmentTime(appointment)}</td>
+                                                <td className="px-3 py-3">
+                                                    <span className="rounded-full bg-[#16b46f]/15 px-2 py-1 text-[10px] font-semibold uppercase text-[#16b46f]">
+                                                        {getServerAppointmentStatus(appointment)}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
+                                {appointmentsMeta.totalPages > 1 ? (
+                                    <p className="mt-3 text-xs text-[#64748b]">
+                                        Showing page {appointmentsMeta.page} of {appointmentsMeta.totalPages}
+                                    </p>
+                                ) : null}
                             </div>
                         )}
                     </section>

@@ -2,9 +2,20 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import PatientAvatar from "@/components/patient-avatar";
 import PatientLogoutButton from "@/components/patient-logout-button";
+import PatientProfileSummary from "@/components/patient-profile-summary";
+import { usePatientProfile } from "@/lib/use-patient-profile";
 
-type PatientNavKey = "dashboard" | "appointments" | "notifications" | "doctors" | "settings" | "help";
+type PatientNavKey =
+  | "dashboard"
+  | "appointments"
+  | "notifications"
+  | "doctors"
+  | "subscription"
+  | "payments"
+  | "settings"
+  | "help";
 
 type PatientMobileNavProps = {
   active: PatientNavKey;
@@ -15,11 +26,14 @@ const items: Array<{ key: PatientNavKey; href: string; label: string; icon: stri
   { key: "appointments", href: "/dashboard/patient/appointments", label: "Appointments", icon: "calendar_month" },
   { key: "notifications", href: "/dashboard/patient/notifications", label: "Notifications", icon: "notifications" },
   { key: "doctors", href: "/dashboard/patient/doctors", label: "Doctors", icon: "medical_services" },
+  { key: "subscription", href: "/dashboard/patient/subscription", label: "Subscription", icon: "card_membership" },
+  { key: "payments", href: "/dashboard/patient/payments", label: "Payments", icon: "receipt_long" },
   { key: "settings", href: "/dashboard/patient/settings", label: "Settings", icon: "settings" },
   { key: "help", href: "/dashboard/patient/help-center", label: "Help", icon: "help" },
 ];
 
 export default function PatientMobileNav({ active }: PatientMobileNavProps) {
+  const profile = usePatientProfile();
   const [isOpen, setIsOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
@@ -96,6 +110,11 @@ export default function PatientMobileNav({ active }: PatientMobileNavProps) {
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
+            </div>
+
+            <div className="mb-5 flex items-center gap-3 rounded-xl bg-white/10 p-3">
+              <PatientAvatar profile={profile} />
+              <PatientProfileSummary />
             </div>
 
             <nav className="space-y-1">

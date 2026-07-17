@@ -1,24 +1,31 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Suspense,
   useCallback,
   useEffect,
   useState,
 } from "react";
+import PatientAvatar from "@/components/patient-avatar";
 import PatientMobileNav from "@/components/patient-mobile-nav";
 import PatientLogoutButton from "@/components/patient-logout-button";
+import PatientProfileSummary from "@/components/patient-profile-summary";
 import {
   getApiErrorMessage,
+  patientApiService,
   patientDoctorsApiService,
+  type DoctorAvailabilitySlot,
   type PublicDoctor,
   type PublicDoctorsResponse,
 } from "@/lib/api";
-
-const PATIENT_NAME = "Alex Johnson";
+import { createAppointmentRequest } from "@/lib/appointments";
+import {
+  getPatientDisplayName,
+  getPatientShortId,
+  usePatientProfile,
+} from "@/lib/use-patient-profile";
 
 const SPECIALIZATION_OPTIONS = [
   "GENERAL_PRACTICE",
@@ -64,16 +71,54 @@ function getDoctorInitials(doctor: PublicDoctor) {
     .join("") || "DR";
 }
 
+function formatSlotDate(value: string) {
+  return new Date(value).toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatSlotTime(value: string) {
+  return new Date(value).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function getDateKey(value: string) {
+  return new Date(value).toISOString().slice(0, 10);
+}
+
+function getDoctorPrimarySpecialization(doctor: PublicDoctor) {
+  return doctor.specializations[0]
+    ? formatSpecialization(doctor.specializations[0])
+    : "Medical Specialist";
+}
+
 function BrowseDoctorsContent() {
+  const router = useRouter();
+  const profile = usePatientProfile();
   const searchParams = useSearchParams();
+  const initialDoctorId = searchParams.get("doctorId") ?? "";
   const [query, setQuery] = useState(searchParams.get("query") ?? "");
   const [debouncedQuery, setDebouncedQuery] = useState(query.trim());
+  const [selectedDoctorId, setSelectedDoctorId] = useState(initialDoctorId);
   const [specialization, setSpecialization] = useState("");
   const [page, setPage] = useState(1);
   const [directory, setDirectory] =
     useState<PublicDoctorsResponse>(EMPTY_RESPONSE);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [bookingDoctor, setBookingDoctor] = useState<PublicDoctor | null>(null);
+  const [availabilitySlots, setAvailabilitySlots] = useState<DoctorAvailabilitySlot[]>([]);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedSlotId, setSelectedSlotId] = useState("");
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+  const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
+  const [bookingError, setBookingError] = useState("");
+  const [bookingMessage, setBookingMessage] = useState("");
+  const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -89,6 +134,15 @@ function BrowseDoctorsContent() {
     setIsLoading(true);
 
     try {
+      if (selectedDoctorId) {
+        const response = await patientDoctorsApiService.getById(selectedDoctorId);
+        setDirectory({
+          data: [response.data],
+          meta: { total: 1, page: 1, limit: 1, totalPages: 1 },
+        });
+        return;
+      }
+
       const response = await patientDoctorsApiService.list({
         page,
         limit: 20,
@@ -101,7 +155,7 @@ function BrowseDoctorsContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedQuery, page, specialization]);
+  }, [debouncedQuery, page, selectedDoctorId, specialization]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -110,6 +164,102 @@ function BrowseDoctorsContent() {
 
     return () => window.clearTimeout(timeoutId);
   }, [loadDoctors]);
+
+  const openBookingFlow = async (doctor: PublicDoctor) => {
+    setBookingDoctor(doctor);
+    setAvailabilitySlots([]);
+    setSelectedDate("");
+    setSelectedSlotId("");
+    setBookingError("");
+    setBookingMessage("");
+    setShowSubscriptionPrompt(false);
+    setIsCheckingSubscription(true);
+
+    try {
+      const subscriptionResponse = await patientApiService.getMySubscription();
+      const subscription = subscriptionResponse.data;
+      const hasActiveSubscription = Boolean(subscription.currentSubscription);
+      const hasConsultations = subscription.consultationBalance > 0;
+
+      if (!hasActiveSubscription || !hasConsultations) {
+        setShowSubscriptionPrompt(true);
+        return;
+      }
+
+      setIsLoadingAvailability(true);
+      const response = await patientApiService.listDoctorAvailability(doctor.id);
+      const availableSlots = response.data
+        .filter((slot) => !slot.isBooked)
+        .sort(
+          (first, second) =>
+            new Date(first.startsAt).getTime() - new Date(second.startsAt).getTime(),
+        );
+
+      setAvailabilitySlots(availableSlots);
+      setSelectedDate(availableSlots[0] ? getDateKey(availableSlots[0].startsAt) : "");
+    } catch (error) {
+      setBookingError(getApiErrorMessage(error));
+    } finally {
+      setIsCheckingSubscription(false);
+      setIsLoadingAvailability(false);
+    }
+  };
+
+  const closeBookingFlow = () => {
+    setBookingDoctor(null);
+    setAvailabilitySlots([]);
+    setSelectedDate("");
+    setSelectedSlotId("");
+    setBookingError("");
+    setBookingMessage("");
+    setShowSubscriptionPrompt(false);
+  };
+
+  const confirmBooking = () => {
+    if (!bookingDoctor) return;
+
+    const selectedSlot = availabilitySlots.find((slot) => slot.id === selectedSlotId);
+
+    if (!selectedSlot) {
+      setBookingError("Select an available time slot to continue.");
+      return;
+    }
+
+    const patientName = getPatientDisplayName(profile);
+    const patientId = profile?.id ?? getPatientShortId(profile);
+    const doctorName = getDoctorName(bookingDoctor);
+    const dateKey = getDateKey(selectedSlot.startsAt);
+
+    createAppointmentRequest({
+      doctorId: bookingDoctor.id,
+      doctorName,
+      doctorSpecialization: getDoctorPrimarySpecialization(bookingDoctor),
+      patientName,
+      patientId,
+      date: dateKey,
+      dateLabel: formatSlotDate(selectedSlot.startsAt),
+      timeSlot: `${formatSlotTime(selectedSlot.startsAt)} - ${formatSlotTime(selectedSlot.endsAt)}`,
+      deductedSubscription: false,
+      walletCredited: false,
+    });
+
+    setBookingError("");
+    setBookingMessage(`Appointment request sent for ${doctorName}.`);
+    window.setTimeout(() => {
+      closeBookingFlow();
+    }, 1400);
+  };
+
+  const availabilityByDate = availabilitySlots.reduce<Record<string, DoctorAvailabilitySlot[]>>(
+    (groups, slot) => {
+      const dateKey = getDateKey(slot.startsAt);
+      groups[dateKey] = [...(groups[dateKey] ?? []), slot];
+      return groups;
+    },
+    {},
+  );
+  const availableDates = Object.keys(availabilityByDate);
+  const selectedDateSlots = selectedDate ? availabilityByDate[selectedDate] ?? [] : [];
 
   return (
     <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
@@ -121,20 +271,8 @@ function BrowseDoctorsContent() {
         </div>
 
         <div className="mb-6 flex items-center gap-3 px-2">
-          <div className="relative h-11 w-11 overflow-hidden rounded-full border-2 border-[#16b46f]/40">
-            <Image
-              className="object-cover"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAPurUR2thld9ARCgQv5h5zzRrmbx5VzEhRhGSj-4R3LQBMFeO5bA8OOCajuwGXXWPjtINjhw8-RqL2BIwlmrOkDz58EbqhMGjnRdrjEPNB6wMXEYirVhXLKHukNRiuOjWAxDoEcMTG9A2c2wKRcRRN4U7gxeFEPhJ7G7sLUQezeiulcTpl6y2fsYeeLmQHBuYLxYwyY3mOhVegyEsvP846S3aiHmWvjDLrjKsx9yBY9vkJssTPuipSUEY4d1WwN6dlulgSFUQpfRjW"
-              alt={PATIENT_NAME}
-              fill
-              sizes="44px"
-              unoptimized
-            />
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">{PATIENT_NAME}</p>
-            <p className="text-xs text-[#d8e2ff]">Patient account</p>
-          </div>
+          <PatientAvatar profile={profile} />
+          <PatientProfileSummary />
         </div>
 
         <nav className="flex-1 space-y-1 text-sm">
@@ -150,6 +288,14 @@ function BrowseDoctorsContent() {
             <span className="material-symbols-outlined text-[20px]">medical_services</span>
             <span>Browse Doctors</span>
           </div>
+          <Link href="/dashboard/patient/subscription" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
+            <span className="material-symbols-outlined text-[20px]">card_membership</span>
+            <span>Subscription</span>
+          </Link>
+          <Link href="/dashboard/patient/payments" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
+            <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+            <span>Payments</span>
+          </Link>
           <Link href="/dashboard/patient/settings" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
             <span className="material-symbols-outlined text-[20px]">settings</span>
             <span>Settings</span>
@@ -184,7 +330,10 @@ function BrowseDoctorsContent() {
               <input
                 type="search"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setSelectedDoctorId("");
+                }}
                 placeholder="Search by name, username, or specialization"
                 className="h-11 w-full rounded-xl border border-[#c6c6cf] bg-white pl-10 pr-4 text-[13px] outline-none focus:border-[#0aa4b4]"
               />
@@ -195,6 +344,7 @@ function BrowseDoctorsContent() {
               value={specialization}
               onChange={(event) => {
                 setSpecialization(event.target.value);
+                setSelectedDoctorId("");
                 setPage(1);
               }}
               aria-label="Filter by specialization"
@@ -261,9 +411,18 @@ function BrowseDoctorsContent() {
 
                   <div className="mt-auto flex items-center justify-between gap-3 border-t border-[#e2e8f0] pt-4">
                     <span className="text-[11px] text-[#64748b]">Verified {new Date(doctor.verifiedAt).toLocaleDateString()}</span>
-                    <Link href={`/dashboard/patient/doctors/${doctor.id}`} className="rounded-lg bg-[#001b5e] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0b2b75]" aria-label={`View profile for ${doctorName}`}>
-                      View Profile
-                    </Link>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Link href={`/dashboard/patient/doctors/${doctor.id}`} className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#001b5e] hover:bg-[#f8fafc]" aria-label={`View profile for ${doctorName}`}>
+                        View Profile
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => void openBookingFlow(doctor)}
+                        className="rounded-lg bg-[#001b5e] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0b2b75]"
+                      >
+                        Book Appointment
+                      </button>
+                    </div>
                   </div>
                 </article>
               );
@@ -286,6 +445,175 @@ function BrowseDoctorsContent() {
           </nav>
         ) : null}
       </main>
+
+      {bookingDoctor ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-6">
+          <button
+            type="button"
+            aria-label="Close appointment booking"
+            className="absolute inset-0 bg-[#0f172a]/55 backdrop-blur-[2px]"
+            onClick={closeBookingFlow}
+          />
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="book-appointment-title"
+            className="relative z-10 max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl sm:p-6"
+          >
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <h3 id="book-appointment-title" className="text-lg font-semibold text-[#001b5e]">
+                  Book appointment with {getDoctorName(bookingDoctor)}
+                </h3>
+                <p className="mt-1 text-sm text-[#64748b]">
+                  Select an available date and time slot.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeBookingFlow}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#c6c6cf] text-[#475569] hover:bg-[#f8fafc]"
+                aria-label="Close"
+              >
+                <span className="material-symbols-outlined text-[19px]">close</span>
+              </button>
+            </div>
+
+            {isCheckingSubscription ? (
+              <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
+                Checking your subscription...
+              </div>
+            ) : null}
+
+            {showSubscriptionPrompt ? (
+              <div className="rounded-xl border border-[#fbbf24]/40 bg-[#fffbeb] p-4">
+                <h4 className="text-base font-semibold text-[#92400e]">No active subscription</h4>
+                <p className="mt-1 text-sm text-[#92400e]">
+                  You need an active subscription with available consultation credits before booking an appointment.
+                </p>
+                <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={closeBookingFlow}
+                    className="rounded-lg border border-[#f59e0b]/50 px-4 py-2 text-sm font-semibold text-[#92400e] hover:bg-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/dashboard/patient/subscription?mode=buy")}
+                    className="rounded-lg bg-[#16b46f] px-4 py-2 text-sm font-semibold text-white hover:brightness-95"
+                  >
+                    Buy Subscription
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {isLoadingAvailability ? (
+              <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
+                Loading availability...
+              </div>
+            ) : null}
+
+            {!isCheckingSubscription && !showSubscriptionPrompt && !isLoadingAvailability && availabilitySlots.length === 0 && !bookingError ? (
+              <div className="rounded-xl border border-dashed border-[#c6c6cf] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
+                No available slots for this doctor right now.
+              </div>
+            ) : null}
+
+            {availableDates.length > 0 ? (
+              <div className="grid gap-4">
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#64748b]">Date</p>
+                  <div className="flex flex-wrap gap-2">
+                    {availableDates.map((dateKey) => {
+                      const firstSlot = availabilityByDate[dateKey][0];
+                      const isSelected = dateKey === selectedDate;
+
+                      return (
+                        <button
+                          key={dateKey}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDate(dateKey);
+                            setSelectedSlotId("");
+                            setBookingError("");
+                          }}
+                          className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                            isSelected
+                              ? "border-[#001b5e] bg-[#001b5e] text-white"
+                              : "border-[#c6c6cf] text-[#334155] hover:bg-[#f8fafc]"
+                          }`}
+                        >
+                          {formatSlotDate(firstSlot.startsAt)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#64748b]">Time slot</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {selectedDateSlots.map((slot) => {
+                      const isSelected = slot.id === selectedSlotId;
+
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSlotId(slot.id);
+                            setBookingError("");
+                          }}
+                          className={`rounded-xl border px-3 py-3 text-left text-sm font-semibold ${
+                            isSelected
+                              ? "border-[#16b46f] bg-[#16b46f]/15 text-[#166534]"
+                              : "border-[#c6c6cf] text-[#334155] hover:bg-[#f8fafc]"
+                          }`}
+                        >
+                          {formatSlotTime(slot.startsAt)} - {formatSlotTime(slot.endsAt)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {bookingError ? (
+              <p role="alert" className="mt-4 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-sm text-[#b91c1c]">
+                {bookingError}
+              </p>
+            ) : null}
+
+            {bookingMessage ? (
+              <p role="status" className="mt-4 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm text-[#15803d]">
+                {bookingMessage}
+              </p>
+            ) : null}
+
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeBookingFlow}
+                className="rounded-lg border border-[#c6c6cf] px-4 py-2 text-sm font-semibold text-[#475569] hover:bg-[#f8fafc]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmBooking}
+                disabled={!selectedSlotId || Boolean(bookingMessage) || showSubscriptionPrompt}
+                className="rounded-lg bg-[#16b46f] px-4 py-2 text-sm font-semibold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+              >
+                Confirm Appointment
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

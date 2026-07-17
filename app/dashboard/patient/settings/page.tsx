@@ -3,113 +3,150 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import PatientAvatar from "@/components/patient-avatar";
 import PatientMobileNav from "@/components/patient-mobile-nav";
 import PatientLogoutButton from "@/components/patient-logout-button";
-import { getApiErrorMessage, getApiResponseMessage, patientAuthApi } from "@/lib/api";
-
-type PaymentRecord = {
-    planName?: string;
-    createdAt?: string;
-};
+import {
+    getApiErrorMessage,
+    getApiResponseMessage,
+    patientApiService,
+    patientAuthApi,
+    type PatientSubscriptionSummary,
+} from "@/lib/api";
+import {
+    getPatientDisplayName,
+    getPatientShortId,
+    setCachedPatientProfile,
+    usePatientProfile,
+} from "@/lib/use-patient-profile";
 
 type CurrentSubscription = {
     planName: string;
     price: number;
+    currency: string;
     balance: number;
     status: "Active" | "No Active Plan";
     renewalLabel: string;
     featureSummary: string;
 };
 
-const PLAN_PRICE_MAP: Record<string, number> = {
-    Starter: 39,
-    Plus: 69,
-    Premium: 249,
-};
+function splitFullName(fullName: string) {
+    const parts = fullName.trim().split(/\s+/).filter(Boolean);
+    const firstName = parts.shift() ?? "";
+    const lastName = parts.join(" ");
 
-const PLAN_FEATURE_MAP: Record<string, string> = {
-    Starter: "5 consultations for occasional check-ins and follow-up care.",
-    Plus: "10 consultations with stronger support for ongoing treatment.",
-    Premium: "50 consultations for family-level and high-frequency care.",
-};
+    return { firstName, lastName };
+}
 
-const CONSULTATION_BALANCE_KEY = "dwConsultationBalance";
-const PAYMENT_RECORDS_KEY = "dwPaymentRecords";
+function asRecord(value: unknown) {
+    return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
 
-function getSubscriptionSnapshot(): CurrentSubscription {
-    if (typeof window === "undefined") {
+function getStringValue(record: Record<string, unknown> | null | undefined, keys: string[], fallback = "") {
+    if (!record) return fallback;
+
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === "string" && value.trim()) return value;
+        if (typeof value === "number") return String(value);
+    }
+
+    return fallback;
+}
+
+function getNumberValue(record: Record<string, unknown> | null | undefined, keys: string[], fallback = 0) {
+    if (!record) return fallback;
+
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === "number" && Number.isFinite(value)) return value;
+        if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
+            return Number(value);
+        }
+    }
+
+    return fallback;
+}
+
+function getEmptySubscriptionSnapshot(): CurrentSubscription {
+    return {
+        planName: "No Active Plan",
+        price: 0,
+        currency: "NGN",
+        balance: 0,
+        status: "No Active Plan",
+        renewalLabel: "No renewal date",
+        featureSummary: "Choose a subscription plan to unlock consultations and priority care.",
+    };
+}
+
+function getSubscriptionSnapshot(summary: PatientSubscriptionSummary | null): CurrentSubscription {
+    if (!summary?.currentSubscription) {
         return {
+            ...getEmptySubscriptionSnapshot(),
+            balance: summary?.consultationBalance ?? 0,
+        };
+    }
+
+    const subscription = summary.currentSubscription;
+    const plan = asRecord(subscription.plan);
+    const expiresAt = getStringValue(subscription, ["expiresAt"]);
+    const priceNaira = getNumberValue(plan, ["priceNaira"], getNumberValue(plan, ["priceCents"]) / 100);
+    const consultationCredits = getNumberValue(plan, ["consultationCredits"]);
+    const consultationMinutes = getNumberValue(plan, ["consultationMinutes"]);
+    const description = getStringValue(plan, ["description"]);
+
+    return {
+        planName: getStringValue(plan, ["name"], getStringValue(subscription, ["planName", "name"], "Active Plan")),
+        price: priceNaira,
+        currency: getStringValue(plan, ["currency"], "NGN"),
+        balance: summary.consultationBalance,
+        status: "Active",
+        renewalLabel: expiresAt
+            ? new Date(expiresAt).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+              })
+            : "No renewal date",
+        featureSummary:
+            description ||
+            `${consultationCredits} consultation credit${consultationCredits === 1 ? "" : "s"}${consultationMinutes ? `, ${consultationMinutes} minutes each` : ""}.`,
+    };
+}
+
+function formatSubscriptionPrice(subscription: CurrentSubscription) {
+    if (subscription.price <= 0) {
+        return "-";
+    }
+
+    return `${subscription.currency} ${subscription.price.toLocaleString()}`;
+}
+
+function getSubscriptionSnapshotLegacy(): CurrentSubscription {
+    return {
             planName: "No Active Plan",
             price: 0,
+            currency: "NGN",
             balance: 0,
             status: "No Active Plan",
             renewalLabel: "No renewal date",
             featureSummary: "Choose a subscription plan to unlock consultations and priority care.",
-        };
-    }
-
-    const rawBalance = Number(window.localStorage.getItem(CONSULTATION_BALANCE_KEY));
-    const balance = Number.isFinite(rawBalance) ? rawBalance : 0;
-
-    const rawRecords = window.localStorage.getItem(PAYMENT_RECORDS_KEY);
-    let records: PaymentRecord[] = [];
-
-    if (rawRecords) {
-        try {
-            records = JSON.parse(rawRecords) as PaymentRecord[];
-        } catch {
-            records = [];
-        }
-    }
-    const latestRecord = Array.isArray(records)
-        ? records.reduce<PaymentRecord | null>((latest, current) => {
-              const latestTime = latest?.createdAt ? new Date(latest.createdAt).getTime() : 0;
-              const currentTime = current?.createdAt ? new Date(current.createdAt).getTime() : 0;
-              return currentTime > latestTime ? current : latest;
-          }, null)
-        : null;
-
-    const activePlanName = latestRecord?.planName && PLAN_PRICE_MAP[latestRecord.planName] ? latestRecord.planName : "";
-
-    if (!activePlanName) {
-        return {
-            planName: "No Active Plan",
-            price: 0,
-            balance,
-            status: "No Active Plan",
-            renewalLabel: "No renewal date",
-            featureSummary: "Choose a subscription plan to unlock consultations and priority care.",
-        };
-    }
-
-    const startDate = latestRecord?.createdAt ? new Date(latestRecord.createdAt) : new Date();
-    const renewalDate = new Date(startDate.getTime());
-    renewalDate.setMonth(renewalDate.getMonth() + 1);
-
-    return {
-        planName: activePlanName,
-        price: PLAN_PRICE_MAP[activePlanName],
-        balance,
-        status: "Active",
-        renewalLabel: renewalDate.toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-        }),
-        featureSummary: PLAN_FEATURE_MAP[activePlanName],
     };
 }
 
 export default function PatientSettingsPage() {
-    const [fullName, setFullName] = useState("Alex Johnson");
-    const [email] = useState("alex.johnson@example.com");
-    const [phone, setPhone] = useState("+1 (202) 555-0190");
-    const [profileImage, setProfileImage] = useState(
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuAPurUR2thld9ARCgQv5h5zzRrmbx5VzEhRhGSj-4R3LQBMFeO5bA8OOCajuwGXXWPjtINjhw8-RqL2BIwlmrOkDz58EbqhMGjnRdrjEPNB6wMXEYirVhXLKHukNRiuOjWAxDoEcMTG9A2c2wKRcRRN4U7gxeFEPhJ7G7sLUQezeiulcTpl6y2fsYeeLmQHBuYLxYwyY3mOhVegyEsvP846S3aiHmWvjDLrjKsx9yBY9vkJssTPuipSUEY4d1WwN6dlulgSFUQpfRjW"
-    );
-    const [emailNotifications, setEmailNotifications] = useState(true);
+    const profile = usePatientProfile();
+    const [fullName, setFullName] = useState<string | null>(null);
+    const [phone, setPhone] = useState<string | null>(null);
+    const [profileImagePreview, setProfileImagePreview] = useState("");
+    const [emailNotifications, setEmailNotifications] = useState<boolean | null>(null);
     const [saveMessage, setSaveMessage] = useState("");
-    const [subscription, setSubscription] = useState<CurrentSubscription>(() => getSubscriptionSnapshot());
+    const [saveError, setSaveError] = useState("");
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const [subscription, setSubscription] = useState<CurrentSubscription>(() => getSubscriptionSnapshotLegacy());
+    const [subscriptionError, setSubscriptionError] = useState("");
     const [isChangingPassword, setIsChangingPassword] = useState(false);
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -125,7 +162,20 @@ export default function PatientSettingsPage() {
         newPassword.length >= 8 &&
         confirmPassword === newPassword;
 
-    const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const profilePreferences = profile?.preferences;
+    const savedEmailNotifications =
+        profilePreferences &&
+        typeof profilePreferences.emailNotifications === "boolean"
+            ? profilePreferences.emailNotifications
+            : true;
+    const fullNameValue = fullName ?? (profile ? getPatientDisplayName(profile) : "");
+    const phoneValue = phone ?? profile?.user.phone ?? "";
+    const emailValue = profile?.user.email ?? "";
+    const emailNotificationsValue = emailNotifications ?? savedEmailNotifications;
+    const displayName = fullNameValue.trim() || getPatientDisplayName(profile);
+    const displayId = getPatientShortId(profile);
+
+    const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
         const selectedFile = event.target.files?.[0];
 
         if (!selectedFile) {
@@ -133,11 +183,52 @@ export default function PatientSettingsPage() {
         }
 
         const previewUrl = URL.createObjectURL(selectedFile);
-        setProfileImage(previewUrl);
+        setProfileImagePreview(previewUrl);
+        setSaveMessage("");
+        setSaveError("");
+        setIsUploadingImage(true);
+
+        try {
+            const response = await patientApiService.uploadProfileImage(selectedFile);
+            setCachedPatientProfile(response.data);
+            setSaveMessage("Profile image uploaded successfully.");
+        } catch (error) {
+            setSaveError(getApiErrorMessage(error));
+        } finally {
+            setIsUploadingImage(false);
+        }
     };
 
-    const handleSave = () => {
-        setSaveMessage("Settings updated successfully.");
+    const handleSave = async () => {
+        const { firstName, lastName } = splitFullName(fullNameValue);
+
+        if (!firstName || !lastName) {
+            setSaveError("Enter both first and last name.");
+            setSaveMessage("");
+            return;
+        }
+
+        setIsSavingProfile(true);
+        setSaveMessage("");
+        setSaveError("");
+
+        try {
+            const response = await patientApiService.updateProfile({
+                firstName,
+                lastName,
+                phone: phoneValue,
+                preferences: {
+                    ...(profile?.preferences ?? {}),
+                    emailNotifications: emailNotificationsValue,
+                },
+            });
+            setCachedPatientProfile(response.data);
+            setSaveMessage("Settings updated successfully.");
+        } catch (error) {
+            setSaveError(getApiErrorMessage(error));
+        } finally {
+            setIsSavingProfile(false);
+        }
     };
 
     const closePasswordModal = () => {
@@ -182,14 +273,36 @@ export default function PatientSettingsPage() {
     };
 
     useEffect(() => {
-        const syncSubscription = () => {
-            setSubscription(getSubscriptionSnapshot());
+        let isCancelled = false;
+
+        const loadSubscription = async () => {
+            try {
+                const response = await patientApiService.getMySubscription();
+                if (isCancelled) return;
+
+                setSubscription(getSubscriptionSnapshot(response.data));
+                setSubscriptionError("");
+            } catch (error) {
+                if (!isCancelled) {
+                    setSubscriptionError(getApiErrorMessage(error));
+                }
+            }
         };
+
+        const syncSubscription = () => {
+            void loadSubscription();
+        };
+
+        const timeoutId = window.setTimeout(() => {
+            void loadSubscription();
+        }, 0);
 
         window.addEventListener("storage", syncSubscription);
         window.addEventListener("dw-subscription-updated", syncSubscription);
 
         return () => {
+            isCancelled = true;
+            window.clearTimeout(timeoutId);
             window.removeEventListener("storage", syncSubscription);
             window.removeEventListener("dw-subscription-updated", syncSubscription);
         };
@@ -205,19 +318,23 @@ export default function PatientSettingsPage() {
                 </div>
 
                 <div className="mb-6 flex items-center gap-3 px-2">
-                    <div className="relative h-11 w-11 overflow-hidden rounded-full border-2 border-[#16b46f]/40">
-                        <Image
-                            className="object-cover"
-                            src={profileImage}
-                            alt={fullName}
-                            fill
-                            sizes="44px"
-                            unoptimized
-                        />
-                    </div>
+                    {profileImagePreview ? (
+                        <div className="relative h-11 w-11 overflow-hidden rounded-full border-2 border-[#16b46f]/40">
+                            <Image
+                                className="object-cover"
+                                src={profileImagePreview}
+                                alt={displayName}
+                                fill
+                                sizes="44px"
+                                unoptimized
+                            />
+                        </div>
+                    ) : (
+                        <PatientAvatar profile={profile} />
+                    )}
                     <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">{fullName}</p>
-                        <p className="text-xs text-[#d8e2ff]">ID: DW-98231</p>
+                        <p className="truncate text-sm font-semibold text-white">{displayName}</p>
+                        <p className="text-xs text-[#d8e2ff]">{displayId}</p>
                     </div>
                 </div>
 
@@ -233,6 +350,14 @@ export default function PatientSettingsPage() {
                     <Link href="/dashboard/patient/doctors" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
                         <span className="material-symbols-outlined text-[20px]">medical_services</span>
                         <span>Browse Doctors</span>
+                    </Link>
+                    <Link href="/dashboard/patient/subscription" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
+                        <span className="material-symbols-outlined text-[20px]">card_membership</span>
+                        <span>Subscription</span>
+                    </Link>
+                    <Link href="/dashboard/patient/payments" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
+                        <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+                        <span>Payments</span>
                     </Link>
                     <div className="flex items-center gap-3 rounded-lg border-l-4 border-[#16b46f] bg-[#16b46f]/20 px-3 py-2 text-[#d7ffe9]">
                         <span className="material-symbols-outlined text-[20px]">settings</span>
@@ -271,14 +396,18 @@ export default function PatientSettingsPage() {
                         <h3 className="mb-4 text-m font-semibold text-[#001b5e]">Profile Settings</h3>
                         <div className="mb-4 flex items-center gap-4 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
                             <div className="relative h-16 w-16 overflow-hidden rounded-full border border-[#c6c6cf] bg-white">
-                                <Image className="object-cover" src={profileImage} alt={fullName} fill sizes="64px" unoptimized />
+                                {profileImagePreview ? (
+                                    <Image className="object-cover" src={profileImagePreview} alt={displayName} fill sizes="64px" unoptimized />
+                                ) : (
+                                    <PatientAvatar profile={profile} className="h-full w-full border-0 text-lg text-[#001b5e]" />
+                                )}
                             </div>
                             <div className="flex-1">
                                 <p className="text-sm font-semibold text-[#001b5e]">Profile Image</p>
                                 <p className="text-xs text-[#64748b]">Upload a clear photo for your account.</p>
                                 <label className="mt-2 inline-flex cursor-pointer items-center rounded-lg border border-[#c6c6cf] bg-white px-3 py-1.5 text-xs font-semibold text-[#001b5e] hover:bg-[#f8fafc]">
-                                    Update Image
-                                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                                    {isUploadingImage ? "Uploading..." : "Update Image"}
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isUploadingImage} />
                                 </label>
                             </div>
                         </div>
@@ -287,7 +416,7 @@ export default function PatientSettingsPage() {
                                 <span className="mb-1 block font-medium text-[#334155]">Full Name</span>
                                 <input
                                     type="text"
-                                    value={fullName}
+                                    value={fullNameValue}
                                     onChange={(event) => setFullName(event.target.value)}
                                     className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
                                 />
@@ -297,7 +426,7 @@ export default function PatientSettingsPage() {
                                 <span className="mb-1 block font-medium text-[#334155]">Email Address</span>
                                 <input
                                     type="email"
-                                    value={email}
+                                    value={emailValue}
                                     readOnly
                                     disabled
                                     className="h-10 w-full cursor-not-allowed rounded-lg border border-[#c6c6cf] bg-[#f8fafc] px-3 text-[#64748b]"
@@ -308,7 +437,7 @@ export default function PatientSettingsPage() {
                                 <span className="mb-1 block font-medium text-[#334155]">Phone Number</span>
                                 <input
                                     type="text"
-                                    value={phone}
+                                    value={phoneValue}
                                     onChange={(event) => setPhone(event.target.value)}
                                     className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
                                 />
@@ -353,7 +482,7 @@ export default function PatientSettingsPage() {
                                 <span>Email Notifications</span>
                                 <input
                                     type="checkbox"
-                                    checked={emailNotifications}
+                                    checked={emailNotificationsValue}
                                     onChange={(event) => setEmailNotifications(event.target.checked)}
                                 />
                             </label>
@@ -363,20 +492,25 @@ export default function PatientSettingsPage() {
                             <button
                                 type="button"
                                 className="rounded-lg border border-[#c6c6cf] px-4 py-2 text-sm font-semibold text-[#475569] hover:bg-[#f8fafc]"
-                                onClick={() => setSaveMessage("")}
+                                onClick={() => {
+                                    setSaveMessage("");
+                                    setSaveError("");
+                                }}
                             >
                                 Cancel
                             </button>
                             <button
                                 type="button"
-                                className="rounded-lg bg-[#001b5e] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b2b75]"
+                                disabled={isSavingProfile}
+                                className="rounded-lg bg-[#001b5e] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
                                 onClick={handleSave}
                             >
-                                Save Settings
+                                {isSavingProfile ? "Saving..." : "Save Settings"}
                             </button>
                         </div>
 
                         {saveMessage ? <p className="mt-3 text-sm font-semibold text-[#16b46f]">{saveMessage}</p> : null}
+                        {saveError ? <p className="mt-3 text-sm font-semibold text-[#dc2626]">{saveError}</p> : null}
                     </section>
 
                     <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm lg:col-span-3">
@@ -402,9 +536,9 @@ export default function PatientSettingsPage() {
                                 <p className="mt-1 text-sm font-semibold text-[#001b5e]">{subscription.planName}</p>
                             </div>
                             <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
-                                <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Monthly Price</p>
+                                <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Price</p>
                                 <p className="mt-1 text-sm font-semibold text-[#001b5e]">
-                                    {subscription.price > 0 ? `$${subscription.price}` : "-"}
+                                    {formatSubscriptionPrice(subscription)}
                                 </p>
                             </div>
                             <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
@@ -412,7 +546,7 @@ export default function PatientSettingsPage() {
                                 <p className="mt-1 text-sm font-semibold text-[#001b5e]">{subscription.balance}</p>
                             </div>
                             <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
-                                <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Next Renewal</p>
+                                <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Expiry Date</p>
                                 <p className="mt-1 text-sm font-semibold text-[#001b5e]">{subscription.renewalLabel}</p>
                             </div>
                         </div>
@@ -420,6 +554,12 @@ export default function PatientSettingsPage() {
                         <div className="mt-3 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3 text-sm text-[#475569]">
                             {subscription.featureSummary}
                         </div>
+
+                        {subscriptionError ? (
+                            <p role="alert" className="mt-3 rounded-lg border border-[#fecaca] bg-[#fef2f2] p-3 text-sm text-[#b91c1c]">
+                                {subscriptionError}
+                            </p>
+                        ) : null}
 
                         <div className="mt-4 flex flex-wrap gap-2">
                             <Link

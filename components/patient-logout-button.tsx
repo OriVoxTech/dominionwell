@@ -30,7 +30,7 @@ export default function PatientLogoutButton({
       // Local session cleanup must still happen if the server session has expired.
     } finally {
       clearPatientSession();
-      router.replace("/login/patient");
+      router.replace("/");
       router.refresh();
     }
   };

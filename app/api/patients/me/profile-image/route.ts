@@ -8,7 +8,7 @@ const API_BASE_URL =
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+export async function POST(request: Request) {
   const authorization = request.headers.get("authorization");
 
   if (!authorization?.startsWith("Bearer ")) {
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
       {
         statusCode: 401,
         error: {
-          message: "Admin authentication is required. Please log in again.",
+          message: "Patient authentication is required. Please log in again.",
           error: "Unauthorized",
           statusCode: 401,
         },
@@ -25,25 +25,31 @@ export async function GET(request: Request) {
     );
   }
 
-  const incomingUrl = new URL(request.url);
-  const upstreamUrl = new URL(`${API_BASE_URL}/admin/users`);
-  upstreamUrl.searchParams.set(
-    "role",
-    incomingUrl.searchParams.get("role") ?? "DOCTOR",
-  );
-
-  const search = incomingUrl.searchParams.get("search")?.trim();
-  if (search) upstreamUrl.searchParams.set("search", search);
+  let formData: FormData;
 
   try {
-    const upstreamResponse = await fetch(upstreamUrl, {
-      method: "GET",
-      headers: {
-        Accept: "*/*",
-        Authorization: authorization,
+    formData = await request.formData();
+  } catch {
+    return Response.json(
+      { error: { message: "A profile image file is required." } },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const upstreamResponse = await fetch(
+      `${API_BASE_URL}/patients/me/profile-image`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "*/*",
+          Authorization: authorization,
+          "ngrok-skip-browser-warning": "true",
+        },
+        body: formData,
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+    );
     const responseBody = await upstreamResponse.text();
 
     return new Response(responseBody || null, {
@@ -59,7 +65,7 @@ export async function GET(request: Request) {
       {
         statusCode: 502,
         error: {
-          message: "The doctors service could not be reached. Please try again.",
+          message: "The profile image could not be uploaded. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },

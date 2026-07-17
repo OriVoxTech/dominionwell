@@ -2,12 +2,29 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, type FormEvent, useState } from "react";
+import { Suspense, type FormEvent, useEffect, useState } from "react";
 import { getApiErrorMessage, patientAuthApi } from "@/lib/api";
-import { clearPatientSession, savePatientSession } from "@/lib/patient-session";
+import {
+  clearPatientSession,
+  savePatientSession,
+} from "@/lib/patient-session";
+import { usePatientSessionActive } from "@/components/use-patient-session-active";
 
 const REMEMBERED_PATIENT_EMAIL_KEY = "dwRememberedPatientEmail";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DEFAULT_PATIENT_DESTINATION = "/dashboard/patient";
+
+function getSafePatientDestination(nextPath: string | null) {
+  if (
+    nextPath === DEFAULT_PATIENT_DESTINATION ||
+    nextPath?.startsWith(`${DEFAULT_PATIENT_DESTINATION}/`) ||
+    nextPath?.startsWith(`${DEFAULT_PATIENT_DESTINATION}?`)
+  ) {
+    return nextPath;
+  }
+
+  return DEFAULT_PATIENT_DESTINATION;
+}
 
 function getRememberedPatientEmail() {
   if (typeof window === "undefined") return "";
@@ -17,18 +34,28 @@ function getRememberedPatientEmail() {
 function PatientLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const hasPatientSession = usePatientSessionActive();
   const isPasswordResetComplete = searchParams.get("reset") === "success";
   const isPatientVerified = searchParams.get("verified") === "success";
   const isSessionExpired = searchParams.get("session") === "expired";
+  const destinationAfterLogin = getSafePatientDestination(
+    searchParams.get("next"),
+  );
   const [email, setEmail] = useState(getRememberedPatientEmail);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(() => Boolean(getRememberedPatientEmail()));
+  const [rememberEmail, setRememberEmail] = useState(() => Boolean(getRememberedPatientEmail()));
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEmailValid = EMAIL_PATTERN.test(email.trim());
   const isPasswordValid = password.length >= 8;
   const isLoginFormValid = isEmailValid && isPasswordValid;
+
+  useEffect(() => {
+    if (hasPatientSession) {
+      router.replace(destinationAfterLogin);
+    }
+  }, [destinationAfterLogin, hasPatientSession, router]);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -45,21 +72,25 @@ function PatientLoginContent() {
         password,
       });
 
-      savePatientSession(response.data, rememberMe);
+      savePatientSession(response.data, true);
 
-      if (rememberMe) {
+      if (rememberEmail) {
         window.localStorage.setItem(REMEMBERED_PATIENT_EMAIL_KEY, normalizedEmail);
       } else {
         window.localStorage.removeItem(REMEMBERED_PATIENT_EMAIL_KEY);
       }
 
-      router.push("/dashboard/patient");
+      router.push(destinationAfterLogin);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (hasPatientSession) {
+    return <main className="min-h-screen bg-[#f7f9fc]" />;
+  }
 
   return (
     <main className="min-h-screen bg-[#f7f9fc] px-4 py-7 sm:py-10 md:px-8">
@@ -166,11 +197,11 @@ function PatientLoginContent() {
               <label className="inline-flex items-center gap-2 text-[#475569]">
                 <input
                   type="checkbox"
-                  checked={rememberMe}
-                  onChange={(event) => setRememberMe(event.target.checked)}
+                  checked={rememberEmail}
+                  onChange={(event) => setRememberEmail(event.target.checked)}
                   className="h-4 w-4 accent-[#16b46f]"
                 />
-                Remember me
+                Remember email
               </label>
               <Link href="/login/patient/forgot-password" className="font-medium text-[#0aa4b4]">
                 Forgot password?

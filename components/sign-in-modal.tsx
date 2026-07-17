@@ -10,6 +10,7 @@ type SignInModalProps = {
   onOpenChange?: (open: boolean) => void;
   hideTrigger?: boolean;
   triggerLabel?: string;
+  patientLoginHref?: string;
 };
 
 export default function SignInModal({
@@ -18,6 +19,7 @@ export default function SignInModal({
   onOpenChange,
   hideTrigger = false,
   triggerLabel = "Sign In",
+  patientLoginHref = "/login/patient",
 }: SignInModalProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = typeof open === "boolean";
@@ -90,7 +92,7 @@ export default function SignInModal({
 
                 <div className="grid gap-3">
                   <Link
-                    href="/login/patient"
+                    href={patientLoginHref}
                     className="rounded-xl border border-[#16b46f] bg-[#16b46f] px-4 py-3 text-center text-sm font-semibold text-white"
                     onClick={() => setOpenState(false)}
                   >

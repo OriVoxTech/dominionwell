@@ -11,6 +11,7 @@ import {
   type PublicDoctor,
 } from "@/lib/api";
 import { isPatientSessionActive } from "@/lib/patient-session";
+import { usePatientSessionActive } from "@/components/use-patient-session-active";
 
 const FEATURED_DOCTOR_COUNT = 4;
 
@@ -21,6 +22,15 @@ function getDoctorName(doctor: PublicDoctor) {
     .join(" ");
 
   return name ? `Dr. ${name}` : `Dr. ${doctor.user.username}`;
+}
+
+function getDoctorSearchQuery(doctor: PublicDoctor) {
+  const name = [doctor.user.firstName, doctor.user.lastName]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return name || doctor.user.username;
 }
 
 function getDoctorInitials(doctor: PublicDoctor) {
@@ -55,6 +65,7 @@ function pickRandomDoctors(doctors: PublicDoctor[]) {
 
 export default function Home() {
   const router = useRouter();
+  const hasPatientSession = usePatientSessionActive();
   const [searchQuery, setSearchQuery] = useState("");
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [featuredDoctors, setFeaturedDoctors] = useState<PublicDoctor[]>([]);
@@ -62,6 +73,16 @@ export default function Home() {
   const [doctorsError, setDoctorsError] = useState("");
 
   useEffect(() => {
+    if (hasPatientSession) {
+      router.replace("/dashboard/patient");
+    }
+  }, [hasPatientSession, router]);
+
+  useEffect(() => {
+    if (hasPatientSession) {
+      return;
+    }
+
     let shouldUpdate = true;
 
     const loadFeaturedDoctors = async () => {
@@ -90,7 +111,7 @@ export default function Home() {
     return () => {
       shouldUpdate = false;
     };
-  }, []);
+  }, [hasPatientSession]);
 
   const isPatientLoggedIn = () => {
     if (typeof window === "undefined") {
@@ -119,11 +140,29 @@ export default function Home() {
     });
   };
 
-  const handleBookConsultation = () => {
-    requirePatientLogin(() => {
-      router.push("/dashboard/patient/doctors");
+  const getFilteredDoctorRoute = (doctor: PublicDoctor) => {
+    const params = new URLSearchParams({
+      doctorId: doctor.id,
+      query: getDoctorSearchQuery(doctor),
     });
+
+    return `/dashboard/patient/doctors?${params.toString()}`;
   };
+
+  const handleBookConsultation = (doctor: PublicDoctor) => {
+    const doctorPath = getFilteredDoctorRoute(doctor);
+
+    if (!isPatientLoggedIn()) {
+      router.push(`/login/patient?next=${encodeURIComponent(doctorPath)}`);
+      return;
+    }
+
+    router.push(doctorPath);
+  };
+
+  if (hasPatientSession) {
+    return <div className="min-h-screen bg-[#f7f9fc]" />;
+  }
 
   return (
     <div className="min-h-screen bg-[#f7f9fc] text-[#191c1e]">
@@ -150,7 +189,11 @@ export default function Home() {
 
         <div className="flex items-center gap-2 sm:gap-3">
           <SignInModal className="text-xs text-[#45464e] hover:text-[#16b46f] sm:text-sm" />
-          <SignInModal open={showLoginModal} onOpenChange={setShowLoginModal} hideTrigger />
+          <SignInModal
+            open={showLoginModal}
+            onOpenChange={setShowLoginModal}
+            hideTrigger
+          />
           <Link href="/register" className="rounded-lg bg-[#16b46f] px-3 py-2 text-xs font-semibold text-white sm:px-4 sm:text-sm">
             Register
           </Link>
@@ -316,7 +359,11 @@ export default function Home() {
                         <div className="p-5 sm:p-6">
                           <h4 className="mb-1 truncate text-1xl font-semibold text-[#001b5e]">{doctorName}</h4>
                           <p className="mb-4 truncate text-sm text-[#45464e]">{specialization}</p>
-                          <button className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]" type="button" onClick={handleBookConsultation}>
+                          <button
+                            className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]"
+                            type="button"
+                            onClick={() => handleBookConsultation(doctor)}
+                          >
                             Book Consultation
                           </button>
                         </div>
@@ -396,7 +443,7 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col items-center justify-between gap-4 border-t border-[#c6c6cf] pt-8 md:flex-row">
-            <p className="text-xs text-[#45464e]">© 2024 DominionWell+. All rights reserved.</p>
+            <p className="text-xs text-[#45464e]">© 2026 DominionWell+. All rights reserved.</p>
             <div className="flex gap-6">
               <a className="text-[#45464e] hover:text-[#16b46f]" href="#"><span className="material-symbols-outlined text-[20px]">public</span></a>
               <a className="text-[#45464e] hover:text-[#16b46f]" href="#"><span className="material-symbols-outlined text-[20px]">group</span></a>

@@ -1,10 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import PatientAvatar from "@/components/patient-avatar";
 import PatientMobileNav from "@/components/patient-mobile-nav";
 import PatientLogoutButton from "@/components/patient-logout-button";
+import PatientProfileSummary from "@/components/patient-profile-summary";
+import { usePatientProfile } from "@/lib/use-patient-profile";
 
 type FaqItem = {
     question: string;
@@ -40,6 +42,7 @@ const faqItems: FaqItem[] = [
 ];
 
 export default function PatientHelpCenterPage() {
+    const profile = usePatientProfile();
     const [openIndex, setOpenIndex] = useState<number>(0);
 
     return (
@@ -52,20 +55,8 @@ export default function PatientHelpCenterPage() {
                 </div>
 
                 <div className="mb-6 flex items-center gap-3 px-2">
-                    <div className="relative h-11 w-11 overflow-hidden rounded-full border-2 border-[#16b46f]/40">
-                        <Image
-                            className="object-cover"
-                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAPurUR2thld9ARCgQv5h5zzRrmbx5VzEhRhGSj-4R3LQBMFeO5bA8OOCajuwGXXWPjtINjhw8-RqL2BIwlmrOkDz58EbqhMGjnRdrjEPNB6wMXEYirVhXLKHukNRiuOjWAxDoEcMTG9A2c2wKRcRRN4U7gxeFEPhJ7G7sLUQezeiulcTpl6y2fsYeeLmQHBuYLxYwyY3mOhVegyEsvP846S3aiHmWvjDLrjKsx9yBY9vkJssTPuipSUEY4d1WwN6dlulgSFUQpfRjW"
-                            alt="Alex Johnson"
-                            fill
-                            sizes="44px"
-                            unoptimized
-                        />
-                    </div>
-                    <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">Alex Johnson</p>
-                        <p className="text-xs text-[#d8e2ff]">ID: DW-98231</p>
-                    </div>
+                    <PatientAvatar profile={profile} />
+                    <PatientProfileSummary />
                 </div>
 
                 <nav className="flex-1 space-y-1 text-sm">
@@ -80,6 +71,14 @@ export default function PatientHelpCenterPage() {
                     <Link href="/dashboard/patient/doctors" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
                         <span className="material-symbols-outlined text-[20px]">medical_services</span>
                         <span>Browse Doctors</span>
+                    </Link>
+                    <Link href="/dashboard/patient/subscription" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
+                        <span className="material-symbols-outlined text-[20px]">card_membership</span>
+                        <span>Subscription</span>
+                    </Link>
+                    <Link href="/dashboard/patient/payments" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
+                        <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+                        <span>Payments</span>
                     </Link>
                     <Link href="/dashboard/patient/settings" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
                         <span className="material-symbols-outlined text-[20px]">settings</span>
