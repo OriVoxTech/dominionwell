@@ -62,7 +62,7 @@ export default function Home() {
               </article>
             </div>
 
-            <p className="foot-note">Your Health. Our Priority.</p>
+            <p className="foot-note">Your Health. Our Priority</p>
           </aside>
         </div>
       </section>
