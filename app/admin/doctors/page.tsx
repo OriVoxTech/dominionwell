@@ -4,14 +4,19 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ADMIN_UPDATED_EVENT,
   readAdminPatients,
+  readDoctorJoinRequests,
   readDoctorWithdrawalRequests,
+  updateDoctorJoinRequestStatus,
   updateDoctorWithdrawalRequestStatus,
   type AdminPatient,
   type AdminDoctor,
+  type DoctorJoinRequest,
   type DoctorWithdrawalRequest,
 } from "@/lib/admin-portal";
 import { APPOINTMENT_REQUESTS_UPDATED_EVENT, readAppointmentRequests } from "@/lib/appointments";
 import { adminApiService, getApiErrorMessage, type AdminDoctorUser } from "@/lib/api";
+
+type AddDoctorTab = "request" | "manual";
 
 type NewDoctorForm = {
   firstName: string;
@@ -82,9 +87,11 @@ function mapApiUserToDoctor(user: AdminDoctorUser): AdminDoctor {
 export default function AdminDoctorsPage() {
   const [doctors, setDoctors] = useState<AdminDoctor[]>([]);
   const [patients, setPatients] = useState<AdminPatient[]>(readAdminPatients());
+  const [doctorJoinRequests, setDoctorJoinRequests] = useState<DoctorJoinRequest[]>(readDoctorJoinRequests());
   const [withdrawalRequests, setWithdrawalRequests] = useState<DoctorWithdrawalRequest[]>(readDoctorWithdrawalRequests());
   const [appointments, setAppointments] = useState(readAppointmentRequests());
   const [selectedDoctorId, setSelectedDoctorId] = useState("");
+  const [addDoctorTab, setAddDoctorTab] = useState<AddDoctorTab>("request");
   const [form, setForm] = useState<NewDoctorForm>(defaultForm);
   const [createError, setCreateError] = useState("");
   const [createMessage, setCreateMessage] = useState("");
@@ -93,6 +100,8 @@ export default function AdminDoctorsPage() {
   const [directoryError, setDirectoryError] = useState("");
   const [doctorTotal, setDoctorTotal] = useState(0);
   const [statusUpdatingUserId, setStatusUpdatingUserId] = useState("");
+  const [requestActionId, setRequestActionId] = useState("");
+  const [requestMessage, setRequestMessage] = useState("");
   const isCreateDoctorValid =
     Boolean(form.firstName.trim()) &&
     Boolean(form.lastName.trim()) &&
@@ -149,6 +158,7 @@ export default function AdminDoctorsPage() {
   useEffect(() => {
     const sync = () => {
       setPatients(readAdminPatients());
+      setDoctorJoinRequests(readDoctorJoinRequests());
       setWithdrawalRequests(readDoctorWithdrawalRequests());
       setAppointments(readAppointmentRequests());
     };
@@ -266,6 +276,68 @@ export default function AdminDoctorsPage() {
     () => new Set(doctors.map((doctor) => doctor.specialization)).size,
     [doctors],
   );
+  const pendingDoctorJoinRequests = useMemo(
+    () => doctorJoinRequests.filter((request) => request.status === "Pending"),
+    [doctorJoinRequests],
+  );
+
+  const reviewedDoctorJoinRequests = useMemo(
+    () => doctorJoinRequests.filter((request) => request.status !== "Pending"),
+    [doctorJoinRequests],
+  );
+
+  const buildDoctorPayloadFromRequest = (request: DoctorJoinRequest) => {
+    const cleanedName = request.name.replace(/^dr\.?\s+/i, "").trim();
+    const nameParts = cleanedName.split(/\s+/).filter(Boolean);
+    const firstName = nameParts[0] ?? request.username;
+    const lastName = nameParts.slice(1).join(" ") || "Doctor";
+
+    return {
+      firstName,
+      lastName,
+      email: request.email.trim().toLowerCase(),
+      phone: request.phone.trim(),
+      specialization: request.specialization.trim().toUpperCase(),
+      username: request.username.trim(),
+    };
+  };
+
+  const handleAcceptJoinRequest = async (request: DoctorJoinRequest) => {
+    if (requestActionId) return;
+
+    setRequestMessage("");
+    setRequestActionId(request.id);
+
+    try {
+      await adminApiService.createDoctor(buildDoctorPayloadFromRequest(request));
+      updateDoctorJoinRequestStatus(
+        request.id,
+        "Accepted",
+        "Accepted by admin. Existing create doctor API was called with the supplied application details.",
+      );
+      setDoctorJoinRequests(readDoctorJoinRequests());
+      setRequestMessage(`${request.name} has been accepted and a doctor account was created.`);
+      await loadDoctors();
+    } catch (error) {
+      setRequestMessage(getApiErrorMessage(error));
+    } finally {
+      setRequestActionId("");
+    }
+  };
+
+  const handleRejectJoinRequest = (request: DoctorJoinRequest) => {
+    if (requestActionId) return;
+
+    setRequestMessage(
+      `${request.name} was rejected. Backend email sending API is not ready yet, so this is marked locally for now.`,
+    );
+    updateDoctorJoinRequestStatus(
+      request.id,
+      "Rejected",
+      "Rejected by admin. Future backend integration should send the rejection email to the applicant.",
+    );
+    setDoctorJoinRequests(readDoctorJoinRequests());
+  };
 
   const handleAddDoctor = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -310,7 +382,7 @@ export default function AdminDoctorsPage() {
         </div>
       ) : null}
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Total Doctors</p>
           <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{isLoadingDoctors ? "—" : doctorTotal}</p>
@@ -327,36 +399,189 @@ export default function AdminDoctorsPage() {
           <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Specializations</p>
           <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{specializationCount}</p>
         </article>
+        <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Join Requests</p>
+          <p className="mt-2 text-2xl font-semibold text-[#b45309]">{pendingDoctorJoinRequests.length}</p>
+        </article>
       </section>
 
-      <section className="rounded-2xl border border-[#dbe4f0] bg-gradient-to-br from-white to-[#f8fbff] p-4 shadow-sm sm:p-5">
-        <h3 className="text-base font-semibold text-[#001b5e]">Add Doctor Login Account</h3>
-        <form className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" onSubmit={handleAddDoctor}>
-          <input value={form.firstName} onChange={(e) => setForm((current) => ({ ...current, firstName: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="First name" autoComplete="given-name" required />
-          <input value={form.lastName} onChange={(e) => setForm((current) => ({ ...current, lastName: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Last name" autoComplete="family-name" required />
-          <select
-            value={form.specialization}
-            onChange={(event) => setForm((current) => ({ ...current, specialization: event.target.value }))}
-            className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]"
-            required
-          >
-            {SPECIALIZATION_OPTIONS.map((specialization) => (
-              <option key={specialization} value={specialization}>
-                {specialization.replaceAll("_", " ")}
-              </option>
+      <section className="rounded-2xl border border-[#dbe4f0] bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-4 rounded-xl bg-[#f8fafc] p-1">
+          <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setAddDoctorTab("request")}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                addDoctorTab === "request"
+                  ? "bg-[#001b5e] text-white shadow-sm"
+                  : "text-[#475569] hover:bg-white"
+              }`}
+            >
+              Review Applications
+            </button>
+            <button
+              type="button"
+              onClick={() => setAddDoctorTab("manual")}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                addDoctorTab === "manual"
+                  ? "bg-[#001b5e] text-white shadow-sm"
+                  : "text-[#475569] hover:bg-white"
+              }`}
+            >
+              Create Doctor Account
+            </button>
+          </div>
+        </div>
+
+        {addDoctorTab === "request" ? (
+          <>
+        <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <div>
+            <h3 className="text-base font-semibold text-[#001b5e]">Doctor Applications</h3>
+            <p className="mt-1 text-sm text-[#64748b]">
+              Review applications submitted from the public “Join as a Doctor” form. Accept calls the current create-doctor API; reject is ready for the future backend email API.
+            </p>
+          </div>
+          <span className="w-fit rounded-full bg-[#f59e0b]/15 px-3 py-1 text-xs font-semibold text-[#b45309]">
+            {pendingDoctorJoinRequests.length} pending
+          </span>
+        </div>
+
+        {requestMessage ? (
+          <p className="mb-4 rounded-xl border border-[#dbe4f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#334155]">
+            {requestMessage}
+          </p>
+        ) : null}
+
+        {pendingDoctorJoinRequests.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
+            No pending doctor application requests.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            {pendingDoctorJoinRequests.map((request) => (
+              <article key={request.id} className="rounded-xl border border-[#e2e8f0] bg-[#f8fbff] p-4">
+                <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
+                  <div>
+                    <p className="text-base font-semibold text-[#001b5e]">{request.name}</p>
+                    <p className="text-xs text-[#64748b]">@{request.username} · {request.specialization.replaceAll("_", " ")}</p>
+                  </div>
+                  <span className="w-fit rounded-full bg-[#f59e0b]/15 px-2 py-1 text-[11px] font-semibold text-[#b45309]">
+                    {request.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 text-xs text-[#475569] sm:grid-cols-2">
+                  <p>Email: <span className="font-semibold">{request.email}</span></p>
+                  <p>Phone: <span className="font-semibold">{request.phone}</span></p>
+                  <p>Requested: <span className="font-semibold">{new Date(request.requestedAt).toLocaleString()}</span></p>
+                </div>
+
+                <div className="mt-3 rounded-lg border border-[#dbe4f0] bg-white p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">Supporting documents and licenses</p>
+                  {request.documents.length === 0 ? (
+                    <p className="text-xs text-[#94a3b8]">No documents attached.</p>
+                  ) : (
+                    <ul className="space-y-1 text-xs text-[#475569]">
+                      {request.documents.map((document) => (
+                        <li key={`${request.id}-${document.name}-${document.size}`} className="flex items-center justify-between gap-3">
+                          <span className="truncate">{document.name}</span>
+                          <span className="shrink-0 text-[#64748b]">{Math.ceil(document.size / 1024)} KB</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={requestActionId === request.id}
+                    onClick={() => void handleAcceptJoinRequest(request)}
+                    className="rounded-lg bg-[#16b46f] px-3 py-2 text-xs font-semibold text-white hover:bg-[#149660] disabled:cursor-wait disabled:bg-[#94a3b8]"
+                  >
+                    {requestActionId === request.id ? "Accepting..." : "Accept"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={Boolean(requestActionId)}
+                    onClick={() => handleRejectJoinRequest(request)}
+                    className="rounded-lg border border-[#ef4444]/40 px-3 py-2 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2] disabled:cursor-wait disabled:opacity-60"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </article>
             ))}
-          </select>
-          <input value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Email" type="email" autoComplete="email" required />
-          <input value={form.phone} onChange={(e) => setForm((current) => ({ ...current, phone: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Phone" type="tel" autoComplete="tel" required />
-          <input value={form.username} onChange={(e) => setForm((current) => ({ ...current, username: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Login username" autoComplete="username" required />
+          </div>
+        )}
 
-          {createError ? <p role="alert" className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-sm text-[#b91c1c] md:col-span-2 xl:col-span-3">{createError}</p> : null}
-          {createMessage ? <p role="status" className="rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm text-[#15803d] md:col-span-2 xl:col-span-3">{createMessage}</p> : null}
+        {reviewedDoctorJoinRequests.length > 0 ? (
+          <details className="mt-4 rounded-xl border border-[#e2e8f0] bg-white p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-[#001b5e]">
+              Reviewed requests ({reviewedDoctorJoinRequests.length})
+            </summary>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-[#f8fafc] uppercase tracking-wide text-[#64748b]">
+                    <th className="px-3 py-2">Doctor</th>
+                    <th className="px-3 py-2">Specialty</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Reviewed</th>
+                    <th className="px-3 py-2">Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reviewedDoctorJoinRequests.map((request) => (
+                    <tr key={request.id} className="border-b border-[#e2e8f0] last:border-b-0">
+                      <td className="px-3 py-2 text-[#334155]">{request.name}</td>
+                      <td className="px-3 py-2 text-[#334155]">{request.specialization.replaceAll("_", " ")}</td>
+                      <td className="px-3 py-2 text-[#334155]">{request.status}</td>
+                      <td className="px-3 py-2 text-[#334155]">{request.reviewedAt ? new Date(request.reviewedAt).toLocaleString() : "—"}</td>
+                      <td className="px-3 py-2 text-[#334155]">{request.reviewNote ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        ) : null}
+          </>
+        ) : (
+          <div className="rounded-2xl border border-[#dbe4f0] bg-gradient-to-br from-white to-[#f8fbff] p-4 sm:p-5">
+            <h3 className="text-base font-semibold text-[#001b5e]">Create Doctor Account</h3>
+            <p className="mt-1 text-sm text-[#64748b]">
+              Create a doctor account directly when there is no public application request.
+            </p>
+            <form className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" onSubmit={handleAddDoctor}>
+              <input value={form.firstName} onChange={(e) => setForm((current) => ({ ...current, firstName: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="First name" autoComplete="given-name" required />
+              <input value={form.lastName} onChange={(e) => setForm((current) => ({ ...current, lastName: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Last name" autoComplete="family-name" required />
+              <select
+                value={form.specialization}
+                onChange={(event) => setForm((current) => ({ ...current, specialization: event.target.value }))}
+                className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]"
+                required
+              >
+                {SPECIALIZATION_OPTIONS.map((specialization) => (
+                  <option key={specialization} value={specialization}>
+                    {specialization.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
+              <input value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Email" type="email" autoComplete="email" required />
+              <input value={form.phone} onChange={(e) => setForm((current) => ({ ...current, phone: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Phone" type="tel" autoComplete="tel" required />
+              <input value={form.username} onChange={(e) => setForm((current) => ({ ...current, username: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Login username" autoComplete="username" required />
 
-          <button type="submit" disabled={!isCreateDoctorValid || isCreatingDoctor} className="h-10 rounded-lg bg-[#001b5e] px-4 text-sm font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8] md:col-span-2 xl:col-span-3">
-            {isCreatingDoctor ? "Creating doctor..." : "Add Doctor"}
-          </button>
-        </form>
+              {createError ? <p role="alert" className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-sm text-[#b91c1c] md:col-span-2 xl:col-span-3">{createError}</p> : null}
+              {createMessage ? <p role="status" className="rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm text-[#15803d] md:col-span-2 xl:col-span-3">{createMessage}</p> : null}
+
+              <button type="submit" disabled={!isCreateDoctorValid || isCreatingDoctor} className="h-10 rounded-lg bg-[#001b5e] px-4 text-sm font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8] md:col-span-2 xl:col-span-3">
+                {isCreatingDoctor ? "Creating doctor..." : "Add Doctor"}
+              </button>
+            </form>
+          </div>
+        )}
       </section>
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_1.4fr]">

@@ -9,6 +9,7 @@ export const ADMIN_SETTINGS_KEY = "dwAdminSettings";
 export const DOCTOR_WALLET_TRANSACTIONS_KEY = "dwDoctorWalletTransactions";
 export const DOCTOR_WITHDRAWAL_REQUESTS_KEY = "dwDoctorWithdrawalRequests";
 export const DOCTOR_BANK_DETAILS_KEY = "dwDoctorBankDetails";
+export const DOCTOR_JOIN_REQUESTS_KEY = "dwDoctorJoinRequests";
 export const ADMIN_UPDATED_EVENT = "dw-admin-updated";
 
 export type AdminStatus = "Whitelisted" | "Blacklisted";
@@ -105,6 +106,28 @@ export type DoctorBankDetails = {
   bankName: string;
   accountName: string;
   accountNumber: string;
+};
+
+export type DoctorJoinRequestStatus = "Pending" | "Accepted" | "Rejected";
+
+export type DoctorJoinRequestFile = {
+  name: string;
+  size: number;
+  type: string;
+};
+
+export type DoctorJoinRequest = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  username: string;
+  specialization: string;
+  documents: DoctorJoinRequestFile[];
+  status: DoctorJoinRequestStatus;
+  requestedAt: string;
+  reviewedAt?: string;
+  reviewNote?: string;
 };
 
 function canUseDOM() {
@@ -286,6 +309,60 @@ function seedSettings(): AdminSettings {
   };
 }
 
+function seedDoctorJoinRequests(): DoctorJoinRequest[] {
+  return [
+    {
+      id: "doctor-request-mock-001",
+      name: "Dr. Ada Okafor",
+      email: "ada.okafor@example.com",
+      phone: "+2348012345678",
+      username: "dradaokafor",
+      specialization: "PEDIATRICS",
+      documents: [
+        {
+          name: "medical-license-ada-okafor.pdf",
+          size: 842_120,
+          type: "application/pdf",
+        },
+        {
+          name: "pediatric-board-certification.pdf",
+          size: 618_430,
+          type: "application/pdf",
+        },
+      ],
+      status: "Pending",
+      requestedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+    },
+    {
+      id: "doctor-request-mock-002",
+      name: "Dr. Tunde Bello",
+      email: "tunde.bello@example.com",
+      phone: "+2348098765432",
+      username: "drtundebello",
+      specialization: "CARDIOLOGY",
+      documents: [
+        {
+          name: "md-degree-certificate.jpg",
+          size: 1_248_900,
+          type: "image/jpeg",
+        },
+        {
+          name: "cardiology-license.pdf",
+          size: 730_112,
+          type: "application/pdf",
+        },
+        {
+          name: "identity-document.png",
+          size: 402_640,
+          type: "image/png",
+        },
+      ],
+      status: "Pending",
+      requestedAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+    },
+  ];
+}
+
 function parseList<T>(value: string | null, fallback: T[]): T[] {
   if (!value) {
     return fallback;
@@ -380,6 +457,43 @@ export function readAdminReports() {
 
 export function readAdminSettings() {
   return readStorageObject(ADMIN_SETTINGS_KEY, seedSettings());
+}
+
+export function readDoctorJoinRequests() {
+  return readStorageList<DoctorJoinRequest>(DOCTOR_JOIN_REQUESTS_KEY, seedDoctorJoinRequests());
+}
+
+export function addDoctorJoinRequest(input: Omit<DoctorJoinRequest, "id" | "status" | "requestedAt">) {
+  const currentRequests = readDoctorJoinRequests();
+  const nextRequest: DoctorJoinRequest = {
+    ...input,
+    id: `doctor-request-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    status: "Pending",
+    requestedAt: new Date().toISOString(),
+  };
+
+  writeStorageList(DOCTOR_JOIN_REQUESTS_KEY, [nextRequest, ...currentRequests]);
+  return nextRequest;
+}
+
+export function updateDoctorJoinRequestStatus(
+  requestId: string,
+  status: DoctorJoinRequestStatus,
+  reviewNote?: string,
+) {
+  const currentRequests = readDoctorJoinRequests();
+  const nextRequests = currentRequests.map((request) =>
+    request.id === requestId
+      ? {
+          ...request,
+          status,
+          reviewedAt: new Date().toISOString(),
+          reviewNote,
+        }
+      : request,
+  );
+
+  writeStorageList(DOCTOR_JOIN_REQUESTS_KEY, nextRequests);
 }
 
 export function updateAdminSettings(nextSettings: Partial<AdminSettings>) {

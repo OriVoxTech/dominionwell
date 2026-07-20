@@ -403,51 +403,83 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-[#c6c6cf] bg-[#f7f9fc] py-16">
+      <footer className="border-t border-[#c6c6cf] bg-[#001b5e] py-14 text-white sm:py-16">
         <div className="mx-auto max-w-[1440px] px-4 md:px-10">
-          <div className="mb-12 grid grid-cols-1 gap-12 md:grid-cols-4">
-            <div>
-              <div className="mb-6 flex items-center gap-2">
-                <Image alt="DominionWell Logo" className="h-6 w-auto" src="/logo.png" width={96} height={24} />
-                <span className="text-m font-bold text-[#001b5e]">DominionWell+</span>
-              </div>
-              <p className="text-base text-[#45464e]">
-                Redefining clinical precision and patient-centric healthcare for the modern world.
+          <div className="mb-10 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-xl sm:p-7 md:flex md:items-center md:justify-between md:gap-8">
+            <div className="max-w-2xl">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-[#74fcad]">Care network</p>
+              <h3 className="text-2xl font-bold tracking-tight sm:text-3xl">Patients need excellent doctors. Excellent doctors need better tools.</h3>
+              <p className="mt-3 text-sm leading-6 text-[#d8e2ff]">
+                Join DominionWell+ as a verified provider and offer secure virtual care to patients who need timely access.
               </p>
             </div>
+            <Link
+              href="/join-doctor"
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#16b46f] px-5 py-3 text-sm font-semibold text-white hover:bg-[#149660] md:mt-0 md:w-auto"
+            >
+              Join as a Doctor
+              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+            </Link>
+          </div>
+
+          <div className="mb-10 grid grid-cols-1 gap-10 md:grid-cols-4">
+            <div className="md:col-span-1">
+              <div className="mb-6 flex items-center gap-2">
+                <Image alt="DominionWell Logo" className="h-6 w-auto" src="/logo.png" width={96} height={24} />
+                <span className="text-m font-bold text-white">DominionWell+</span>
+              </div>
+              <p className="text-sm leading-6 text-[#d8e2ff]">
+                Redefining clinical precision and patient-centered healthcare for patients, doctors, and care teams.
+              </p>
+              <div className="mt-5 flex gap-3">
+                <a className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-[#d8e2ff] hover:bg-[#16b46f] hover:text-white" href="#" aria-label="DominionWell web">
+                  <span className="material-symbols-outlined text-[18px]">public</span>
+                </a>
+                <a className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-[#d8e2ff] hover:bg-[#16b46f] hover:text-white" href="#" aria-label="DominionWell community">
+                  <span className="material-symbols-outlined text-[18px]">group</span>
+                </a>
+                <a className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-[#d8e2ff] hover:bg-[#16b46f] hover:text-white" href="#" aria-label="DominionWell updates">
+                  <span className="material-symbols-outlined text-[18px]">campaign</span>
+                </a>
+              </div>
+            </div>
             <div>
-              <h5 className="mb-6 text-sm font-bold text-[#001b5e]">Platform</h5>
-              <ul className="space-y-4 text-[#45464e]">
-                <li><a className="hover:text-[#16b46f]" href="#">Find Doctors</a></li>
+              <h5 className="mb-4 text-sm font-bold text-white">Platform</h5>
+              <ul className="space-y-3 text-sm text-[#d8e2ff]">
+                <li><a className="hover:text-[#74fcad]" href="#">Find Doctors</a></li>
+                <li><Link className="hover:text-[#74fcad]" href="/services">Services</Link></li>
+                <li><Link className="hover:text-[#74fcad]" href="/register">Patient Registration</Link></li>
+                <li><Link className="hover:text-[#74fcad]" href="/login/patient">Patient Login</Link></li>
               </ul>
             </div>
             <div>
-              <h5 className="mb-6 text-sm font-bold text-[#001b5e]">Company</h5>
-              <ul className="space-y-4 text-[#45464e]">
-                <li><Link className="hover:text-[#16b46f]" href="/about">About Us</Link></li>
-                <li><Link className="hover:text-[#16b46f]" href="/contact">Contact</Link></li>
-                <li><Link className="hover:text-[#16b46f]" href="/admin/login">Admin Portal</Link></li>
-                <li><a className="hover:text-[#16b46f]" href="#">Privacy</a></li>
+              <h5 className="mb-4 text-sm font-bold text-white">Company</h5>
+              <ul className="space-y-3 text-sm text-[#d8e2ff]">
+                <li><Link className="hover:text-[#74fcad]" href="/about">About Us</Link></li>
+                <li><Link className="hover:text-[#74fcad]" href="/contact">Contact</Link></li>
+                <li><Link className="hover:text-[#74fcad]" href="/join-doctor">Join as a Doctor</Link></li>
+                <li><Link className="hover:text-[#74fcad]" href="/login/doctor">Doctor Login</Link></li>
+                <li><Link className="hover:text-[#74fcad]" href="/admin/login">Admin Portal</Link></li>
               </ul>
             </div>
             <div>
-              <h5 className="mb-6 text-sm font-bold text-[#001b5e]">Newsletter</h5>
-              <p className="mb-4 text-xs text-[#45464e]">Stay updated with our latest health tips and platform updates.</p>
-              <div className="flex gap-2">
-                <input className="flex-1 rounded-lg border border-[#c6c6cf] bg-[#eceef1] px-4 py-2 text-sm outline-none" placeholder="Your email" type="email" />
-                <button className="rounded-lg bg-[#001b5e] px-4 py-2 text-xs font-semibold text-white" type="button">
+              <h5 className="mb-4 text-sm font-bold text-white">Stay in the loop</h5>
+              <p className="mb-4 text-sm leading-6 text-[#d8e2ff]">Get health tips, care updates, and product announcements.</p>
+              <div className="flex gap-2 rounded-xl bg-white/10 p-1">
+                <input className="min-w-0 flex-1 rounded-lg border border-transparent bg-white px-3 py-2 text-sm text-[#001b5e] outline-none placeholder:text-[#64748b]" placeholder="Your email" type="email" />
+                <button className="rounded-lg bg-[#16b46f] px-4 py-2 text-xs font-semibold text-white hover:bg-[#149660]" type="button">
                   Join
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-between gap-4 border-t border-[#c6c6cf] pt-8 md:flex-row">
-            <p className="text-xs text-[#45464e]">© 2026 DominionWell+. All rights reserved.</p>
-            <div className="flex gap-6">
-              <a className="text-[#45464e] hover:text-[#16b46f]" href="#"><span className="material-symbols-outlined text-[20px]">public</span></a>
-              <a className="text-[#45464e] hover:text-[#16b46f]" href="#"><span className="material-symbols-outlined text-[20px]">group</span></a>
-              <a className="text-[#45464e] hover:text-[#16b46f]" href="#"><span className="material-symbols-outlined text-[20px]">campaign</span></a>
+          <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 md:flex-row">
+            <p className="text-xs text-[#b8c7ee]">© 2026 DominionWell+. All rights reserved.</p>
+            <div className="flex flex-wrap justify-center gap-4 text-xs text-[#b8c7ee]">
+              <a className="hover:text-[#74fcad]" href="#">Privacy Policy</a>
+              <a className="hover:text-[#74fcad]" href="#">Terms of Use</a>
+              <a className="hover:text-[#74fcad]" href="#">Security</a>
             </div>
           </div>
         </div>
