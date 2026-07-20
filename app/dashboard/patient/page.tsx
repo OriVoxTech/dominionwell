@@ -25,8 +25,6 @@ const TimeOfDayGreeting = dynamic(() => import("../../../components/time-of-day-
     loading: () => <span>Hello</span>,
 });
 
-const PATIENT_NOTIFICATIONS_KEY = "dwPatientNotifications";
-
 function getDoctorName(doctor: PublicDoctor) {
     const name = [doctor.user.firstName, doctor.user.lastName]
         .map((part) => part.trim())
@@ -136,28 +134,20 @@ export default function PatientDashboardPage() {
 
     useEffect(() => {
         const refreshUnreadCount = () => {
-            const stored = window.localStorage.getItem(PATIENT_NOTIFICATIONS_KEY);
-
-            if (!stored) {
-                setUnreadNotifications(0);
-                return;
-            }
-
-            try {
-                const parsed = JSON.parse(stored) as Array<{ unread?: boolean }>;
-                const unreadCount = Array.isArray(parsed) ? parsed.filter((item) => item.unread).length : 0;
-                setUnreadNotifications(unreadCount);
-            } catch {
-                setUnreadNotifications(0);
-            }
+            void patientApiService
+                .getUnreadNotificationCount()
+                .then((response) => {
+                    setUnreadNotifications(response.data.unreadCount);
+                })
+                .catch(() => {
+                    setUnreadNotifications(0);
+                });
         };
 
         refreshUnreadCount();
-        window.addEventListener("storage", refreshUnreadCount);
         window.addEventListener("dw-notifications-updated", refreshUnreadCount);
 
         return () => {
-            window.removeEventListener("storage", refreshUnreadCount);
             window.removeEventListener("dw-notifications-updated", refreshUnreadCount);
         };
     }, []);

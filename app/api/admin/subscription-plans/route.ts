@@ -8,7 +8,7 @@ const API_BASE_URL =
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+export async function POST(request: Request) {
   const authorization = request.headers.get("authorization");
 
   if (!authorization?.startsWith("Bearer ")) {
@@ -25,25 +25,39 @@ export async function GET(request: Request) {
     );
   }
 
-  const incomingUrl = new URL(request.url);
-  const upstreamUrl = new URL(`${API_BASE_URL}/admin/users`);
-  upstreamUrl.searchParams.set(
-    "role",
-    incomingUrl.searchParams.get("role") ?? "DOCTOR",
-  );
-
-  const search = incomingUrl.searchParams.get("search")?.trim();
-  if (search) upstreamUrl.searchParams.set("search", search);
+  let body: unknown;
 
   try {
-    const upstreamResponse = await fetch(upstreamUrl, {
-      method: "GET",
-      headers: {
-        Accept: "*/*",
-        Authorization: authorization,
+    body = await request.json();
+  } catch {
+    return Response.json(
+      {
+        statusCode: 400,
+        error: {
+          message: "Subscription plan details are required.",
+          error: "Bad Request",
+          statusCode: 400,
+        },
       },
-      cache: "no-store",
-    });
+      { status: 400 },
+    );
+  }
+
+  try {
+    const upstreamResponse = await fetch(
+      `${API_BASE_URL}/admin/subscription-plans`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "*/*",
+          Authorization: authorization,
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      },
+    );
     const responseBody = await upstreamResponse.text();
 
     return new Response(responseBody || null, {
@@ -59,7 +73,8 @@ export async function GET(request: Request) {
       {
         statusCode: 502,
         error: {
-          message: "The doctors service could not be reached. Please try again.",
+          message:
+            "Subscription plan service could not be reached. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },

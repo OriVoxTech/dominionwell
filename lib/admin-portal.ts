@@ -457,20 +457,22 @@ export function updatePatientStatus(patientId: string, status: AdminStatus) {
 }
 
 export function addSubscriptionPlan(input: {
+  id?: string;
   name: string;
   monthlyPrice: number;
   consultationsPerMonth: number;
   description: string;
+  active?: boolean;
 }) {
   const currentPlans = readSubscriptionPlans();
 
   const nextPlan: SubscriptionPlan = {
-    id: `plan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: input.id ?? `plan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     name: input.name.trim(),
     monthlyPrice: Math.max(0, Math.floor(input.monthlyPrice)),
     consultationsPerMonth: Math.max(1, Math.floor(input.consultationsPerMonth)),
     description: input.description.trim(),
-    active: true,
+    active: input.active ?? true,
   };
 
   writeStorageList(ADMIN_PLANS_KEY, [nextPlan, ...currentPlans]);

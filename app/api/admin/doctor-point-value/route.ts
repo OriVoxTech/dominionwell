@@ -8,16 +8,12 @@ const API_BASE_URL =
 
 export const dynamic = "force-dynamic";
 
-function getAuthorization(request: Request) {
-  return request.headers.get("authorization");
-}
-
 function unauthorizedResponse() {
   return Response.json(
     {
       statusCode: 401,
       error: {
-        message: "Patient authentication is required. Please log in again.",
+        message: "Admin authentication is required. Please log in again.",
         error: "Unauthorized",
         statusCode: 401,
       },
@@ -38,22 +34,25 @@ function proxyResponse(upstreamResponse: Response, responseBody: string) {
 }
 
 export async function GET(request: Request) {
-  const authorization = getAuthorization(request);
+  const authorization = request.headers.get("authorization");
 
   if (!authorization?.startsWith("Bearer ")) {
     return unauthorizedResponse();
   }
 
   try {
-    const upstreamResponse = await fetch(`${API_BASE_URL}/patients/me`, {
-      method: "GET",
-      headers: {
-        Accept: "*/*",
-        Authorization: authorization,
-        "ngrok-skip-browser-warning": "true",
+    const upstreamResponse = await fetch(
+      `${API_BASE_URL}/admin/doctor-point-value`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "*/*",
+          Authorization: authorization,
+          "ngrok-skip-browser-warning": "true",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+    );
     const responseBody = await upstreamResponse.text();
 
     return proxyResponse(upstreamResponse, responseBody);
@@ -62,7 +61,8 @@ export async function GET(request: Request) {
       {
         statusCode: 502,
         error: {
-          message: "The patient profile could not be reached. Please try again.",
+          message:
+            "Doctor point value service could not be reached. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const authorization = getAuthorization(request);
+  const authorization = request.headers.get("authorization");
 
   if (!authorization?.startsWith("Bearer ")) {
     return unauthorizedResponse();
@@ -85,23 +85,33 @@ export async function PATCH(request: Request) {
     body = await request.json();
   } catch {
     return Response.json(
-      { error: { message: "A valid patient profile is required." } },
+      {
+        statusCode: 400,
+        error: {
+          message: "Point value is required.",
+          error: "Bad Request",
+          statusCode: 400,
+        },
+      },
       { status: 400 },
     );
   }
 
   try {
-    const upstreamResponse = await fetch(`${API_BASE_URL}/patients/me`, {
-      method: "PATCH",
-      headers: {
-        Accept: "*/*",
-        Authorization: authorization,
-        "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
+    const upstreamResponse = await fetch(
+      `${API_BASE_URL}/admin/doctor-point-value`,
+      {
+        method: "PATCH",
+        headers: {
+          Accept: "*/*",
+          Authorization: authorization,
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
       },
-      body: JSON.stringify(body),
-      cache: "no-store",
-    });
+    );
     const responseBody = await upstreamResponse.text();
 
     return proxyResponse(upstreamResponse, responseBody);
@@ -110,7 +120,8 @@ export async function PATCH(request: Request) {
       {
         statusCode: 502,
         error: {
-          message: "The patient profile could not be updated. Please try again.",
+          message:
+            "Doctor point value service could not be reached. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },

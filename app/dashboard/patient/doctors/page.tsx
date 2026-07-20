@@ -20,12 +20,7 @@ import {
   type PublicDoctor,
   type PublicDoctorsResponse,
 } from "@/lib/api";
-import { createAppointmentRequest } from "@/lib/appointments";
-import {
-  getPatientDisplayName,
-  getPatientShortId,
-  usePatientProfile,
-} from "@/lib/use-patient-profile";
+import { usePatientProfile } from "@/lib/use-patient-profile";
 
 const SPECIALIZATION_OPTIONS = [
   "GENERAL_PRACTICE",
@@ -90,12 +85,6 @@ function getDateKey(value: string) {
   return new Date(value).toISOString().slice(0, 10);
 }
 
-function getDoctorPrimarySpecialization(doctor: PublicDoctor) {
-  return doctor.specializations[0]
-    ? formatSpecialization(doctor.specializations[0])
-    : "Medical Specialist";
-}
-
 function BrowseDoctorsContent() {
   const router = useRouter();
   const profile = usePatientProfile();
@@ -116,6 +105,7 @@ function BrowseDoctorsContent() {
   const [selectedSlotId, setSelectedSlotId] = useState("");
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
+  const [isBookingAppointment, setIsBookingAppointment] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [bookingMessage, setBookingMessage] = useState("");
   const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
@@ -212,10 +202,11 @@ function BrowseDoctorsContent() {
     setSelectedSlotId("");
     setBookingError("");
     setBookingMessage("");
+    setIsBookingAppointment(false);
     setShowSubscriptionPrompt(false);
   };
 
-  const confirmBooking = () => {
+  const confirmBooking = async () => {
     if (!bookingDoctor) return;
 
     const selectedSlot = availabilitySlots.find((slot) => slot.id === selectedSlotId);
@@ -225,29 +216,33 @@ function BrowseDoctorsContent() {
       return;
     }
 
-    const patientName = getPatientDisplayName(profile);
-    const patientId = profile?.id ?? getPatientShortId(profile);
     const doctorName = getDoctorName(bookingDoctor);
-    const dateKey = getDateKey(selectedSlot.startsAt);
-
-    createAppointmentRequest({
-      doctorId: bookingDoctor.id,
-      doctorName,
-      doctorSpecialization: getDoctorPrimarySpecialization(bookingDoctor),
-      patientName,
-      patientId,
-      date: dateKey,
-      dateLabel: formatSlotDate(selectedSlot.startsAt),
-      timeSlot: `${formatSlotTime(selectedSlot.startsAt)} - ${formatSlotTime(selectedSlot.endsAt)}`,
-      deductedSubscription: false,
-      walletCredited: false,
-    });
 
     setBookingError("");
-    setBookingMessage(`Appointment request sent for ${doctorName}.`);
-    window.setTimeout(() => {
-      closeBookingFlow();
-    }, 1400);
+    setBookingMessage("");
+    setIsBookingAppointment(true);
+
+    try {
+      await patientApiService.bookAppointment({
+        doctorId: bookingDoctor.id,
+        slotId: selectedSlot.id,
+      });
+
+      setAvailabilitySlots((current) =>
+        current.filter((slot) => slot.id !== selectedSlot.id),
+      );
+      setSelectedSlotId("");
+      window.dispatchEvent(new Event("dw-appointments-updated"));
+      window.dispatchEvent(new Event("dw-subscription-updated"));
+      setBookingMessage(`Appointment booked with ${doctorName}.`);
+      window.setTimeout(() => {
+        closeBookingFlow();
+      }, 1400);
+    } catch (error) {
+      setBookingError(getApiErrorMessage(error));
+    } finally {
+      setIsBookingAppointment(false);
+    }
   };
 
   const availabilityByDate = availabilitySlots.reduce<Record<string, DoctorAvailabilitySlot[]>>(
@@ -605,10 +600,10 @@ function BrowseDoctorsContent() {
               <button
                 type="button"
                 onClick={confirmBooking}
-                disabled={!selectedSlotId || Boolean(bookingMessage) || showSubscriptionPrompt}
+                disabled={!selectedSlotId || isBookingAppointment || Boolean(bookingMessage) || showSubscriptionPrompt}
                 className="rounded-lg bg-[#16b46f] px-4 py-2 text-sm font-semibold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
               >
-                Confirm Appointment
+                {isBookingAppointment ? "Booking..." : "Confirm Appointment"}
               </button>
             </div>
           </section>

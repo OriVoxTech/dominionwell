@@ -16,7 +16,7 @@ export async function GET(request: Request) {
       {
         statusCode: 401,
         error: {
-          message: "Admin authentication is required. Please log in again.",
+          message: "Patient authentication is required. Please log in again.",
           error: "Unauthorized",
           statusCode: 401,
         },
@@ -25,22 +25,13 @@ export async function GET(request: Request) {
     );
   }
 
-  const incomingUrl = new URL(request.url);
-  const upstreamUrl = new URL(`${API_BASE_URL}/admin/users`);
-  upstreamUrl.searchParams.set(
-    "role",
-    incomingUrl.searchParams.get("role") ?? "DOCTOR",
-  );
-
-  const search = incomingUrl.searchParams.get("search")?.trim();
-  if (search) upstreamUrl.searchParams.set("search", search);
-
   try {
-    const upstreamResponse = await fetch(upstreamUrl, {
+    const upstreamResponse = await fetch(`${API_BASE_URL}/notifications`, {
       method: "GET",
       headers: {
         Accept: "*/*",
         Authorization: authorization,
+        "ngrok-skip-browser-warning": "true",
       },
       cache: "no-store",
     });
@@ -59,7 +50,7 @@ export async function GET(request: Request) {
       {
         statusCode: 502,
         error: {
-          message: "The doctors service could not be reached. Please try again.",
+          message: "Notifications could not be reached. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },

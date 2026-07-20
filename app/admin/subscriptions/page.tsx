@@ -9,10 +9,14 @@ import {
   updateAdminSettings,
   type SubscriptionPlan,
 } from "@/lib/admin-portal";
+import { adminApiService, getApiErrorMessage } from "@/lib/api";
 
 export default function AdminSubscriptionsPage() {
   const [plans, setPlans] = useState<SubscriptionPlan[]>(readSubscriptionPlans());
   const [pointValue, setPointValue] = useState(readAdminSettings().pointValue);
+  const [isSavingPointValue, setIsSavingPointValue] = useState(false);
+  const [isAddingPlan, setIsAddingPlan] = useState(false);
+  const [notice, setNotice] = useState("");
   const [form, setForm] = useState({
     name: "",
     monthlyPrice: "",
@@ -36,19 +40,88 @@ export default function AdminSubscriptionsPage() {
     };
   }, []);
 
-  const handleAddPlan = (event: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void adminApiService
+        .getDoctorPointValue()
+        .then((response) => {
+          setPointValue(response.data.pointValue);
+          updateAdminSettings({ pointValue: response.data.pointValue });
+        })
+        .catch(() => {
+          // Keep the locally cached value if the backend value is temporarily unavailable.
+        });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
+
+  const handleSavePointValue = async () => {
+    const normalizedPointValue = Math.max(0, Math.floor(pointValue));
+
+    setNotice("");
+    setIsSavingPointValue(true);
+
+    try {
+      const response = await adminApiService.updateDoctorPointValue({
+        pointValue: normalizedPointValue,
+      });
+      const savedPointValue = response.data.pointValue ?? normalizedPointValue;
+
+      setPointValue(savedPointValue);
+      updateAdminSettings({ pointValue: savedPointValue });
+      setNotice("Point value updated successfully.");
+    } catch (error) {
+      setNotice(getApiErrorMessage(error));
+    } finally {
+      setIsSavingPointValue(false);
+    }
+  };
+
+  const handleAddPlan = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!form.name.trim()) {
       return;
     }
 
-    addSubscriptionPlan({
+    const payload = {
       name: form.name,
       monthlyPrice: Number(form.monthlyPrice) || 0,
       consultationsPerMonth: Number(form.consultationsPerMonth) || 1,
       description: form.description || "Custom plan",
-    });
+    };
+
+    setNotice("");
+    setIsAddingPlan(true);
+
+    try {
+      const response = await adminApiService.createSubscriptionPlan(payload);
+
+      addSubscriptionPlan({
+        id: response.data.id,
+        name: response.data.name,
+        monthlyPrice:
+          response.data.monthlyPrice ??
+          response.data.priceNaira ??
+          Math.floor((response.data.priceCents ?? payload.monthlyPrice * 100) / 100),
+        consultationsPerMonth:
+          response.data.consultationsPerMonth ??
+          response.data.consultationCredits ??
+          payload.consultationsPerMonth,
+        description: response.data.description ?? payload.description,
+        active: response.data.active ?? response.data.isActive ?? true,
+      });
+
+      setNotice("Subscription plan created successfully.");
+    } catch (error) {
+      setNotice(getApiErrorMessage(error));
+      return;
+    } finally {
+      setIsAddingPlan(false);
+    }
 
     setForm({
       name: "",
@@ -65,6 +138,12 @@ export default function AdminSubscriptionsPage() {
         <p className="mt-1 text-sm text-[#475569]">Create and inspect subscription plans, plus doctor wallet payout configuration.</p>
       </div>
 
+      {notice ? (
+        <p className="rounded-xl border border-[#dbe4f0] bg-white px-4 py-3 text-sm text-[#334155]">
+          {notice}
+        </p>
+      ) : null}
+
       <section className="rounded-xl border border-[#e2e8f0] p-4">
         <h3 className="text-base font-semibold text-[#001b5e]">Doctor Wallet Configuration</h3>
         <p className="mt-1 text-sm text-[#475569]">Each completed consultation awards 1 point. Configure point-to-currency value.</p>
@@ -78,10 +157,11 @@ export default function AdminSubscriptionsPage() {
           />
           <button
             type="button"
-            className="h-10 rounded-lg bg-[#001b5e] px-4 text-sm font-semibold text-white hover:bg-[#0b2b75]"
-            onClick={() => updateAdminSettings({ pointValue: Math.max(0, Math.floor(pointValue)) })}
+            className="h-10 rounded-lg bg-[#001b5e] px-4 text-sm font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+            disabled={isSavingPointValue}
+            onClick={handleSavePointValue}
           >
-            Save Point Value
+            {isSavingPointValue ? "Saving..." : "Save Point Value"}
           </button>
         </div>
       </section>
@@ -93,8 +173,12 @@ export default function AdminSubscriptionsPage() {
           <input value={form.monthlyPrice} onChange={(e) => setForm((current) => ({ ...current, monthlyPrice: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] px-3 text-sm" placeholder="Monthly price (NGN)" type="number" min={0} />
           <input value={form.consultationsPerMonth} onChange={(e) => setForm((current) => ({ ...current, consultationsPerMonth: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] px-3 text-sm" placeholder="Consultations per month" type="number" min={1} />
           <input value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] px-3 text-sm" placeholder="Description" />
-          <button type="submit" className="h-10 rounded-lg bg-[#16b46f] px-4 text-sm font-semibold text-white hover:bg-[#149660] md:col-span-2">
-            Add Plan
+          <button
+            type="submit"
+            disabled={isAddingPlan}
+            className="h-10 rounded-lg bg-[#16b46f] px-4 text-sm font-semibold text-white hover:bg-[#149660] disabled:cursor-not-allowed disabled:bg-[#94a3b8] md:col-span-2"
+          >
+            {isAddingPlan ? "Adding..." : "Add Plan"}
           </button>
         </form>
       </section>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import PatientAvatar from "@/components/patient-avatar";
 import PatientMobileNav from "@/components/patient-mobile-nav";
 import PatientLogoutButton from "@/components/patient-logout-button";
@@ -11,76 +11,9 @@ import {
     patientApiService,
     type PatientAppointment,
 } from "@/lib/api";
-import {
-    APPOINTMENT_REQUESTS_UPDATED_EVENT,
-    isConsultationInviteWindow,
-    readAppointmentRequests,
-    type AppointmentRequest,
-} from "@/lib/appointments";
 import { usePatientProfile } from "@/lib/use-patient-profile";
 
-type AppointmentStatus = "Completed" | "Follow-up" | "Canceled";
 type AppointmentsTab = "upcoming" | "history";
-
-type Appointment = {
-    id: string;
-    doctor: string;
-    specialty: string;
-    status: AppointmentStatus;
-    date: string;
-    notes: string;
-};
-
-const statusStyles: Record<AppointmentStatus, string> = {
-    Completed: "bg-[#16b46f]/15 text-[#16b46f]",
-    "Follow-up": "bg-[#0aa4b4]/15 text-[#0aa4b4]",
-    Canceled: "bg-[#ef4444]/12 text-[#dc2626]",
-};
-
-const appointmentRequestStyles: Record<AppointmentRequest["status"], string> = {
-    Pending: "bg-[#f59e0b]/15 text-[#b45309]",
-    Booked: "bg-[#16b46f]/15 text-[#16b46f]",
-    Accepted: "bg-[#16b46f]/15 text-[#16b46f]",
-    Completed: "bg-[#0aa4b4]/15 text-[#0369a1]",
-    Rejected: "bg-[#ef4444]/12 text-[#dc2626]",
-};
-
-const PATIENT_ID = "DW-98231";
-
-const consultationHistory: Appointment[] = [
-    {
-        id: "hist-1",
-        doctor: "Dr. Sarah Weaver",
-        specialty: "General Physician",
-        status: "Completed",
-        date: "2026-06-28 10:30 AM",
-        notes: "Discussed recurring fatigue. Advised blood test and hydration plan.",
-    },
-    {
-        id: "hist-2",
-        doctor: "Dr. Richardson",
-        specialty: "Cardiology",
-        status: "Completed",
-        date: "2026-06-10 09:15 AM",
-        notes: "Reviewed ECG. Continue current medication and monitor blood pressure.",
-    },
-    {
-        id: "hist-3",
-        doctor: "Dr. Emily Stone",
-        specialty: "Dermatology",
-        status: "Follow-up",
-        date: "2026-05-22 02:00 PM",
-        notes: "Skin improvement observed. Follow-up in 3 weeks for progress review.",
-    },
-    {
-        id: "hist-4",
-        doctor: "Dr. Anthony Cole",
-        specialty: "Neurology",
-        status: "Canceled",
-        date: "2026-05-05 11:00 AM",
-        notes: "Consultation canceled by patient due to travel.",
-    },
-];
 
 function asRecord(value: unknown) {
     return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
@@ -110,9 +43,101 @@ function getNestedStringValue(record: Record<string, unknown> | null, path: stri
     return typeof current === "string" && current.trim() ? current : fallback;
 }
 
-function formatAppointmentDate(value: string) {
+function formatAppointmentDateTime(value: string) {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function formatAppointmentDate(value: string) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+        ? value
+        : date.toLocaleDateString(undefined, {
+            weekday: "short",
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+        });
+}
+
+function getAppointmentStart(appointment: PatientAppointment) {
+    const record = asRecord(appointment);
+    const slot = asRecord(record?.slot);
+
+    return (
+        getStringValue(record, ["startsAt", "startTime", "appointmentAt", "scheduledAt"], "") ||
+        getStringValue(slot, ["startsAt", "startTime"], "")
+    );
+}
+
+function getAppointmentEnd(appointment: PatientAppointment) {
+    const record = asRecord(appointment);
+    const slot = asRecord(record?.slot);
+
+    return (
+        getStringValue(record, ["endsAt", "endTime"], "") ||
+        getStringValue(slot, ["endsAt", "endTime"], "")
+    );
+}
+
+function getAppointmentStartDate(appointment: PatientAppointment) {
+    const startsAt = getAppointmentStart(appointment);
+    if (!startsAt) return null;
+
+    const date = new Date(startsAt);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getNormalizedAppointmentStatus(appointment: PatientAppointment) {
+    return getServerAppointmentStatus(appointment).trim().toUpperCase();
+}
+
+function getAppointmentStatusClass(status: string) {
+    const normalizedStatus = status.trim().toUpperCase();
+
+    if (normalizedStatus === "BOOKED" || normalizedStatus === "VERIFIED") {
+        return "bg-[#16b46f]/15 text-[#16b46f]";
+    }
+
+    if (normalizedStatus === "COMPLETED") {
+        return "bg-[#0aa4b4]/15 text-[#0369a1]";
+    }
+
+    if (normalizedStatus === "CANCELLED" || normalizedStatus === "CANCELED") {
+        return "bg-[#ef4444]/12 text-[#dc2626]";
+    }
+
+    return "bg-[#64748b]/15 text-[#475569]";
+}
+
+function isUpcomingAppointment(appointment: PatientAppointment, now = new Date()) {
+    const startsAt = getAppointmentStartDate(appointment);
+    return getNormalizedAppointmentStatus(appointment) === "BOOKED" && Boolean(startsAt && startsAt > now);
+}
+
+function isHistoryAppointment(appointment: PatientAppointment, now = new Date()) {
+    const status = getNormalizedAppointmentStatus(appointment);
+    const startsAt = getAppointmentStartDate(appointment);
+
+    return (
+        status === "COMPLETED" ||
+        status === "CANCELLED" ||
+        status === "CANCELED" ||
+        Boolean(startsAt && startsAt <= now)
+    );
+}
+
+function getAppointmentHistoryNote(appointment: PatientAppointment) {
+    const record = asRecord(appointment);
+    const cancellationReason = getStringValue(record, ["cancellationReason"], "");
+    const completedAt = getStringValue(record, ["completedAt"], "");
+    const meetingStatus = getStringValue(record, ["meetingStatus"], "");
+
+    if (cancellationReason) return cancellationReason;
+    if (completedAt) return `Completed at ${formatAppointmentDateTime(completedAt)}`;
+    if (meetingStatus && meetingStatus !== "-") return `Meeting status: ${meetingStatus}`;
+
+    return "No notes available.";
 }
 
 function getPatientAppointmentDoctor(appointment: PatientAppointment) {
@@ -128,6 +153,13 @@ function getPatientAppointmentDoctor(appointment: PatientAppointment) {
         : getNestedStringValue(record, ["doctor", "user", "username"], "Doctor");
 }
 
+function getPatientAppointmentDoctorId(appointment: PatientAppointment) {
+    const record = asRecord(appointment);
+    const doctor = asRecord(record?.doctor);
+
+    return getStringValue(doctor, ["id"], "") || getStringValue(record, ["doctorId"], "");
+}
+
 function getPatientAppointmentSpecialty(appointment: PatientAppointment) {
     const doctor = asRecord(asRecord(appointment)?.doctor);
     const specializations = doctor?.specializations;
@@ -141,15 +173,15 @@ function getPatientAppointmentSpecialty(appointment: PatientAppointment) {
 
 function getPatientAppointmentDate(appointment: PatientAppointment) {
     const record = asRecord(appointment);
-    const startsAt = getStringValue(record, ["startsAt", "startTime", "appointmentAt", "scheduledAt"], "");
+    const startsAt = getAppointmentStart(appointment);
 
     return startsAt ? formatAppointmentDate(startsAt) : getStringValue(record, ["date"], "-");
 }
 
 function getPatientAppointmentTime(appointment: PatientAppointment) {
     const record = asRecord(appointment);
-    const startsAt = getStringValue(record, ["startsAt", "startTime", "appointmentAt", "scheduledAt"], "");
-    const endsAt = getStringValue(record, ["endsAt", "endTime"], "");
+    const startsAt = getAppointmentStart(appointment);
+    const endsAt = getAppointmentEnd(appointment);
 
     if (startsAt && endsAt) {
         return `${new Date(startsAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} - ${new Date(endsAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
@@ -165,27 +197,15 @@ function getServerAppointmentStatus(appointment: PatientAppointment) {
 export default function PatientAppointmentsPage() {
     const profile = usePatientProfile();
     const [activeTab, setActiveTab] = useState<AppointmentsTab>("upcoming");
-    const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
     const [patientAppointments, setPatientAppointments] = useState<PatientAppointment[]>([]);
     const [appointmentsMeta, setAppointmentsMeta] = useState({ total: 0, page: 1, limit: 20, totalPages: 0 });
     const [isLoadingPatientAppointments, setIsLoadingPatientAppointments] = useState(true);
     const [appointmentsError, setAppointmentsError] = useState("");
-
-    useEffect(() => {
-        const syncRequests = () => {
-            const requests = readAppointmentRequests().filter((request) => request.patientId === PATIENT_ID);
-            setAppointmentRequests(requests);
-        };
-
-        syncRequests();
-        window.addEventListener("storage", syncRequests);
-        window.addEventListener(APPOINTMENT_REQUESTS_UPDATED_EVENT, syncRequests);
-
-        return () => {
-            window.removeEventListener("storage", syncRequests);
-            window.removeEventListener(APPOINTMENT_REQUESTS_UPDATED_EVENT, syncRequests);
-        };
-    }, []);
+    const [reviewAppointment, setReviewAppointment] = useState<PatientAppointment | null>(null);
+    const [reviewRating, setReviewRating] = useState(5);
+    const [reviewComment, setReviewComment] = useState("");
+    const [reviewMessage, setReviewMessage] = useState("");
+    const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
     useEffect(() => {
         let isCancelled = false;
@@ -212,13 +232,79 @@ export default function PatientAppointmentsPage() {
         };
 
         void loadPatientAppointments();
+        window.addEventListener("dw-appointments-updated", loadPatientAppointments);
 
         return () => {
             isCancelled = true;
+            window.removeEventListener("dw-appointments-updated", loadPatientAppointments);
         };
     }, []);
 
-    const upcomingCount = appointmentRequests.length + patientAppointments.length;
+    const now = new Date();
+    const upcomingAppointments = patientAppointments
+        .filter((appointment) => isUpcomingAppointment(appointment, now))
+        .sort((first, second) =>
+            (getAppointmentStartDate(first)?.getTime() ?? 0) -
+            (getAppointmentStartDate(second)?.getTime() ?? 0),
+        );
+    const historyAppointments = patientAppointments
+        .filter((appointment) => isHistoryAppointment(appointment, now))
+        .sort((first, second) =>
+            (getAppointmentStartDate(second)?.getTime() ?? 0) -
+            (getAppointmentStartDate(first)?.getTime() ?? 0),
+        );
+
+    const openReviewModal = (appointment: PatientAppointment) => {
+        setReviewAppointment(appointment);
+        setReviewRating(5);
+        setReviewComment("");
+        setReviewMessage("");
+    };
+
+    const closeReviewModal = () => {
+        if (isSubmittingReview) return;
+        setReviewAppointment(null);
+        setReviewMessage("");
+    };
+
+    const handleSubmitReview = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        if (!reviewAppointment) return;
+
+        const doctorId = getPatientAppointmentDoctorId(reviewAppointment);
+
+        if (!doctorId) {
+            setReviewMessage("Doctor information is missing for this appointment.");
+            return;
+        }
+
+        if (!reviewComment.trim()) {
+            setReviewMessage("Please add a short review comment.");
+            return;
+        }
+
+        setReviewMessage("");
+        setIsSubmittingReview(true);
+
+        try {
+            await patientApiService.createDoctorReview(doctorId, {
+                appointmentId: reviewAppointment.id,
+                rating: reviewRating,
+                comment: reviewComment.trim(),
+            });
+
+            setReviewMessage("Review submitted successfully.");
+            window.setTimeout(() => {
+                setReviewAppointment(null);
+                setReviewMessage("");
+            }, 700);
+        } catch (error) {
+            setReviewMessage(getApiErrorMessage(error));
+        } finally {
+            setIsSubmittingReview(false);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
@@ -298,7 +384,7 @@ export default function PatientAppointmentsPage() {
                             }`}
                             onClick={() => setActiveTab("upcoming")}
                         >
-                            Upcoming ({upcomingCount})
+                            Upcoming ({upcomingAppointments.length})
                         </button>
                         <button
                             type="button"
@@ -309,7 +395,7 @@ export default function PatientAppointmentsPage() {
                             }`}
                             onClick={() => setActiveTab("history")}
                         >
-                            History ({consultationHistory.length})
+                            History ({historyAppointments.length})
                         </button>
                     </div>
                 </section>
@@ -319,7 +405,7 @@ export default function PatientAppointmentsPage() {
                         <div className="mb-4 flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-[#001b5e]">Upcoming Appointments</h3>
                             <p className="text-xs text-[#64748b]">
-                                {isLoadingPatientAppointments ? "Loading..." : `${upcomingCount} appointment(s)`}
+                                {isLoadingPatientAppointments ? "Loading..." : `${upcomingAppointments.length} appointment(s)`}
                             </p>
                         </div>
 
@@ -329,7 +415,7 @@ export default function PatientAppointmentsPage() {
                             </div>
                         ) : null}
 
-                        {!isLoadingPatientAppointments && upcomingCount === 0 ? (
+                        {!isLoadingPatientAppointments && upcomingAppointments.length === 0 ? (
                             <div className="rounded-lg border border-dashed border-[#c6c6cf] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
                                 You have no upcoming appointments yet. Book from the doctors page.
                             </div>
@@ -346,41 +432,23 @@ export default function PatientAppointmentsPage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {appointmentRequests.map((request) => (
-                                            <tr key={request.id} className="border-b border-[#e2e8f0] last:border-b-0">
-                                                <td className="px-3 py-3 font-medium text-[#001b5e]">{request.doctorName}</td>
-                                                <td className="px-3 py-3 text-[#475569]">{request.doctorSpecialization}</td>
-                                                <td className="whitespace-nowrap px-3 py-3 text-[#475569]">{request.dateLabel}</td>
-                                                <td className="px-3 py-3 text-[#475569]">
-                                                    <div>{request.timeSlot}</div>
-                                                    {isConsultationInviteWindow(request) ? (
-                                                        <p className="mt-1 text-[11px] font-semibold text-[#001b5e]">
-                                                            Check mail for consultation invite
-                                                        </p>
-                                                    ) : null}
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    <span
-                                                        className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${appointmentRequestStyles[request.status]}`}
-                                                    >
-                                                        {request.status}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {patientAppointments.map((appointment) => (
+                                        {upcomingAppointments.map((appointment) => {
+                                            const status = getServerAppointmentStatus(appointment);
+
+                                            return (
                                             <tr key={`server-${appointment.id}`} className="border-b border-[#e2e8f0] last:border-b-0">
                                                 <td className="px-3 py-3 font-medium text-[#001b5e]">{getPatientAppointmentDoctor(appointment)}</td>
                                                 <td className="px-3 py-3 capitalize text-[#475569]">{getPatientAppointmentSpecialty(appointment)}</td>
                                                 <td className="whitespace-nowrap px-3 py-3 text-[#475569]">{getPatientAppointmentDate(appointment)}</td>
                                                 <td className="px-3 py-3 text-[#475569]">{getPatientAppointmentTime(appointment)}</td>
                                                 <td className="px-3 py-3">
-                                                    <span className="rounded-full bg-[#16b46f]/15 px-2 py-1 text-[10px] font-semibold uppercase text-[#16b46f]">
-                                                        {getServerAppointmentStatus(appointment)}
+                                                    <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${getAppointmentStatusClass(status)}`}>
+                                                        {status}
                                                     </span>
                                                 </td>
                                             </tr>
-                                        ))}
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                                 {appointmentsMeta.totalPages > 1 ? (
@@ -395,10 +463,10 @@ export default function PatientAppointmentsPage() {
                     <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
                         <div className="mb-4 flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-[#001b5e]">Consultation History</h3>
-                            <p className="text-xs text-[#64748b]">{consultationHistory.length} records</p>
+                            <p className="text-xs text-[#64748b]">{historyAppointments.length} records</p>
                         </div>
 
-                        {consultationHistory.length === 0 ? (
+                        {historyAppointments.length === 0 ? (
                             <div className="rounded-lg border border-dashed border-[#c6c6cf] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
                                 No consultation history available yet.
                             </div>
@@ -411,23 +479,44 @@ export default function PatientAppointmentsPage() {
                                             <th className="px-3 py-3">Specialty</th>
                                             <th className="px-3 py-3">Status</th>
                                             <th className="px-3 py-3">Date</th>
-                                            <th className="rounded-r-lg px-3 py-3">Notes</th>
+                                            <th className="px-3 py-3">Notes</th>
+                                            <th className="rounded-r-lg px-3 py-3">Review</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {consultationHistory.map((entry) => (
-                                            <tr key={entry.id} className="border-b border-[#e2e8f0] last:border-b-0">
-                                                <td className="px-3 py-3 font-medium text-[#001b5e]">{entry.doctor}</td>
-                                                <td className="px-3 py-3 text-[#475569]">{entry.specialty}</td>
+                                        {historyAppointments.map((appointment) => {
+                                            const status = getServerAppointmentStatus(appointment);
+
+                                            return (
+                                            <tr key={appointment.id} className="border-b border-[#e2e8f0] last:border-b-0">
+                                                <td className="px-3 py-3 font-medium text-[#001b5e]">{getPatientAppointmentDoctor(appointment)}</td>
+                                                <td className="px-3 py-3 capitalize text-[#475569]">{getPatientAppointmentSpecialty(appointment)}</td>
                                                 <td className="px-3 py-3">
-                                                    <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${statusStyles[entry.status]}`}>
-                                                        {entry.status}
+                                                    <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${getAppointmentStatusClass(status)}`}>
+                                                        {status}
                                                     </span>
                                                 </td>
-                                                <td className="whitespace-nowrap px-3 py-3 text-[#475569]">{entry.date}</td>
-                                                <td className="min-w-[280px] px-3 py-3 text-[#475569]">{entry.notes}</td>
+                                                <td className="whitespace-nowrap px-3 py-3 text-[#475569]">
+                                                    <div>{getPatientAppointmentDate(appointment)}</div>
+                                                    <p className="mt-1 text-xs text-[#64748b]">{getPatientAppointmentTime(appointment)}</p>
+                                                </td>
+                                                <td className="min-w-[280px] px-3 py-3 text-[#475569]">{getAppointmentHistoryNote(appointment)}</td>
+                                                <td className="px-3 py-3">
+                                                    {getNormalizedAppointmentStatus(appointment) === "COMPLETED" ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openReviewModal(appointment)}
+                                                            className="rounded-lg border border-[#f59e0b]/40 px-3 py-1.5 text-xs font-semibold text-[#b45309] hover:bg-[#f59e0b]/10"
+                                                        >
+                                                            Rate Doctor
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-xs text-[#94a3b8]">—</span>
+                                                    )}
+                                                </td>
                                             </tr>
-                                        ))}
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -435,6 +524,93 @@ export default function PatientAppointmentsPage() {
                     </section>
                 )}
             </main>
+
+            {reviewAppointment ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/45 p-4">
+                    <button
+                        type="button"
+                        aria-label="Close review form"
+                        className="absolute inset-0"
+                        onClick={closeReviewModal}
+                    />
+                    <form
+                        onSubmit={handleSubmitReview}
+                        className="relative z-10 w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6"
+                    >
+                        <div className="mb-4 flex items-start justify-between gap-3">
+                            <div>
+                                <h3 className="text-lg font-semibold text-[#001b5e]">Rate your consultation</h3>
+                                <p className="mt-1 text-sm text-[#64748b]">
+                                    Share your experience with {getPatientAppointmentDoctor(reviewAppointment)}.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={closeReviewModal}
+                                className="grid h-8 w-8 place-items-center rounded-full border border-[#cbd5e1] text-[#475569] hover:bg-[#f8fafc]"
+                                aria-label="Close"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">close</span>
+                            </button>
+                        </div>
+
+                        <div className="mb-4">
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#64748b]">Rating</p>
+                            <div className="flex gap-1" role="radiogroup" aria-label="Doctor rating">
+                                {[1, 2, 3, 4, 5].map((rating) => (
+                                    <button
+                                        key={rating}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={reviewRating === rating}
+                                        onClick={() => setReviewRating(rating)}
+                                        className="rounded-md p-1 text-[#f59e0b] hover:bg-[#fef3c7]"
+                                        aria-label={`${rating} star${rating === 1 ? "" : "s"}`}
+                                    >
+                                        <span className="material-symbols-outlined text-3xl">
+                                            {rating <= reviewRating ? "star" : "star_outline"}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-[#64748b]" htmlFor="doctor-review-comment">
+                            Review
+                        </label>
+                        <textarea
+                            id="doctor-review-comment"
+                            value={reviewComment}
+                            onChange={(event) => setReviewComment(event.target.value)}
+                            rows={4}
+                            className="mt-2 w-full rounded-xl border border-[#cbd5e1] px-3 py-2 text-sm outline-none focus:border-[#0aa4b4]"
+                            placeholder="Tell us how the consultation went..."
+                            required
+                        />
+
+                        {reviewMessage ? (
+                            <p className="mt-3 text-sm text-[#475569]">{reviewMessage}</p>
+                        ) : null}
+
+                        <div className="mt-5 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={closeReviewModal}
+                                className="rounded-lg border border-[#c6c6cf] px-4 py-2 text-sm font-semibold text-[#475569] hover:bg-[#f8fafc]"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isSubmittingReview}
+                                className="rounded-lg bg-[#001b5e] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+                            >
+                                {isSubmittingReview ? "Submitting..." : "Submit Review"}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            ) : null}
         </div>
     );
 }

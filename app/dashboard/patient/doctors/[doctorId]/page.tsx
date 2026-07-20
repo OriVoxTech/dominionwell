@@ -5,8 +5,11 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import PatientMobileNav from "@/components/patient-mobile-nav";
 import {
+  patientApiService,
   getApiErrorMessage,
   patientDoctorsApiService,
+  type DoctorReview,
+  type DoctorReviewsResponse,
   type PublicDoctor,
 } from "@/lib/api";
 
@@ -33,12 +36,46 @@ function getDoctorInitials(doctor: PublicDoctor) {
     .join("") || "DR";
 }
 
+function getReviewPatientName(review: DoctorReview) {
+  const user = review.patient?.user;
+  const name = [user?.firstName, user?.lastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return name || user?.username || "Patient";
+}
+
+function formatReviewDate(value?: string) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString();
+}
+
+function StarRating({ rating }: { rating: number }) {
+  const roundedRating = Math.max(0, Math.min(5, Math.round(rating)));
+
+  return (
+    <span className="inline-flex items-center gap-0.5 text-[#f59e0b]" aria-label={`${rating} out of 5 stars`}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <span key={star} className="material-symbols-outlined text-[18px]">
+          {star <= roundedRating ? "star" : "star_outline"}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export default function DoctorProfilePage() {
   const params = useParams<{ doctorId: string }>();
   const doctorId = typeof params.doctorId === "string" ? params.doctorId : "";
   const [doctor, setDoctor] = useState<PublicDoctor | null>(null);
+  const [reviews, setReviews] = useState<DoctorReviewsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [reviewsError, setReviewsError] = useState("");
 
   const loadDoctor = useCallback(async () => {
     if (!doctorId) {
@@ -61,15 +98,35 @@ export default function DoctorProfilePage() {
     }
   }, [doctorId]);
 
+  const loadReviews = useCallback(async () => {
+    if (!doctorId) return;
+
+    setReviewsError("");
+    setIsLoadingReviews(true);
+
+    try {
+      const response = await patientApiService.listDoctorReviews(doctorId);
+      setReviews(response.data);
+    } catch (error) {
+      setReviews(null);
+      setReviewsError(getApiErrorMessage(error));
+    } finally {
+      setIsLoadingReviews(false);
+    }
+  }, [doctorId]);
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void loadDoctor();
+      void loadReviews();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [loadDoctor]);
+  }, [loadDoctor, loadReviews]);
 
   const doctorName = doctor ? getDoctorName(doctor) : "Doctor Profile";
+  const averageRating = reviews?.satisfaction.averageRating ?? null;
+  const reviewCount = reviews?.satisfaction.reviewCount ?? 0;
 
   return (
     <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
@@ -136,15 +193,73 @@ export default function DoctorProfilePage() {
                   </div>
                 </div>
                 <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">Verification</p>
-                  <p className="mt-3 text-sm font-semibold text-[#001b5e]">Verified {new Date(doctor.verifiedAt).toLocaleDateString()}</p>
-                  <p className="mt-1 text-xs text-[#64748b]">Member since {new Date(doctor.user.createdAt).toLocaleDateString()}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">Patient Rating</p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <StarRating rating={averageRating ?? 0} />
+                    <span className="text-sm font-semibold text-[#001b5e]">
+                      {averageRating ? averageRating.toFixed(1) : "No rating yet"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-[#64748b]">{reviewCount} review(s)</p>
                 </div>
+              </div>
+
+              <div className="mb-6 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">Verification</p>
+                <p className="mt-3 text-sm font-semibold text-[#001b5e]">
+                  {doctor.verifiedAt ? `Verified ${new Date(doctor.verifiedAt).toLocaleDateString()}` : "Verification pending"}
+                </p>
+                <p className="mt-1 text-xs text-[#64748b]">Member since {new Date(doctor.user.createdAt).toLocaleDateString()}</p>
               </div>
 
               <div className="mb-6 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
                 <h3 className="text-sm font-semibold text-[#001b5e]">About</h3>
                 <p className="mt-2 text-sm leading-6 text-[#475569]">{doctor.bio || "This doctor has not added a biography yet."}</p>
+              </div>
+
+              <div className="mb-6 rounded-xl border border-[#e2e8f0] bg-white p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-[#001b5e]">Patient Reviews</h3>
+                    <p className="mt-1 text-xs text-[#64748b]">
+                      {reviewCount} review(s) from completed consultations.
+                    </p>
+                  </div>
+                  {averageRating ? <StarRating rating={averageRating} /> : null}
+                </div>
+
+                {isLoadingReviews ? (
+                  <p className="text-sm text-[#64748b]">Loading reviews...</p>
+                ) : null}
+
+                {!isLoadingReviews && reviewsError ? (
+                  <p role="alert" className="rounded-lg border border-[#fecaca] bg-[#fef2f2] p-3 text-sm text-[#b91c1c]">
+                    {reviewsError}
+                  </p>
+                ) : null}
+
+                {!isLoadingReviews && !reviewsError && reviews?.data.length === 0 ? (
+                  <p className="text-sm text-[#64748b]">No reviews yet.</p>
+                ) : null}
+
+                {!isLoadingReviews && !reviewsError && reviews?.data.length ? (
+                  <div className="space-y-3">
+                    {reviews.data.map((review) => (
+                      <article key={review.id} className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-[#001b5e]">{getReviewPatientName(review)}</p>
+                            {formatReviewDate(review.createdAt) ? (
+                              <p className="text-xs text-[#64748b]">{formatReviewDate(review.createdAt)}</p>
+                            ) : null}
+                          </div>
+                          <StarRating rating={review.rating} />
+                        </div>
+                        <p className="text-sm leading-6 text-[#475569]">{review.comment || "No comment provided."}</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex justify-end">

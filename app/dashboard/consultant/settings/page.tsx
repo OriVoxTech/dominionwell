@@ -22,18 +22,88 @@ import {
 } from "@/lib/api";
 
 type AvailabilityStatus = "Available" | "Busy" | "Offline";
+type PresenceStatus = "AVAILABLE" | "BUSY" | "OFFLINE";
 
 const availabilityOptions: Array<{
   label: AvailabilityStatus;
   value: AvailabilityStatus;
+  presenceStatus: PresenceStatus;
   className: string;
 }> = [
-  { label: "Available", value: "Available", className: "bg-[#16b36c] text-white" },
-  { label: "Busy", value: "Busy", className: "bg-[#f59e0b] text-white" },
-  { label: "Offline", value: "Offline", className: "bg-[#475569] text-white" },
+  { label: "Available", value: "Available", presenceStatus: "AVAILABLE", className: "bg-[#16b36c] text-white" },
+  { label: "Busy", value: "Busy", presenceStatus: "BUSY", className: "bg-[#f59e0b] text-white" },
+  { label: "Offline", value: "Offline", presenceStatus: "OFFLINE", className: "bg-[#475569] text-white" },
 ];
 
 const CURRENT_DOCTOR_ID = "dr-richardson";
+
+const nigerianBanks = [
+  { name: "Access Bank", code: "044" },
+  { name: "Citibank Nigeria", code: "023" },
+  { name: "Ecobank Nigeria", code: "050" },
+  { name: "Fidelity Bank", code: "070" },
+  { name: "First Bank of Nigeria", code: "011" },
+  { name: "First City Monument Bank", code: "214" },
+  { name: "Globus Bank", code: "00103" },
+  { name: "Guaranty Trust Bank", code: "058" },
+  { name: "Heritage Bank", code: "030" },
+  { name: "Jaiz Bank", code: "301" },
+  { name: "Keystone Bank", code: "082" },
+  { name: "Kuda Microfinance Bank", code: "50211" },
+  { name: "Lotus Bank", code: "303" },
+  { name: "Moniepoint Microfinance Bank", code: "50515" },
+  { name: "OPay Digital Services", code: "999992" },
+  { name: "PalmPay", code: "999991" },
+  { name: "Parallex Bank", code: "104" },
+  { name: "Polaris Bank", code: "076" },
+  { name: "PremiumTrust Bank", code: "105" },
+  { name: "Providus Bank", code: "101" },
+  { name: "Stanbic IBTC Bank", code: "221" },
+  { name: "Standard Chartered Bank", code: "068" },
+  { name: "Sterling Bank", code: "232" },
+  { name: "SunTrust Bank", code: "100" },
+  { name: "TAJ Bank", code: "302" },
+  { name: "Titan Trust Bank", code: "102" },
+  { name: "Union Bank of Nigeria", code: "032" },
+  { name: "United Bank for Africa", code: "033" },
+  { name: "Unity Bank", code: "215" },
+  { name: "VFD Microfinance Bank", code: "566" },
+  { name: "Wema Bank", code: "035" },
+  { name: "Zenith Bank", code: "057" },
+] as const;
+
+const specializationOptions = [
+  "GENERAL_PRACTICE",
+  "CARDIOLOGY",
+  "DERMATOLOGY",
+  "ENDOCRINOLOGY",
+  "GASTROENTEROLOGY",
+  "GYNECOLOGY",
+  "NEUROLOGY",
+  "ONCOLOGY",
+  "OPHTHALMOLOGY",
+  "ORTHOPEDICS",
+  "PEDIATRICS",
+  "PSYCHIATRY",
+  "UROLOGY",
+] as const;
+
+function formatSpecialization(value: string) {
+  return value
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getAvailabilityStatusFromPresenceStatus(status: unknown): AvailabilityStatus {
+  if (status === "BUSY") return "Busy";
+  if (status === "OFFLINE") return "Offline";
+  return "Available";
+}
+
+function getPresenceStatusFromAvailability(status: AvailabilityStatus): PresenceStatus {
+  return availabilityOptions.find((option) => option.value === status)?.presenceStatus ?? "AVAILABLE";
+}
 
 const slotOptions = [
   "09:00 AM",
@@ -190,6 +260,7 @@ export default function ConsultantSettingsPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [specialization, setSpecialization] = useState("Not provided");
+  const [yearsOfExperience, setYearsOfExperience] = useState("0");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [username, setUsername] = useState("");
@@ -235,10 +306,10 @@ export default function ConsultantSettingsPage() {
       setFirstName(profile.user.firstName);
       setLastName(profile.user.lastName);
       setSpecialization(
-        profile.specializations
-          .map((item) => item.replaceAll("_", " "))
-          .join(", ") || "Not provided",
+        profile.specializations[0] || "GENERAL_PRACTICE",
       );
+      setAvailabilityStatus(getAvailabilityStatusFromPresenceStatus(profile.presenceStatus));
+      setYearsOfExperience(String(profile.yearsOfExperience ?? 0));
       setEmail(profile.user.email);
       setPhone(profile.user.phone ?? "");
       setUsername(profile.user.username);
@@ -260,21 +331,50 @@ export default function ConsultantSettingsPage() {
   }, [loadDoctorProfile]);
 
   const saveProfile = async () => {
-    const normalizedSpecializations = specialization
-      .split(",")
-      .map((item) => item.trim().toUpperCase().replaceAll(/\s+/g, "_"))
-      .filter(Boolean);
+    const normalizedSpecialization = specialization.trim();
+    const normalizedYearsOfExperience = Math.max(
+      0,
+      Math.floor(Number(yearsOfExperience) || 0),
+    );
 
     if (
       !firstName.trim() ||
       !lastName.trim() ||
       !phone.trim() ||
-      normalizedSpecializations.length === 0
+      !specializationOptions.includes(
+        normalizedSpecialization as (typeof specializationOptions)[number],
+      )
     ) {
       setProfileSaveError(
-        "First name, last name, phone number, and at least one specialization are required.",
+        "First name, last name, phone number, and specialization are required.",
       );
       return;
+    }
+
+    const selectedBank = nigerianBanks.find(
+      (bank) => bank.name === bankDetails.bankName,
+    );
+    const hasAnyBankDetail = Boolean(
+      bankDetails.bankName.trim() ||
+        bankDetails.accountName.trim() ||
+        bankDetails.accountNumber.trim(),
+    );
+
+    if (hasAnyBankDetail) {
+      if (!selectedBank) {
+        setProfileSaveError("Please select a bank from the dropdown.");
+        return;
+      }
+
+      if (!bankDetails.accountName.trim()) {
+        setProfileSaveError("Account name is required for bank details.");
+        return;
+      }
+
+      if (!/^\d{10}$/.test(bankDetails.accountNumber)) {
+        setProfileSaveError("Account number must be exactly 10 digits.");
+        return;
+      }
     }
 
     setProfileSaveError("");
@@ -284,10 +384,20 @@ export default function ConsultantSettingsPage() {
     try {
       const response = await doctorApiService.updateProfile({
         bio: bio?.trim() ?? "",
-        specializations: normalizedSpecializations,
+        specializations: [normalizedSpecialization],
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         phone: phone.trim(),
+        presenceStatus: getPresenceStatusFromAvailability(availabilityStatus),
+        yearsOfExperience: normalizedYearsOfExperience,
+        ...(hasAnyBankDetail && selectedBank
+          ? {
+              bankName: selectedBank.name,
+              bankCode: selectedBank.code,
+              bankAccountName: bankDetails.accountName.trim(),
+              bankAccountNumber: bankDetails.accountNumber.trim(),
+            }
+          : {}),
       });
       const profile = response.data;
       const name = [profile.user.firstName, profile.user.lastName]
@@ -300,12 +410,24 @@ export default function ConsultantSettingsPage() {
       setPhone(profile.user.phone ?? "");
       setBio(profile.bio);
       setSpecialization(
-        profile.specializations
-          .map((item) => item.replaceAll("_", " "))
-          .join(", "),
+        profile.specializations[0] || normalizedSpecialization,
       );
-      updateDoctorBankDetails(CURRENT_DOCTOR_ID, bankDetails);
-      setSuccessMessage("Profile updated successfully.");
+      setYearsOfExperience(String(profile.yearsOfExperience ?? normalizedYearsOfExperience));
+      setAvailabilityStatus(getAvailabilityStatusFromPresenceStatus(profile.presenceStatus));
+
+      if (hasAnyBankDetail && selectedBank) {
+        updateDoctorBankDetails(CURRENT_DOCTOR_ID, {
+          bankName: selectedBank.name,
+          accountName: bankDetails.accountName.trim(),
+          accountNumber: bankDetails.accountNumber.trim(),
+        });
+      }
+
+      setSuccessMessage(
+        hasAnyBankDetail
+          ? "Profile and bank details updated successfully."
+          : "Profile updated successfully.",
+      );
     } catch (error) {
       setProfileSaveError(getApiErrorMessage(error));
     } finally {
@@ -597,7 +719,7 @@ export default function ConsultantSettingsPage() {
           </div>
           <div>
             <p className="font-semibold text-[#7784ac]">{fullName}</p>
-            <p className="text-xs text-[#7784ac]/80">{specialization}</p>
+            <p className="text-xs text-[#7784ac]/80">{formatSpecialization(specialization)}</p>
           </div>
         </div>
 
@@ -982,15 +1104,33 @@ export default function ConsultantSettingsPage() {
 
             <label className="block text-sm md:col-span-2">
               <span className="mb-1 block font-medium text-[#334155]">Specialization</span>
-              <input
-                type="text"
+              <select
                 value={specialization}
                 onChange={(event) => setSpecialization(event.target.value)}
                 disabled={isLoadingProfile || isSavingProfile}
-                placeholder="GENERAL PRACTICE, CARDIOLOGY"
+                className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
+              >
+                {specializationOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {formatSpecialization(option)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-[#334155]">Years of Experience</span>
+              <input
+                type="number"
+                min={0}
+                value={yearsOfExperience}
+                onChange={(event) =>
+                  setYearsOfExperience(event.target.value.replace(/[^\d]/g, ""))
+                }
+                disabled={isLoadingProfile || isSavingProfile}
+                placeholder="12"
                 className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
               />
-              <span className="mt-1 block text-xs text-[#64748b]">Separate multiple specializations with commas.</span>
             </label>
 
             <label className="block text-sm">
@@ -1030,18 +1170,27 @@ export default function ConsultantSettingsPage() {
 
             <label className="block text-sm md:col-span-2">
               <span className="mb-1 block font-medium text-[#334155]">Bank Name</span>
-              <input
-                type="text"
+              <select
                 value={bankDetails.bankName}
                 onChange={(event) => {
+                  const selectedBank = nigerianBanks.find(
+                    (bank) => bank.name === event.target.value,
+                  );
                   setBankDetails((current) => ({
                     ...current,
-                    bankName: event.target.value,
+                    bankName: selectedBank?.name ?? "",
                   }));
                 }}
-                placeholder="Enter your bank"
+                disabled={isSavingProfile}
                 className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
-              />
+              >
+                <option value="">Select bank</option>
+                {nigerianBanks.map((bank) => (
+                  <option key={bank.code} value={bank.name}>
+                    {bank.name} ({bank.code})
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="block text-sm">

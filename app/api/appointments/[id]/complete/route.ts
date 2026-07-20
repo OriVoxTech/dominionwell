@@ -8,7 +8,10 @@ const API_BASE_URL =
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const authorization = request.headers.get("authorization");
 
   if (!authorization?.startsWith("Bearer ")) {
@@ -16,7 +19,7 @@ export async function GET(request: Request) {
       {
         statusCode: 401,
         error: {
-          message: "Admin authentication is required. Please log in again.",
+          message: "Doctor authentication is required. Please log in again.",
           error: "Unauthorized",
           statusCode: 401,
         },
@@ -25,25 +28,21 @@ export async function GET(request: Request) {
     );
   }
 
-  const incomingUrl = new URL(request.url);
-  const upstreamUrl = new URL(`${API_BASE_URL}/admin/users`);
-  upstreamUrl.searchParams.set(
-    "role",
-    incomingUrl.searchParams.get("role") ?? "DOCTOR",
-  );
-
-  const search = incomingUrl.searchParams.get("search")?.trim();
-  if (search) upstreamUrl.searchParams.set("search", search);
+  const { id } = await params;
 
   try {
-    const upstreamResponse = await fetch(upstreamUrl, {
-      method: "GET",
-      headers: {
-        Accept: "*/*",
-        Authorization: authorization,
+    const upstreamResponse = await fetch(
+      `${API_BASE_URL}/appointments/${encodeURIComponent(id)}/complete`,
+      {
+        method: "PATCH",
+        headers: {
+          Accept: "*/*",
+          Authorization: authorization,
+          "ngrok-skip-browser-warning": "true",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+    );
     const responseBody = await upstreamResponse.text();
 
     return new Response(responseBody || null, {
@@ -59,7 +58,7 @@ export async function GET(request: Request) {
       {
         statusCode: 502,
         error: {
-          message: "The doctors service could not be reached. Please try again.",
+          message: "Appointment completion could not be reached. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },

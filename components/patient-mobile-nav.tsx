@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import PatientAvatar from "@/components/patient-avatar";
 import PatientLogoutButton from "@/components/patient-logout-button";
 import PatientProfileSummary from "@/components/patient-profile-summary";
+import { patientApiService } from "@/lib/api";
 import { usePatientProfile } from "@/lib/use-patient-profile";
 
 type PatientNavKey =
@@ -39,28 +40,20 @@ export default function PatientMobileNav({ active }: PatientMobileNavProps) {
 
   useEffect(() => {
     const refreshUnreadCount = () => {
-      const stored = window.localStorage.getItem("dwPatientNotifications");
-
-      if (!stored) {
-        setUnreadNotifications(0);
-        return;
-      }
-
-      try {
-        const parsed = JSON.parse(stored) as Array<{ unread?: boolean }>;
-        const unreadCount = Array.isArray(parsed) ? parsed.filter((item) => item.unread).length : 0;
-        setUnreadNotifications(unreadCount);
-      } catch {
-        setUnreadNotifications(0);
-      }
+      void patientApiService
+        .getUnreadNotificationCount()
+        .then((response) => {
+          setUnreadNotifications(response.data.unreadCount);
+        })
+        .catch(() => {
+          setUnreadNotifications(0);
+        });
     };
 
     refreshUnreadCount();
-    window.addEventListener("storage", refreshUnreadCount);
     window.addEventListener("dw-notifications-updated", refreshUnreadCount);
 
     return () => {
-      window.removeEventListener("storage", refreshUnreadCount);
       window.removeEventListener("dw-notifications-updated", refreshUnreadCount);
     };
   }, []);

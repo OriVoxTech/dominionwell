@@ -1,5 +1,5 @@
 const DEFAULT_API_BASE_URL =
-  "https://cf7f-105-127-10-124.ngrok-free.app/api";
+  "https://4794-102-88-55-59.ngrok-free.app/api";
 
 const API_BASE_URL =
   process.env.API_BASE_URL ??
@@ -93,6 +93,12 @@ export async function PATCH(request: Request) {
     firstName?: unknown;
     lastName?: unknown;
     phone?: unknown;
+    presenceStatus?: unknown;
+    yearsOfExperience?: unknown;
+    bankName?: unknown;
+    bankCode?: unknown;
+    bankAccountName?: unknown;
+    bankAccountNumber?: unknown;
   };
   const bio = typeof payload.bio === "string" ? payload.bio.trim() : "";
   const firstName =
@@ -101,6 +107,26 @@ export async function PATCH(request: Request) {
     typeof payload.lastName === "string" ? payload.lastName.trim() : "";
   const phone =
     typeof payload.phone === "string" ? payload.phone.trim() : "";
+  const presenceStatus =
+    typeof payload.presenceStatus === "string"
+      ? payload.presenceStatus.trim().toUpperCase()
+      : "";
+  const yearsOfExperience =
+    typeof payload.yearsOfExperience === "number"
+      ? Math.max(0, Math.floor(payload.yearsOfExperience))
+      : 0;
+  const bankName =
+    typeof payload.bankName === "string" ? payload.bankName.trim() : "";
+  const bankCode =
+    typeof payload.bankCode === "string" ? payload.bankCode.trim() : "";
+  const bankAccountName =
+    typeof payload.bankAccountName === "string"
+      ? payload.bankAccountName.trim()
+      : "";
+  const bankAccountNumber =
+    typeof payload.bankAccountNumber === "string"
+      ? payload.bankAccountNumber.trim()
+      : "";
   const specializations = Array.isArray(payload.specializations)
     ? payload.specializations
         .filter((item): item is string => typeof item === "string")
@@ -108,13 +134,19 @@ export async function PATCH(request: Request) {
         .filter(Boolean)
     : [];
 
-  if (!firstName || !lastName || !phone || specializations.length === 0) {
+  if (
+    !firstName ||
+    !lastName ||
+    !phone ||
+    specializations.length === 0 ||
+    !["AVAILABLE", "BUSY", "OFFLINE"].includes(presenceStatus)
+  ) {
     return Response.json(
       {
         statusCode: 400,
         error: {
           message:
-            "First name, last name, phone number, and at least one specialization are required.",
+            "First name, last name, phone number, presence status, and at least one specialization are required.",
           error: "Bad Request",
           statusCode: 400,
         },
@@ -137,6 +169,19 @@ export async function PATCH(request: Request) {
         firstName,
         lastName,
         phone,
+        presenceStatus,
+        yearsOfExperience,
+        ...(bankName &&
+        bankCode &&
+        bankAccountName &&
+        bankAccountNumber
+          ? {
+              bankName,
+              bankCode,
+              bankAccountName,
+              bankAccountNumber,
+            }
+          : {}),
       }),
       cache: "no-store",
     });

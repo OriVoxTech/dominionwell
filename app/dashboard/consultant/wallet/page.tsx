@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
 import DoctorProfileSummary from "@/components/doctor-profile-summary";
 import DoctorLogoutButton from "@/components/doctor-logout-button";
+import { doctorApiService, getApiErrorMessage, type DoctorWallet } from "@/lib/api";
 import {
   ADMIN_UPDATED_EVENT,
   getPendingDoctorWithdrawalRequest,
@@ -13,12 +14,15 @@ import {
   readAdminSettings,
   readDoctorWalletActivity,
   readDoctorWalletSummary,
-  requestDoctorWithdrawal,
 } from "@/lib/admin-portal";
+import { useDoctorProfile } from "@/lib/use-doctor-profile";
 
 const CURRENT_DOCTOR_ID = "dr-richardson";
 
 export default function ConsultantWalletPage() {
+  const doctorProfile = useDoctorProfile();
+  const [serverWallet, setServerWallet] = useState<DoctorWallet | null>(null);
+  const [walletError, setWalletError] = useState("");
   const [walletSummary, setWalletSummary] = useState(() => readDoctorWalletSummary(CURRENT_DOCTOR_ID));
   const [walletActivity, setWalletActivity] = useState(() => readDoctorWalletActivity(CURRENT_DOCTOR_ID));
   const [pointValue, setPointValue] = useState(() => readAdminSettings().pointValue);
@@ -26,6 +30,33 @@ export default function ConsultantWalletPage() {
   const [pendingRequest, setPendingRequest] = useState(() => getPendingDoctorWithdrawalRequest(CURRENT_DOCTOR_ID));
   const [withdrawAmount, setWithdrawAmount] = useState(() => String(readAdminSettings().pointValue));
   const [notice, setNotice] = useState("");
+  const [isRequestingWithdrawal, setIsRequestingWithdrawal] = useState(false);
+
+  useEffect(() => {
+    if (!doctorProfile?.id) return;
+
+    let isCancelled = false;
+    const timeoutId = window.setTimeout(() => {
+      setWalletError("");
+      void doctorApiService
+        .getWallet(doctorProfile.id)
+        .then((response) => {
+          if (!isCancelled) {
+            setServerWallet(response.data);
+          }
+        })
+        .catch((error) => {
+          if (!isCancelled) {
+            setWalletError(getApiErrorMessage(error));
+          }
+        });
+    }, 0);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [doctorProfile?.id]);
 
   useEffect(() => {
     const syncWallet = () => {
@@ -46,22 +77,57 @@ export default function ConsultantWalletPage() {
     };
   }, []);
 
+  const displayedWallet = {
+    points: serverWallet?.lifetimePoints ?? doctorProfile?.wallet?.lifetimePoints ?? walletSummary.points,
+    balance: serverWallet?.currentBalance ?? doctorProfile?.wallet?.currentBalance ?? walletSummary.balance,
+    pointValue: serverWallet?.pointValue ?? doctorProfile?.wallet?.pointValue ?? pointValue,
+  };
   const completedConsultations = useMemo(() => walletActivity.transactions.length, [walletActivity.transactions.length]);
+  const displayedBankDetails = {
+    bankName: doctorProfile?.bankName || bankDetails.bankName,
+    accountName: doctorProfile?.bankAccountName || bankDetails.accountName,
+    accountNumber: doctorProfile?.bankAccountNumber || bankDetails.accountNumber,
+  };
+  const completedConsultationCount =
+    doctorProfile?.appointmentStats?.completed ?? completedConsultations;
 
-  const handleRequestWithdrawal = () => {
-    const amount = Math.max(0, Math.floor(Number(withdrawAmount) || 0));
-    const result = requestDoctorWithdrawal(CURRENT_DOCTOR_ID, amount);
-
-    if (!result.ok) {
-      setNotice(result.reason);
+  const handleRequestWithdrawal = async () => {
+    if (!doctorProfile?.id) {
+      setNotice("Doctor profile is still loading. Please try again.");
       return;
     }
 
-    setNotice(`Withdrawal request submitted for NGN ${result.request.amount.toLocaleString()}.`);
-    setWithdrawAmount(String(pointValue));
-    setWalletSummary(readDoctorWalletSummary(CURRENT_DOCTOR_ID));
-    setWalletActivity(readDoctorWalletActivity(CURRENT_DOCTOR_ID));
-    setPendingRequest(getPendingDoctorWithdrawalRequest(CURRENT_DOCTOR_ID));
+    const amount = Math.max(0, Math.floor(Number(withdrawAmount) || 0));
+
+    if (amount <= 0) {
+      setNotice("Enter a valid withdrawal amount.");
+      return;
+    }
+
+    if (amount > displayedWallet.balance) {
+      setNotice("Withdrawal amount cannot exceed your available balance.");
+      return;
+    }
+
+    setNotice("");
+    setIsRequestingWithdrawal(true);
+
+    try {
+      await doctorApiService.requestWithdrawal({
+        doctorId: doctorProfile.id,
+        amount,
+      });
+
+      setNotice(`Withdrawal request submitted for NGN ${amount.toLocaleString()}.`);
+      setWithdrawAmount(String(displayedWallet.pointValue));
+
+      const walletResponse = await doctorApiService.getWallet(doctorProfile.id);
+      setServerWallet(walletResponse.data);
+    } catch (error) {
+      setNotice(getApiErrorMessage(error));
+    } finally {
+      setIsRequestingWithdrawal(false);
+    }
   };
 
   return (
@@ -136,22 +202,28 @@ export default function ConsultantWalletPage() {
             <h1 className="text-xl font-semibold text-[#00020d] sm:text-2xl">Wallet</h1>
           </div>
           <p className="text-xs text-[#45464e] sm:text-sm">
-            Each completed consultation adds 1 point and NGN {pointValue.toLocaleString()} to your wallet balance. Points stay cumulative even after withdrawals.
+            Each completed consultation adds 1 point and NGN {displayedWallet.pointValue.toLocaleString()} to your wallet balance. Points stay cumulative even after withdrawals.
           </p>
         </header>
+
+        {walletError ? (
+          <section role="alert" className="mb-5 rounded-xl border border-[#fecaca] bg-[#fef2f2] p-4 text-sm text-[#b91c1c]">
+            {walletError}
+          </section>
+        ) : null}
 
         <section className="mb-5 grid grid-cols-1 gap-3 sm:mb-6 sm:grid-cols-3">
           <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Total Points</p>
-            <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{walletSummary.points}</p>
+            <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{displayedWallet.points}</p>
           </article>
           <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Available Balance</p>
-            <p className="mt-2 text-2xl font-semibold text-[#001b5e]">NGN {walletSummary.balance.toLocaleString()}</p>
+            <p className="mt-2 text-2xl font-semibold text-[#001b5e]">NGN {displayedWallet.balance.toLocaleString()}</p>
           </article>
           <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Completed Consultations</p>
-            <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{completedConsultations}</p>
+            <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{completedConsultationCount}</p>
           </article>
         </section>
 
@@ -160,19 +232,19 @@ export default function ConsultantWalletPage() {
           <div className="mt-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
             <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
               <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Bank</p>
-              <p className="mt-1 font-semibold text-[#001b5e]">{bankDetails.bankName || "Not set"}</p>
+              <p className="mt-1 font-semibold text-[#001b5e]">{displayedBankDetails.bankName || "Not set"}</p>
             </div>
             <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
               <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Account Name</p>
-              <p className="mt-1 font-semibold text-[#001b5e]">{bankDetails.accountName || "Not set"}</p>
+              <p className="mt-1 font-semibold text-[#001b5e]">{displayedBankDetails.accountName || "Not set"}</p>
             </div>
             <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
               <p className="text-[11px] uppercase tracking-wide text-[#64748b]">Account Number</p>
-              <p className="mt-1 font-semibold text-[#001b5e]">{bankDetails.accountNumber || "Not set"}</p>
+              <p className="mt-1 font-semibold text-[#001b5e]">{displayedBankDetails.accountNumber || "Not set"}</p>
             </div>
           </div>
 
-          {!bankDetails.bankName || !bankDetails.accountName || !bankDetails.accountNumber ? (
+          {!displayedBankDetails.bankName || !displayedBankDetails.accountName || !displayedBankDetails.accountNumber ? (
             <p className="mt-2 text-xs text-[#475569]">
               Complete your payout account details in
               <Link href="/dashboard/doctor/settings" className="ml-1 font-semibold text-[#0aa4b4] hover:underline">
@@ -185,13 +257,13 @@ export default function ConsultantWalletPage() {
 
         <section className="mb-5 rounded-2xl border border-[#dbe4f0] bg-white p-4 shadow-sm sm:mb-6 sm:p-5">
           <h2 className="text-base font-semibold text-[#001b5e]">Request Withdrawal</h2>
-          <p className="mt-1 text-xs text-[#475569]">Withdrawals are requested in multiples of NGN {pointValue.toLocaleString()}.</p>
+          <p className="mt-1 text-xs text-[#475569]">Withdrawals are requested in multiples of NGN {displayedWallet.pointValue.toLocaleString()}.</p>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input
               type="number"
-              min={pointValue}
-              step={pointValue}
+              min={displayedWallet.pointValue}
+              step={displayedWallet.pointValue}
               value={withdrawAmount}
               onChange={(event) => setWithdrawAmount(event.target.value)}
               className="h-10 w-44 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm"
@@ -200,10 +272,15 @@ export default function ConsultantWalletPage() {
             <button
               type="button"
               className="h-10 rounded-lg bg-[#001b5e] px-4 text-sm font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
-              disabled={walletSummary.balance < pointValue || Boolean(pendingRequest)}
+              disabled={
+                isRequestingWithdrawal ||
+                !doctorProfile?.id ||
+                displayedWallet.balance < displayedWallet.pointValue ||
+                Boolean(pendingRequest)
+              }
               onClick={handleRequestWithdrawal}
             >
-              Request Withdrawal
+              {isRequestingWithdrawal ? "Requesting..." : "Request Withdrawal"}
             </button>
           </div>
 
@@ -215,37 +292,7 @@ export default function ConsultantWalletPage() {
           {notice ? <p className="mt-2 text-xs text-[#334155]">{notice}</p> : null}
         </section>
 
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <article className="rounded-2xl border border-[#dbe4f0] bg-white p-4 shadow-sm sm:p-5">
-            <h3 className="mb-3 text-base font-semibold text-[#001b5e]">Consultation Earnings</h3>
-            {walletActivity.transactions.length === 0 ? (
-              <p className="text-sm text-[#64748b]">No completed consultation earnings yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs sm:text-sm">
-                  <thead>
-                    <tr className="bg-[#f8fafc] text-xs uppercase tracking-wide text-[#64748b]">
-                      <th className="px-3 py-2">Consultation</th>
-                      <th className="px-3 py-2">Points</th>
-                      <th className="px-3 py-2">Amount</th>
-                      <th className="px-3 py-2">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {walletActivity.transactions.slice(0, 10).map((transaction) => (
-                      <tr key={transaction.id} className="border-b border-[#e2e8f0] last:border-b-0">
-                        <td className="px-3 py-2 text-[#334155]">{transaction.consultationId}</td>
-                        <td className="px-3 py-2 text-[#334155]">{transaction.points}</td>
-                        <td className="px-3 py-2 text-[#334155]">NGN {transaction.amount.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-[#334155]">{new Date(transaction.createdAt).toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </article>
-
+        <section>
           <article className="rounded-2xl border border-[#dbe4f0] bg-white p-4 shadow-sm sm:p-5">
             <h3 className="mb-3 text-base font-semibold text-[#001b5e]">Withdrawal History</h3>
             {walletActivity.withdrawals.length === 0 ? (

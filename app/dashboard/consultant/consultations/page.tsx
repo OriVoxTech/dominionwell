@@ -2,18 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
 import DoctorProfileSummary from "@/components/doctor-profile-summary";
 import DoctorLogoutButton from "@/components/doctor-logout-button";
-import {
-  APPOINTMENT_REQUESTS_UPDATED_EVENT,
-  isConsultationInviteWindow,
-  readAppointmentRequests,
-  updateAppointmentRequestStatus,
-  type AppointmentRequest,
-} from "@/lib/appointments";
-import { creditDoctorForCompletedConsultation } from "@/lib/admin-portal";
 import {
   doctorApiService,
   getApiErrorMessage,
@@ -21,17 +13,9 @@ import {
   type DoctorAppointmentStatus,
 } from "@/lib/api";
 
-type ConsultationStatus = "Completed" | "Pending" | "Cancelled" | "Ongoing";
+type ConsultationTab = "upcoming" | "all";
 
-type ConsultationItem = {
-  id: string;
-  patient: string;
-  concern?: string;
-  report?: string;
-  status: ConsultationStatus;
-};
-
-const initialConsultations: ConsultationItem[] = [];
+const CONSULTATION_PAST_GRACE_MINUTES = 10;
 
 const doctorAppointmentStatuses: DoctorAppointmentStatus[] = [
   "BOOKED",
@@ -40,56 +24,179 @@ const doctorAppointmentStatuses: DoctorAppointmentStatus[] = [
   "CANCELLED",
 ];
 
-const statusClassMap: Record<ConsultationStatus, string> = {
-  Completed: "bg-[#16b36c]/15 text-[#16b36c]",
-  Pending: "bg-[#f59e0b]/15 text-[#b45309]",
-  Cancelled: "bg-[#ef4444]/12 text-[#b91c1c]",
-  Ongoing: "bg-[#0ea5e9]/15 text-[#0369a1]",
-};
-
-const statusTransitions: Record<ConsultationStatus, ConsultationStatus[]> = {
-  Pending: ["Pending", "Ongoing"],
-  Ongoing: ["Ongoing", "Completed", "Cancelled"],
-  Completed: ["Completed"],
-  Cancelled: ["Cancelled"],
-};
-
-function isLockedStatus(status: ConsultationStatus) {
-  return status === "Completed" || status === "Cancelled";
+function asRecord(value: unknown) {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
 
-const statusDescription = {
-  Completed:
-    "The consultation has been successfully concluded. Both the doctor and the patient participated in the consultation within the allocated one-hour consultation window. One consultation credit is deducted from the patient's subscription upon completion.",
-  Pending:
-    "The consultation has been verified and is waiting to begin. The patient has not yet joined or responded, but the one-hour consultation window has not expired.",
-  Cancelled:
-    "The consultation could not be completed. This may occur if the consultation verification fails or if the patient does not respond or join within the one-hour consultation window after the doctor has notified the patient that the consultation is ready to begin.",
-  Ongoing:
-    "The consultation has been verified, and the doctor has confirmed that the consultation has started. The consultation is currently in progress.",
-};
+function getStringValue(record: Record<string, unknown> | null, keys: string[], fallback = "-") {
+  if (!record) return fallback;
+
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value;
+    if (typeof value === "number") return String(value);
+  }
+
+  return fallback;
+}
+
+function getNestedStringValue(record: Record<string, unknown> | null, path: string[], fallback = "-") {
+  let current: unknown = record;
+
+  for (const key of path) {
+    const currentRecord = asRecord(current);
+    if (!currentRecord) return fallback;
+    current = currentRecord[key];
+  }
+
+  if (typeof current === "string" && current.trim()) return current;
+  if (typeof current === "number") return String(current);
+
+  return fallback;
+}
+
+function getAppointmentStatus(appointment: DoctorAppointment, overrides: Record<string, DoctorAppointmentStatus>) {
+  return overrides[appointment.id] ?? appointment.status;
+}
+
+function getAppointmentStatusClass(status: string) {
+  const normalizedStatus = status.trim().toUpperCase();
+
+  if (normalizedStatus === "BOOKED" || normalizedStatus === "VERIFIED") {
+    return "bg-[#16b36c]/15 text-[#16b36c]";
+  }
+
+  if (normalizedStatus === "COMPLETED") {
+    return "bg-[#0ea5e9]/15 text-[#0369a1]";
+  }
+
+  if (normalizedStatus === "CANCELLED" || normalizedStatus === "CANCELED") {
+    return "bg-[#ef4444]/12 text-[#b91c1c]";
+  }
+
+  return "bg-[#64748b]/15 text-[#475569]";
+}
+
+function getAppointmentPatient(appointment: DoctorAppointment) {
+  const record = asRecord(appointment);
+  const patient = asRecord(record?.patient);
+  const patientUser = asRecord(patient?.user);
+  const firstName = getStringValue(patientUser, ["firstName"], "");
+  const lastName = getStringValue(patientUser, ["lastName"], "");
+  const fullName = [firstName, lastName].filter(Boolean).join(" ");
+
+  return (
+    fullName ||
+    getNestedStringValue(record, ["patient", "user", "username"], "") ||
+    getStringValue(record, ["patientName", "patientId"], "Patient")
+  );
+}
+
+function getAppointmentStart(appointment: DoctorAppointment) {
+  const record = asRecord(appointment);
+  const slot = asRecord(record?.slot);
+
+  return (
+    getStringValue(record, ["startsAt", "startTime", "appointmentAt", "scheduledAt"], "") ||
+    getStringValue(slot, ["startsAt", "startTime"], "")
+  );
+}
+
+function getAppointmentEnd(appointment: DoctorAppointment) {
+  const record = asRecord(appointment);
+  const slot = asRecord(record?.slot);
+
+  return (
+    getStringValue(record, ["endsAt", "endTime"], "") ||
+    getStringValue(slot, ["endsAt", "endTime"], "")
+  );
+}
+
+function getAppointmentStartDate(appointment: DoctorAppointment) {
+  const startsAt = getAppointmentStart(appointment);
+  if (!startsAt) return null;
+
+  const date = new Date(startsAt);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatAppointmentDate(appointment: DoctorAppointment) {
+  const startsAt = getAppointmentStart(appointment);
+  if (!startsAt) return "-";
+
+  const date = new Date(startsAt);
+  return Number.isNaN(date.getTime())
+    ? startsAt
+    : date.toLocaleDateString(undefined, {
+        weekday: "short",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+}
+
+function formatAppointmentTime(appointment: DoctorAppointment) {
+  const startsAt = getAppointmentStart(appointment);
+  const endsAt = getAppointmentEnd(appointment);
+
+  if (!startsAt) return "-";
+
+  const startDate = new Date(startsAt);
+  const startLabel = Number.isNaN(startDate.getTime())
+    ? startsAt
+    : startDate.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+
+  if (!endsAt) return startLabel;
+
+  const endDate = new Date(endsAt);
+  const endLabel = Number.isNaN(endDate.getTime())
+    ? endsAt
+    : endDate.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+
+  return `${startLabel} - ${endLabel}`;
+}
+
+function isUpcomingAppointment(
+  appointment: DoctorAppointment,
+  overrides: Record<string, DoctorAppointmentStatus>,
+  now = new Date(),
+) {
+  const status = getAppointmentStatus(appointment, overrides);
+  const startsAt = getAppointmentStartDate(appointment);
+
+  if (status !== "BOOKED" || !startsAt) return false;
+
+  const pastThreshold = new Date(
+    startsAt.getTime() + CONSULTATION_PAST_GRACE_MINUTES * 60 * 1000,
+  );
+
+  return now < pastThreshold;
+}
+
+function canCompleteAppointment(appointment: DoctorAppointment, now = new Date()) {
+  const startsAt = getAppointmentStartDate(appointment);
+  if (!startsAt) return false;
+
+  const completionThreshold = new Date(
+    startsAt.getTime() + CONSULTATION_PAST_GRACE_MINUTES * 60 * 1000,
+  );
+
+  return now >= completionThreshold;
+}
 
 export default function ConsultantConsultationsPage() {
-  const [consultations, setConsultations] = useState<ConsultationItem[]>(initialConsultations);
-  const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
-  const [activeConsultationTab, setActiveConsultationTab] = useState<"requests" | "all">("requests");
-  const [verificationPatientId, setVerificationPatientId] = useState("");
-  const [verificationPassword, setVerificationPassword] = useState("");
-  const [verificationMessage, setVerificationMessage] = useState("");
-  const [verificationSuccess, setVerificationSuccess] = useState(false);
-  const [completionConsultationId, setCompletionConsultationId] = useState<string | null>(null);
-  const [completionConcern, setCompletionConcern] = useState("");
-  const [completionReport, setCompletionReport] = useState("");
-  const [completionStep, setCompletionStep] = useState<"concern" | "reportPrompt" | "reportInput">("concern");
-  const [completionError, setCompletionError] = useState("");
+  const [activeConsultationTab, setActiveConsultationTab] = useState<ConsultationTab>("upcoming");
   const [doctorAppointments, setDoctorAppointments] = useState<DoctorAppointment[]>([]);
   const [appointmentStatus, setAppointmentStatus] = useState<DoctorAppointmentStatus | "">("");
   const [appointmentPage, setAppointmentPage] = useState(1);
   const [appointmentMeta, setAppointmentMeta] = useState({ total: 0, page: 1, limit: 20, totalPages: 0 });
+  const [allConsultationsTotal, setAllConsultationsTotal] = useState<number | null>(null);
   const [isLoadingDoctorAppointments, setIsLoadingDoctorAppointments] = useState(true);
   const [doctorAppointmentsError, setDoctorAppointmentsError] = useState("");
-
-  const activeCompletionConsultation = consultations.find((item) => item.id === completionConsultationId) ?? null;
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, DoctorAppointmentStatus>>({});
+  const [actionMessage, setActionMessage] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [actingAppointmentId, setActingAppointmentId] = useState("");
 
   const loadDoctorAppointments = useCallback(async () => {
     setDoctorAppointmentsError("");
@@ -97,7 +204,10 @@ export default function ConsultantConsultationsPage() {
 
     try {
       const response = await doctorApiService.listAppointments({
-        status: appointmentStatus || undefined,
+        status:
+          activeConsultationTab === "all"
+            ? appointmentStatus || undefined
+            : "BOOKED",
         page: appointmentPage,
         limit: 20,
       });
@@ -108,7 +218,16 @@ export default function ConsultantConsultationsPage() {
     } finally {
       setIsLoadingDoctorAppointments(false);
     }
-  }, [appointmentPage, appointmentStatus]);
+  }, [activeConsultationTab, appointmentPage, appointmentStatus]);
+
+  const loadAllConsultationsTotal = useCallback(async () => {
+    try {
+      const response = await doctorApiService.listAppointments({ page: 1, limit: 1 });
+      setAllConsultationsTotal(response.data.meta.total);
+    } catch {
+      setAllConsultationsTotal(null);
+    }
+  }, []);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -119,146 +238,65 @@ export default function ConsultantConsultationsPage() {
   }, [loadDoctorAppointments]);
 
   useEffect(() => {
-    const syncAppointmentRequests = () => {
-      setAppointmentRequests(readAppointmentRequests());
-    };
+    const timeoutId = window.setTimeout(() => {
+      void loadAllConsultationsTotal();
+    }, 0);
 
-    syncAppointmentRequests();
-    window.addEventListener("storage", syncAppointmentRequests);
-    window.addEventListener(APPOINTMENT_REQUESTS_UPDATED_EVENT, syncAppointmentRequests);
+    return () => window.clearTimeout(timeoutId);
+  }, [loadAllConsultationsTotal]);
 
-    return () => {
-      window.removeEventListener("storage", syncAppointmentRequests);
-      window.removeEventListener(APPOINTMENT_REQUESTS_UPDATED_EVENT, syncAppointmentRequests);
-    };
-  }, []);
+  const upcomingAppointments = useMemo(
+    () =>
+      doctorAppointments
+        .filter((appointment) => isUpcomingAppointment(appointment, statusOverrides))
+        .sort(
+          (first, second) =>
+            (getAppointmentStartDate(first)?.getTime() ?? 0) -
+            (getAppointmentStartDate(second)?.getTime() ?? 0),
+        ),
+    [doctorAppointments, statusOverrides],
+  );
 
-  const closeCompletionModal = () => {
-    setCompletionConsultationId(null);
-    setCompletionConcern("");
-    setCompletionReport("");
-    setCompletionStep("concern");
-    setCompletionError("");
-  };
+  const visibleAppointments = activeConsultationTab === "upcoming" ? upcomingAppointments : doctorAppointments;
 
-  const openCompletionModal = (consultationId: string) => {
-    setCompletionConsultationId(consultationId);
-    setCompletionConcern("");
-    setCompletionReport("");
-    setCompletionStep("concern");
-    setCompletionError("");
-  };
+  const updateAppointmentStatus = async (appointmentId: string, status: "CANCELLED" | "COMPLETED") => {
+    setActionMessage("");
+    setActionError("");
+    setActingAppointmentId(appointmentId);
 
-  const saveCompletedConcern = () => {
-    if (!completionConsultationId) {
-      return;
+    try {
+      const response =
+        status === "COMPLETED"
+          ? await doctorApiService.completeAppointment(appointmentId)
+          : await doctorApiService.cancelAppointment(appointmentId);
+      const updatedAppointment = asRecord(response.data)
+        ? (response.data as DoctorAppointment)
+        : null;
+      const updatedStatus = updatedAppointment?.status ?? status;
+
+      setDoctorAppointments((current) =>
+        current.map((appointment) =>
+          appointment.id === appointmentId
+            ? { ...appointment, ...(updatedAppointment ?? {}), status: updatedStatus }
+            : appointment,
+        ),
+      );
+      setStatusOverrides((current) => ({ ...current, [appointmentId]: updatedStatus }));
+      setActionMessage(
+        updatedStatus === "COMPLETED"
+          ? "Consultation marked as completed."
+          : "Consultation cancelled.",
+      );
+      void loadAllConsultationsTotal();
+      window.dispatchEvent(new Event("dw-appointments-updated"));
+    } catch (error) {
+      setActionError(getApiErrorMessage(error));
+    } finally {
+      setActingAppointmentId("");
     }
-
-    const normalizedConcern = completionConcern.trim();
-
-    if (normalizedConcern.length < 3) {
-      setCompletionError("Please add a valid concern before completing this consultation.");
-      return;
-    }
-
-    setConsultations((current) =>
-      current.map((consultation) => {
-        if (consultation.id !== completionConsultationId) {
-          return consultation;
-        }
-
-        return {
-          ...consultation,
-          status: "Completed",
-          concern: normalizedConcern,
-        };
-      })
-    );
-
-    creditDoctorForCompletedConsultation("dr-richardson", completionConsultationId);
-
-    setCompletionError("");
-    setCompletionStep("reportPrompt");
   };
 
-  const saveCompletionReport = () => {
-    if (!completionConsultationId) {
-      return;
-    }
-
-    const normalizedReport = completionReport.trim();
-
-    if (normalizedReport.length < 3) {
-      setCompletionError("Please add a valid report or choose No to close.");
-      return;
-    }
-
-    setConsultations((current) =>
-      current.map((consultation) => {
-        if (consultation.id !== completionConsultationId) {
-          return consultation;
-        }
-
-        return {
-          ...consultation,
-          report: normalizedReport,
-        };
-      })
-    );
-
-    closeCompletionModal();
-  };
-
-  const updateConsultationStatus = (consultationId: string, nextStatus: ConsultationStatus) => {
-    setConsultations((current) =>
-      current.map((consultation) => {
-        if (consultation.id !== consultationId) {
-          return consultation;
-        }
-
-        const allowedStatuses = statusTransitions[consultation.status];
-
-        if (!allowedStatuses.includes(nextStatus)) {
-          return consultation;
-        }
-
-        if (consultation.status === "Ongoing" && nextStatus === "Completed") {
-          openCompletionModal(consultationId);
-          return consultation;
-        }
-
-        return {
-          ...consultation,
-          status: nextStatus,
-        };
-      })
-    );
-  };
-
-  const handleVerifyConsultation = () => {
-    const normalizedPatientId = verificationPatientId.trim();
-    const normalizedPassword = verificationPassword.trim();
-
-    if (normalizedPatientId.length < 3 || normalizedPassword.length < 3) {
-      setVerificationSuccess(false);
-      setVerificationMessage("Please provide both patient ID and verification password.");
-      return;
-    }
-
-    if (!normalizedPassword.toUpperCase().startsWith("DW-")) {
-      setVerificationSuccess(false);
-      setVerificationMessage("Invalid verification password format. Expected format starts with DW-.");
-      return;
-    }
-
-    setVerificationSuccess(true);
-    setVerificationMessage(`Consultation verified for patient ID ${normalizedPatientId}.`);
-  };
-
-  const handleAppointmentDecision = (appointmentId: string, decision: "Booked" | "Rejected" | "Completed") => {
-    updateAppointmentRequestStatus(appointmentId, decision);
-    setAppointmentRequests(readAppointmentRequests());
-  };
+  const showPagination = activeConsultationTab === "all" && appointmentMeta.totalPages > 1;
 
   return (
     <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
@@ -331,30 +369,83 @@ export default function ConsultantConsultationsPage() {
             </Link>
             <h1 className="text-xl font-semibold text-[#00020d] sm:text-2xl">Consultations</h1>
           </div>
-          <p className="text-xs text-[#45464e] sm:text-sm">View all consultations and their current status.</p>
+          <p className="text-xs text-[#45464e] sm:text-sm">View upcoming and all doctor consultations.</p>
         </header>
 
-        <section className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <section className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-2 shadow-sm backdrop-blur-sm">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveConsultationTab("upcoming");
+                setAppointmentPage(1);
+              }}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                activeConsultationTab === "upcoming"
+                  ? "bg-[#001b5e] text-white"
+                  : "bg-[#f8fafc] text-[#334155] hover:bg-[#eef2f7]"
+              }`}
+            >
+              Upcoming Consultations ({upcomingAppointments.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveConsultationTab("all");
+                setAppointmentPage(1);
+              }}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                activeConsultationTab === "all"
+                  ? "bg-[#001b5e] text-white"
+                  : "bg-[#f8fafc] text-[#334155] hover:bg-[#eef2f7]"
+              }`}
+            >
+              All Consultations ({allConsultationsTotal ?? "—"})
+            </button>
+          </div>
+        </section>
+
+        {actionMessage ? (
+          <section className="mb-6 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] p-4 text-sm font-semibold text-[#166534]">
+            {actionMessage}
+          </section>
+        ) : null}
+
+        {actionError ? (
+          <section role="alert" className="mb-6 rounded-xl border border-[#fecaca] bg-[#fef2f2] p-4 text-sm font-semibold text-[#b91c1c]">
+            {actionError}
+          </section>
+        ) : null}
+
+        <section className="rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-base font-semibold text-[#00020d]">Doctor Appointments</h2>
-              <p className="mt-1 text-xs text-[#64748b]">Total: {isLoadingDoctorAppointments ? "—" : appointmentMeta.total}</p>
+              <h2 className="text-base font-semibold text-[#00020d]">
+                {activeConsultationTab === "upcoming" ? "Upcoming Consultations" : "All Consultations"}
+              </h2>
+              <p className="mt-1 text-xs text-[#64748b]">
+                Total: {isLoadingDoctorAppointments ? "—" : activeConsultationTab === "upcoming" ? upcomingAppointments.length : appointmentMeta.total}
+              </p>
             </div>
+
             <div className="flex flex-col gap-2 sm:flex-row">
-              <select
-                value={appointmentStatus}
-                onChange={(event) => {
-                  setAppointmentStatus(event.target.value as DoctorAppointmentStatus | "");
-                  setAppointmentPage(1);
-                }}
-                className="h-10 rounded-lg border border-[#c6c6cf] bg-white px-3 text-sm text-[#334155] outline-none focus:border-[#0aa4b4]"
-                aria-label="Filter appointments by status"
-              >
-                <option value="">All statuses</option>
-                {doctorAppointmentStatuses.map((status) => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
+              {activeConsultationTab === "all" ? (
+                <select
+                  value={appointmentStatus}
+                  onChange={(event) => {
+                    setAppointmentStatus(event.target.value as DoctorAppointmentStatus | "");
+                    setAppointmentPage(1);
+                  }}
+                  className="h-10 rounded-lg border border-[#c6c6cf] bg-white px-3 text-sm text-[#334155] outline-none focus:border-[#0aa4b4]"
+                  aria-label="Filter consultations by status"
+                >
+                  <option value="">All statuses</option>
+                  {doctorAppointmentStatuses.map((status) => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+              ) : null}
+
               <button
                 type="button"
                 onClick={() => void loadDoctorAppointments()}
@@ -367,407 +458,111 @@ export default function ConsultantConsultationsPage() {
           </div>
 
           {doctorAppointmentsError ? (
-            <div role="alert" className="mt-4 flex flex-col gap-2 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-sm text-[#b91c1c] sm:flex-row sm:items-center sm:justify-between">
+            <div role="alert" className="mb-4 flex flex-col gap-2 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-sm text-[#b91c1c] sm:flex-row sm:items-center sm:justify-between">
               <span>{doctorAppointmentsError}</span>
               <button type="button" onClick={() => void loadDoctorAppointments()} className="rounded-md border border-[#fca5a5] px-2 py-1 text-xs font-semibold hover:bg-white">Try Again</button>
             </div>
           ) : null}
 
           {isLoadingDoctorAppointments ? (
-            <p className="mt-4 rounded-lg bg-[#f8fafc] p-4 text-sm text-[#64748b]">Loading appointments...</p>
-          ) : doctorAppointments.length === 0 && !doctorAppointmentsError ? (
-            <p className="mt-4 rounded-lg border border-dashed border-[#c6c6cf] bg-[#f8fafc] p-4 text-sm text-[#64748b]">No appointments found.</p>
+            <p className="rounded-lg bg-[#f8fafc] p-4 text-sm text-[#64748b]">Loading consultations...</p>
+          ) : visibleAppointments.length === 0 && !doctorAppointmentsError ? (
+            <p className="rounded-lg border border-dashed border-[#c6c6cf] bg-[#f8fafc] p-4 text-sm text-[#64748b]">No consultations found.</p>
           ) : (
-            <div className="mt-4 overflow-x-auto">
+            <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="bg-[#f2f4f7] text-[11px] uppercase tracking-wide text-[#64748b]">
                     <th className="rounded-l-lg px-3 py-3">Appointment ID</th>
-                    <th className="rounded-r-lg px-3 py-3">Status</th>
+                    <th className="px-3 py-3">Patient</th>
+                    <th className="px-3 py-3">Date</th>
+                    <th className="px-3 py-3">Time</th>
+                    <th className="px-3 py-3">Status</th>
+                    <th className="rounded-r-lg px-3 py-3">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {doctorAppointments.map((appointment) => (
-                    <tr key={appointment.id} className="border-b border-[#e2e8f0] last:border-b-0">
-                      <td className="px-3 py-3 font-medium text-[#001b5e]">{appointment.id}</td>
-                      <td className="px-3 py-3">
-                        <span className="rounded-full bg-[#e2e8f0] px-2 py-1 text-[10px] font-semibold text-[#334155]">{appointment.status}</span>
-                      </td>
-                    </tr>
-                  ))}
+                  {visibleAppointments.map((appointment) => {
+                    const status = getAppointmentStatus(appointment, statusOverrides);
+                    const canAct = activeConsultationTab === "upcoming" && status === "BOOKED";
+                    const isActing = actingAppointmentId === appointment.id;
+                    const canComplete = canCompleteAppointment(appointment);
+
+                    return (
+                      <tr key={appointment.id} className="border-b border-[#e2e8f0] last:border-b-0">
+                        <td className="px-3 py-3 font-medium text-[#001b5e]">{appointment.id}</td>
+                        <td className="px-3 py-3 text-[#475569]">{getAppointmentPatient(appointment)}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-[#475569]">{formatAppointmentDate(appointment)}</td>
+                        <td className="px-3 py-3 text-[#475569]">{formatAppointmentTime(appointment)}</td>
+                        <td className="px-3 py-3">
+                          <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${getAppointmentStatusClass(status)}`}>
+                            {status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3">
+                          {canAct ? (
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                disabled={isActing}
+                                onClick={() => void updateAppointmentStatus(appointment.id, "CANCELLED")}
+                                className="rounded-lg border border-[#ef4444]/40 px-3 py-1.5 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2]"
+                              >
+                                {isActing ? "Saving..." : "Cancel"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isActing || !canComplete}
+                                onClick={() => void updateAppointmentStatus(appointment.id, "COMPLETED")}
+                                className="rounded-lg bg-[#16b36c] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#149660] disabled:cursor-wait disabled:bg-[#94a3b8]"
+                                title={
+                                  canComplete
+                                    ? "Mark this consultation as completed"
+                                    : "You can complete this consultation 10 minutes after its appointment time"
+                                }
+                              >
+                                {isActing ? "Saving..." : "Mark as Completed"}
+                              </button>
+                              {!canComplete ? (
+                                <p className="basis-full text-[11px] text-[#64748b]">
+                                  Completion unlocks 10 minutes after appointment time.
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-[#64748b]">No action</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
 
-          {appointmentMeta.totalPages > 1 ? (
+          {showPagination ? (
             <div className="mt-4 flex items-center justify-between gap-3">
-              <button type="button" disabled={appointmentPage <= 1 || isLoadingDoctorAppointments} onClick={() => setAppointmentPage((page) => Math.max(1, page - 1))} className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#001b5e] disabled:cursor-not-allowed disabled:opacity-50">Previous</button>
-              <p className="text-xs text-[#64748b]">Page {appointmentMeta.page} of {appointmentMeta.totalPages}</p>
-              <button type="button" disabled={appointmentPage >= appointmentMeta.totalPages || isLoadingDoctorAppointments} onClick={() => setAppointmentPage((page) => page + 1)} className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#001b5e] disabled:cursor-not-allowed disabled:opacity-50">Next</button>
-            </div>
-          ) : null}
-        </section>
-
-        <section id="verify-consultation" className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm scroll-mt-24">
-          <h2 className="mb-3 text-base font-semibold text-[#00020d]">Verify Consultation</h2>
-          <p className="mb-4 text-sm text-[#334155]">
-            Enter the patient ID and verification password provided by the patient, then click verify.
-          </p>
-
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <label className="block text-sm">
-              <span className="mb-1 block font-medium text-[#334155]">Patient ID</span>
-              <input
-                type="text"
-                value={verificationPatientId}
-                onChange={(event) => setVerificationPatientId(event.target.value)}
-                className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
-                placeholder="Enter patient ID"
-              />
-            </label>
-
-            <label className="block text-sm">
-              <span className="mb-1 block font-medium text-[#334155]">Verification Password</span>
-              <input
-                type="text"
-                value={verificationPassword}
-                onChange={(event) => setVerificationPassword(event.target.value)}
-                className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
-                placeholder="Enter password from patient"
-              />
-            </label>
-
-            <div className="flex items-end">
               <button
                 type="button"
-                className="h-10 w-full rounded-lg bg-[#001b5e] px-3 text-xs font-semibold text-white hover:bg-[#0b2b75]"
-                onClick={handleVerifyConsultation}
+                disabled={appointmentPage <= 1 || isLoadingDoctorAppointments}
+                onClick={() => setAppointmentPage((page) => Math.max(1, page - 1))}
+                className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#001b5e] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Verify Consultation
+                Previous
+              </button>
+              <p className="text-xs text-[#64748b]">Page {appointmentMeta.page} of {appointmentMeta.totalPages}</p>
+              <button
+                type="button"
+                disabled={appointmentPage >= appointmentMeta.totalPages || isLoadingDoctorAppointments}
+                onClick={() => setAppointmentPage((page) => page + 1)}
+                className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#001b5e] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
               </button>
             </div>
-          </div>
-
-          {verificationMessage ? (
-            <p
-              className={`mt-3 text-sm ${verificationSuccess ? "text-[#166534]" : "text-[#b91c1c]"}`}
-            >
-              {verificationMessage}
-            </p>
           ) : null}
         </section>
-
-        <section className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
-          <h2 className="mb-3 text-base font-semibold text-[#00020d]">Status Definitions</h2>
-          <div className="space-y-3 text-sm text-[#334155]">
-            <p>
-              <span className="font-semibold text-[#b45309]">Pending:</span> {statusDescription.Pending}
-            </p>
-            <p>
-              <span className="font-semibold text-[#0369a1]">Ongoing:</span> {statusDescription.Ongoing}
-            </p>
-            <p>
-              <span className="font-semibold text-[#16b36c]">Completed:</span> {statusDescription.Completed}
-            </p>
-            <p>
-              <span className="font-semibold text-[#b91c1c]">Cancelled:</span> {statusDescription.Cancelled}
-            </p>
-          </div>
-        </section>
-
-        <section className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-2 shadow-sm backdrop-blur-sm">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveConsultationTab("requests")}
-              className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-                activeConsultationTab === "requests"
-                  ? "bg-[#001b5e] text-white"
-                  : "bg-[#f8fafc] text-[#334155] hover:bg-[#eef2f7]"
-              }`}
-            >
-              Appointment Requests ({appointmentRequests.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveConsultationTab("all")}
-              className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-                activeConsultationTab === "all"
-                  ? "bg-[#001b5e] text-white"
-                  : "bg-[#f8fafc] text-[#334155] hover:bg-[#eef2f7]"
-              }`}
-            >
-              All Consultations ({consultations.length})
-            </button>
-          </div>
-        </section>
-
-        {activeConsultationTab === "requests" ? (
-          <section className="rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold text-[#00020d]">Appointment Requests</h2>
-              <p className="text-xs text-[#64748b]">Total: {appointmentRequests.length}</p>
-            </div>
-
-            {appointmentRequests.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-[#c6c6cf] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
-                No appointment requests available yet.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="bg-[#f2f4f7] text-[11px] uppercase tracking-wide text-[#64748b]">
-                      <th className="rounded-l-lg px-3 py-3">Patient</th>
-                      <th className="px-3 py-3">Doctor</th>
-                      <th className="px-3 py-3">Date</th>
-                      <th className="px-3 py-3">Time</th>
-                      <th className="px-3 py-3">Status</th>
-                      <th className="rounded-r-lg px-3 py-3">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {appointmentRequests.map((request) => (
-                      <tr key={request.id} className="border-b border-[#e2e8f0] last:border-b-0">
-                        <td className="px-3 py-3 font-medium text-[#001b5e]">{request.patientName}</td>
-                        <td className="px-3 py-3 text-[#475569]">{request.doctorName}</td>
-                        <td className="px-3 py-3 text-[#475569]">{request.dateLabel}</td>
-                        <td className="px-3 py-3 text-[#475569]">{request.timeSlot}</td>
-                        <td className="px-3 py-3">
-                          <span
-                            className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${
-                              request.status === "Pending"
-                                ? "bg-[#f59e0b]/15 text-[#b45309]"
-                                : request.status === "Completed"
-                                  ? "bg-[#0aa4b4]/15 text-[#0369a1]"
-                                : request.status === "Booked" || request.status === "Accepted"
-                                  ? "bg-[#16b46f]/15 text-[#16b46f]"
-                                  : "bg-[#ef4444]/12 text-[#dc2626]"
-                            }`}
-                          >
-                            {request.status === "Accepted" ? "Booked" : request.status}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3">
-                          {request.status === "Pending" ? (
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                className="rounded-lg border border-[#ef4444]/40 px-3 py-1.5 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2]"
-                                onClick={() => handleAppointmentDecision(request.id, "Rejected")}
-                              >
-                                Reject
-                              </button>
-                              <button
-                                type="button"
-                                className="rounded-lg bg-[#16b46f] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#149660]"
-                                onClick={() => handleAppointmentDecision(request.id, "Booked")}
-                              >
-                                Accept
-                              </button>
-                            </div>
-                          ) : request.status === "Booked" || request.status === "Accepted" ? (
-                            <button
-                              type="button"
-                              className="rounded-lg bg-[#001b5e] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0b2b75]"
-                              onClick={() => handleAppointmentDecision(request.id, "Completed")}
-                            >
-                              Mark Completed
-                            </button>
-                          ) : (
-                            <span className="text-xs text-[#64748b]">No action</span>
-                          )}
-                          {isConsultationInviteWindow(request) ? (
-                            <p className="mt-1 text-[11px] font-semibold text-[#001b5e]">Check mail for consultation invite</p>
-                          ) : null}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        ) : (
-          <section className="rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-1xl font-semibold text-[#00020d]">All Consultations</h2>
-              <p className="text-xs text-[#64748b]">Total: {consultations.length}</p>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="bg-[#f2f4f7] text-[11px] uppercase tracking-wide text-[#64748b]">
-                    <th className="rounded-l-lg px-3 py-3">Consultation ID</th>
-                    <th className="px-3 py-3">Patient</th>
-                    <th className="px-3 py-3">Concern</th>
-                    <th className="px-3 py-3">Status</th>
-                    <th className="rounded-r-lg px-3 py-3">Update Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {consultations.map((consultation) => (
-                    <tr key={consultation.id} className="border-b border-[#e2e8f0] last:border-b-0">
-                      <td className="px-3 py-3 font-semibold text-[#001b5e]">{consultation.id}</td>
-                      <td className="px-3 py-3 text-[#475569]">{consultation.patient}</td>
-                      <td className="px-3 py-3 text-[#475569]">
-                        {consultation.status === "Completed" ? consultation.concern || "-" : "-"}
-                      </td>
-                      <td className="px-3 py-3">
-                        <span
-                          className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${statusClassMap[consultation.status]}`}
-                        >
-                          {consultation.status}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3">
-                        <select
-                          className="h-9 w-full rounded-lg border border-[#c6c6cf] bg-white px-2 text-xs text-[#334155] outline-none focus:border-[#0aa4b4] disabled:cursor-not-allowed disabled:bg-[#f8fafc] disabled:text-[#94a3b8]"
-                          value={consultation.status}
-                          onChange={(event) =>
-                            updateConsultationStatus(
-                              consultation.id,
-                              event.target.value as ConsultationStatus
-                            )
-                          }
-                          disabled={isLockedStatus(consultation.status)}
-                          aria-label={`Update status for consultation ${consultation.id}`}
-                        >
-                          {statusTransitions[consultation.status].map((statusOption) => (
-                            <option key={statusOption} value={statusOption}>
-                              {statusOption}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
-        {completionConsultationId && activeCompletionConsultation ? (
-          <div className="fixed inset-0 z-50 grid place-items-center p-4">
-            <button
-              type="button"
-              className="absolute inset-0 bg-[#0f172a]/45"
-              aria-label="Close completion modal"
-              onClick={closeCompletionModal}
-            />
-
-            <section className="relative z-10 w-full max-w-lg rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-xl">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-[#001b5e]">Complete Consultation {activeCompletionConsultation.id}</h3>
-                <button
-                  type="button"
-                  className="rounded-md p-1 text-[#64748b] hover:bg-[#f2f4f7]"
-                  aria-label="Close modal"
-                  onClick={closeCompletionModal}
-                >
-                  <span className="material-symbols-outlined text-[20px]">close</span>
-                </button>
-              </div>
-
-              {completionStep === "concern" ? (
-                <>
-                  <p className="mb-3 text-sm text-[#334155]">
-                    Add consultation concern before setting this consultation to completed.
-                  </p>
-                  <label className="block text-sm">
-                    <span className="mb-1 block font-medium text-[#334155]">Concern</span>
-                    <textarea
-                      value={completionConcern}
-                      onChange={(event) => setCompletionConcern(event.target.value)}
-                      className="min-h-24 w-full rounded-lg border border-[#c6c6cf] px-3 py-2 outline-none focus:border-[#0aa4b4]"
-                      placeholder="Enter concern summary"
-                    />
-                  </label>
-
-                  {completionError ? <p className="mt-2 text-sm text-[#dc2626]">{completionError}</p> : null}
-
-                  <div className="mt-4 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#475569] hover:bg-[#f8fafc]"
-                      onClick={closeCompletionModal}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg bg-[#16b46f] px-3 py-2 text-xs font-semibold text-white hover:bg-[#149660]"
-                      onClick={saveCompletedConcern}
-                    >
-                      Save Concern
-                    </button>
-                  </div>
-                </>
-              ) : null}
-
-              {completionStep === "reportPrompt" ? (
-                <>
-                  <p className="text-sm text-[#334155]">Concern saved. Do you want to add a report now?</p>
-                  <div className="mt-4 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#475569] hover:bg-[#f8fafc]"
-                      onClick={closeCompletionModal}
-                    >
-                      No, Close
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg bg-[#001b5e] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0b2b75]"
-                      onClick={() => {
-                        setCompletionError("");
-                        setCompletionStep("reportInput");
-                      }}
-                    >
-                      Yes, Add Report
-                    </button>
-                  </div>
-                </>
-              ) : null}
-
-              {completionStep === "reportInput" ? (
-                <>
-                  <label className="block text-sm">
-                    <span className="mb-1 block font-medium text-[#334155]">Report</span>
-                    <textarea
-                      value={completionReport}
-                      onChange={(event) => setCompletionReport(event.target.value)}
-                      className="min-h-24 w-full rounded-lg border border-[#c6c6cf] px-3 py-2 outline-none focus:border-[#0aa4b4]"
-                      placeholder="Enter consultation report"
-                    />
-                  </label>
-
-                  {completionError ? <p className="mt-2 text-sm text-[#dc2626]">{completionError}</p> : null}
-
-                  <div className="mt-4 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#475569] hover:bg-[#f8fafc]"
-                      onClick={closeCompletionModal}
-                    >
-                      Close
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg bg-[#16b46f] px-3 py-2 text-xs font-semibold text-white hover:bg-[#149660]"
-                      onClick={saveCompletionReport}
-                    >
-                      Save Report
-                    </button>
-                  </div>
-                </>
-              ) : null}
-            </section>
-          </div>
-        ) : null}
       </main>
     </div>
   );

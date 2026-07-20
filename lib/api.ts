@@ -17,7 +17,7 @@ import {
 } from "@/lib/admin-session";
 
 const DEFAULT_API_BASE_URL =
-  "https://cf7f-105-127-10-124.ngrok-free.app/api";
+  "https://4794-102-88-55-59.ngrok-free.app/api";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
 export const api = axios.create({
@@ -269,6 +269,26 @@ export interface DoctorProfile {
   userId: string;
   bio: string | null;
   specializations: string[];
+  presenceStatus?: "AVAILABLE" | "BUSY" | "OFFLINE";
+  yearsOfExperience?: number | null;
+  bankName?: string | null;
+  bankCode?: string | null;
+  bankAccountName?: string | null;
+  bankAccountNumber?: string | null;
+  wallet?: {
+    currentBalance: number;
+    lifetimePoints: number;
+    pointValue: number;
+  } | null;
+  appointmentStats?: {
+    today: number;
+    completed: number;
+  } | null;
+  satisfaction?: {
+    averageRating: number | null;
+    reviewCount: number;
+  } | null;
+  badges?: string[];
   verifiedAt: string | null;
   deletedAt: string | null;
   createdAt: string;
@@ -290,6 +310,44 @@ export interface UpdateDoctorProfilePayload {
   firstName: string;
   lastName: string;
   phone: string;
+  presenceStatus: "AVAILABLE" | "BUSY" | "OFFLINE";
+  yearsOfExperience: number;
+  bankName?: string;
+  bankCode?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
+}
+
+export interface UpdateDoctorBankAccountPayload {
+  bankName: string;
+  bankCode: string;
+  bankAccountName: string;
+  bankAccountNumber: string;
+}
+
+export interface DoctorWallet {
+  id: string;
+  doctorId: string;
+  currentBalance: number;
+  lifetimePoints: number;
+  pointValue: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RequestDoctorWithdrawalPayload {
+  doctorId: string;
+  amount: number;
+}
+
+export interface DoctorWithdrawalResponse {
+  id?: string;
+  doctorId?: string;
+  amount?: number;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  [key: string]: unknown;
 }
 
 export interface PatientProfile {
@@ -330,6 +388,75 @@ export interface PatientDashboardResponse {
   badges: string[];
 }
 
+export interface DoctorReviewPayload {
+  appointmentId: string;
+  rating: number;
+  comment: string;
+}
+
+export interface DoctorReview extends Record<string, unknown> {
+  id: string;
+  appointmentId?: string;
+  rating: number;
+  comment?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  patient?: {
+    user?: {
+      firstName?: string;
+      lastName?: string;
+      username?: string | null;
+    };
+  } | null;
+}
+
+export interface DoctorReviewsResponse {
+  satisfaction: {
+    averageRating: number | null;
+    reviewCount: number;
+  };
+  data: DoctorReview[];
+  meta: PaginationMeta;
+}
+
+export interface PatientNotification {
+  id: string;
+  title?: string;
+  subject?: string;
+  message?: string;
+  body?: string;
+  content?: string;
+  type?: string;
+  category?: string;
+  isRead?: boolean;
+  read?: boolean;
+  readAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  [key: string]: unknown;
+}
+
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface PatientNotificationsResponse {
+  data?: PatientNotification[];
+  meta?: PaginationMeta;
+  [key: string]: unknown;
+}
+
+export interface NotificationUnreadCountResponse {
+  unreadCount: number;
+}
+
+export interface MarkNotificationsReadResponse {
+  updatedCount: number;
+}
+
 export type DoctorAppointmentStatus =
   | "BOOKED"
   | "CANCELLED"
@@ -358,6 +485,7 @@ export interface DoctorAppointmentsResponse {
 }
 
 export interface PatientAppointmentsQuery {
+  status?: DoctorAppointmentStatus;
   page?: number;
   limit?: number;
 }
@@ -365,6 +493,31 @@ export interface PatientAppointmentsQuery {
 export interface PatientAppointment extends Record<string, unknown> {
   id: string;
   status?: string;
+}
+
+export interface BookPatientAppointmentPayload {
+  doctorId: string;
+  slotId: string;
+}
+
+export interface BookPatientAppointmentResponse extends Record<string, unknown> {
+  id: string;
+  patientId: string;
+  doctorId: string;
+  slotId: string;
+  status: string;
+  cancellationReason: string | null;
+  completedAt: string | null;
+  verifiedAt: string | null;
+  googleEventId: string | null;
+  meetingUrl: string | null;
+  meetingStatus: string | null;
+  meetingCreationError: string | null;
+  confirmationSentAt: string | null;
+  dayReminderSentAt: string | null;
+  hourReminderSentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PatientAppointmentsResponse {
@@ -671,6 +824,72 @@ export interface AdminOverview {
   };
 }
 
+export interface CreateAdminSubscriptionPlanPayload {
+  name: string;
+  monthlyPrice: number;
+  consultationsPerMonth: number;
+  description: string;
+}
+
+export interface AdminSubscriptionPlan extends Record<string, unknown> {
+  id: string;
+  name: string;
+  monthlyPrice?: number;
+  priceNaira?: number;
+  priceCents?: number;
+  consultationsPerMonth?: number;
+  consultationCredits?: number;
+  description?: string;
+  isActive?: boolean;
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AdminDoctorPointValueResponse {
+  pointValue: number;
+}
+
+export interface UpdateAdminDoctorPointValuePayload {
+  pointValue: number;
+}
+
+export interface AdminSubscriptionPayment extends Record<string, unknown> {
+  id: string;
+  patientId?: string;
+  provider?: string;
+  providerRef?: string;
+  amountCents?: number;
+  amount?: number;
+  currency?: string;
+  status?: string;
+  metadata?: {
+    planName?: string;
+    planId?: string;
+    [key: string]: unknown;
+  } | null;
+  patient?: {
+    id?: string;
+    user?: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+    };
+  } | null;
+  subscription?: {
+    plan?: {
+      name?: string;
+    } | null;
+  } | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AdminSubscriptionPaymentsResponse {
+  data: AdminSubscriptionPayment[];
+  meta?: PaginationMeta;
+}
+
 export interface ApiResponse<T = unknown> {
   data?: T;
   message?: unknown;
@@ -811,9 +1030,23 @@ export const patientApiService = {
       "/api/appointments/patient",
       { params: { page: 1, limit: 20, ...params } },
     ),
+  bookAppointment: (payload: BookPatientAppointmentPayload) =>
+    patientGatewayApi.post<BookPatientAppointmentResponse>(
+      "/api/appointments",
+      payload,
+    ),
   listDoctorAvailability: (doctorId: string) =>
     patientGatewayApi.get<DoctorAvailabilitySlot[]>(
       `/api/doctors/${encodeURIComponent(doctorId)}/availability`,
+    ),
+  listDoctorReviews: (doctorId: string) =>
+    patientGatewayApi.get<DoctorReviewsResponse>(
+      `/api/doctors/${encodeURIComponent(doctorId)}/reviews`,
+    ),
+  createDoctorReview: (doctorId: string, payload: DoctorReviewPayload) =>
+    patientGatewayApi.post<DoctorReview>(
+      `/api/doctors/${encodeURIComponent(doctorId)}/reviews`,
+      payload,
     ),
   listSubscriptionPlans: () =>
     patientGatewayApi.get<SubscriptionPlan[]>("/api/subscriptions/plans"),
@@ -835,6 +1068,22 @@ export const patientApiService = {
     patientGatewayApi.get<VerifySubscriptionPaymentResponse>(
       `/api/subscriptions/verify/${encodeURIComponent(reference)}`,
     ),
+  listNotifications: () =>
+    patientGatewayApi.get<PatientNotificationsResponse | PatientNotification[]>(
+      "/api/notifications",
+    ),
+  getUnreadNotificationCount: () =>
+    patientGatewayApi.get<NotificationUnreadCountResponse>(
+      "/api/notifications/unread-count",
+    ),
+  markAllNotificationsAsRead: () =>
+    patientGatewayApi.patch<MarkNotificationsReadResponse>(
+      "/api/notifications/read-all",
+    ),
+  markNotificationAsRead: (notificationId: string) =>
+    patientGatewayApi.patch<PatientNotification | MarkNotificationsReadResponse>(
+      `/api/notifications/${encodeURIComponent(notificationId)}/read`,
+    ),
 };
 
 export const doctorAuthApi = {
@@ -852,10 +1101,29 @@ export const doctorApiService = {
   getProfile: () => doctorGatewayApi.get<DoctorProfile>("/api/doctors/me"),
   updateProfile: (payload: UpdateDoctorProfilePayload) =>
     doctorGatewayApi.patch<DoctorProfile>("/api/doctors/me", payload),
+  updateBankAccount: (payload: UpdateDoctorBankAccountPayload) =>
+    doctorGatewayApi.put<ApiResponse>("/api/doctors/me/bank-account", payload),
+  getWallet: (doctorId: string) =>
+    doctorGatewayApi.get<DoctorWallet>(
+      `/api/wallets/doctors/${encodeURIComponent(doctorId)}`,
+    ),
+  requestWithdrawal: (payload: RequestDoctorWithdrawalPayload) =>
+    doctorGatewayApi.post<DoctorWithdrawalResponse>(
+      "/api/withdrawals",
+      payload,
+    ),
   listAppointments: (params: DoctorAppointmentsQuery = {}) =>
     doctorGatewayApi.get<DoctorAppointmentsResponse>(
       "/api/appointments/doctor",
       { params: { page: 1, limit: 20, ...params } },
+    ),
+  cancelAppointment: (appointmentId: string) =>
+    doctorGatewayApi.patch<DoctorAppointment>(
+      `/api/appointments/${encodeURIComponent(appointmentId)}/cancel`,
+    ),
+  completeAppointment: (appointmentId: string) =>
+    doctorGatewayApi.patch<DoctorAppointment>(
+      `/api/appointments/${encodeURIComponent(appointmentId)}/complete`,
     ),
   createAvailability: (payload: CreateDoctorAvailabilityPayload) =>
     doctorGatewayApi.put<CreateDoctorAvailabilityResponse>(
@@ -894,6 +1162,24 @@ export const adminApiService = {
     adminApi.post<AdminSession>("/admin/login", payload),
   getOverview: () =>
     adminUsersApi.get<AdminOverview>("/api/admin/overview"),
+  createSubscriptionPlan: (payload: CreateAdminSubscriptionPlanPayload) =>
+    adminUsersApi.post<AdminSubscriptionPlan>(
+      "/api/admin/subscription-plans",
+      payload,
+    ),
+  getDoctorPointValue: () =>
+    adminUsersApi.get<AdminDoctorPointValueResponse>(
+      "/api/admin/doctor-point-value",
+    ),
+  updateDoctorPointValue: (payload: UpdateAdminDoctorPointValuePayload) =>
+    adminUsersApi.patch<AdminDoctorPointValueResponse>(
+      "/api/admin/doctor-point-value",
+      payload,
+    ),
+  listSubscriptionPayments: () =>
+    adminUsersApi.get<AdminSubscriptionPaymentsResponse>(
+      "/api/admin/subscription-payments",
+    ),
   createDoctor: (payload: CreateDoctorPayload) =>
     adminApi.post<CreateDoctorResponse>("/admin/doctors", payload),
   listDoctors: (search?: string) =>

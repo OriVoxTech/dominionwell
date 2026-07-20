@@ -6,6 +6,8 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   DEFAULT_API_BASE_URL;
 
+export const dynamic = "force-dynamic";
+
 export async function PUT(request: Request) {
   const authorization = request.headers.get("authorization");
 
@@ -29,44 +31,10 @@ export async function PUT(request: Request) {
     body = await request.json();
   } catch {
     return Response.json(
-      { error: { message: "A valid availability request is required." } },
-      { status: 400 },
-    );
-  }
-
-  const payload = body as {
-    date?: unknown;
-    startTimes?: unknown;
-    slotDurationMinutes?: unknown;
-    timezoneOffsetMinutes?: unknown;
-  };
-  const date = typeof payload.date === "string" ? payload.date : "";
-  const startTimes = Array.isArray(payload.startTimes)
-    ? payload.startTimes.filter(
-        (time): time is string => typeof time === "string",
-      )
-    : [];
-  const slotDurationMinutes = payload.slotDurationMinutes;
-  const timezoneOffsetMinutes = payload.timezoneOffsetMinutes;
-  const hasOnlyValidStartTimes =
-    startTimes.length > 0 &&
-    startTimes.length ===
-      (Array.isArray(payload.startTimes) ? payload.startTimes.length : 0) &&
-    startTimes.every((time) => /^([01]\d|2[0-3]):[0-5]\d$/.test(time));
-
-  if (
-    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
-    !hasOnlyValidStartTimes ||
-    slotDurationMinutes !== 60 ||
-    typeof timezoneOffsetMinutes !== "number" ||
-    !Number.isFinite(timezoneOffsetMinutes)
-  ) {
-    return Response.json(
       {
         statusCode: 400,
         error: {
-          message:
-            "Provide a valid date, at least one start time in HH:mm format, a 60-minute duration, and a timezone offset.",
+          message: "Bank account details are required.",
           error: "Bad Request",
           statusCode: 400,
         },
@@ -77,20 +45,16 @@ export async function PUT(request: Request) {
 
   try {
     const upstreamResponse = await fetch(
-      `${API_BASE_URL}/doctors/me/availability/day`,
+      `${API_BASE_URL}/doctors/me/bank-account`,
       {
         method: "PUT",
         headers: {
           Accept: "*/*",
           Authorization: authorization,
           "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
         },
-        body: JSON.stringify({
-          date,
-          startTimes,
-          slotDurationMinutes,
-          timezoneOffsetMinutes,
-        }),
+        body: JSON.stringify(body),
         cache: "no-store",
       },
     );
@@ -109,7 +73,7 @@ export async function PUT(request: Request) {
       {
         statusCode: 502,
         error: {
-          message: "Doctor availability could not be saved. Please try again.",
+          message: "Bank account update could not be reached. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },

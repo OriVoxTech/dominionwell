@@ -6,6 +6,12 @@ import PatientAvatar from "@/components/patient-avatar";
 import PatientMobileNav from "@/components/patient-mobile-nav";
 import PatientLogoutButton from "@/components/patient-logout-button";
 import PatientProfileSummary from "@/components/patient-profile-summary";
+import {
+  getApiErrorMessage,
+  patientApiService,
+  type PatientNotification,
+  type PatientNotificationsResponse,
+} from "@/lib/api";
 import { usePatientProfile } from "@/lib/use-patient-profile";
 
 type NotificationItem = {
@@ -18,95 +24,158 @@ type NotificationItem = {
   unread: boolean;
 };
 
-const STORAGE_KEY = "dwPatientNotifications";
+function getNotificationList(
+  response: PatientNotificationsResponse | PatientNotification[],
+) {
+  return Array.isArray(response) ? response : (response.data ?? []);
+}
 
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "n-1",
-    title: "Appointment Reminder",
-    description: "Your consultation with Dr. Richardson is tomorrow at 09:30 AM.",
-    time: "10 minutes ago",
-    typeClass: "bg-[#16b46f]/15 text-[#16b46f]",
-    tag: "Reminder",
-    unread: true,
-  },
-  {
-    id: "n-2",
-    title: "Prescription Updated",
-    description: "Dr. Emily Stone updated your dermatology prescription.",
-    time: "2 hours ago",
-    typeClass: "bg-[#0aa4b4]/15 text-[#0aa4b4]",
-    tag: "Medical",
-    unread: true,
-  },
-  {
-    id: "n-3",
-    title: "Subscription Notice",
-    description: "You have 48 consultations left in your current billing cycle.",
-    time: "Yesterday",
-    typeClass: "bg-[#64748b]/15 text-[#64748b]",
-    tag: "Billing",
-    unread: false,
-  },
-  {
-    id: "n-4",
-    title: "Message from Support",
-    description: "Your recent support request has been resolved.",
-    time: "2 days ago",
-    typeClass: "bg-[#64748b]/15 text-[#64748b]",
-    tag: "Support",
-    unread: false,
-  },
-];
+function getStringValue(
+  notification: PatientNotification,
+  keys: Array<keyof PatientNotification>,
+) {
+  for (const key of keys) {
+    const value = notification[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function getNotificationUnreadState(notification: PatientNotification) {
+  if (typeof notification.isRead === "boolean") return !notification.isRead;
+  if (typeof notification.read === "boolean") return !notification.read;
+  if (typeof notification.unread === "boolean") return notification.unread;
+  return !notification.readAt;
+}
+
+function formatNotificationTime(value?: string) {
+  if (!value) return "Just now";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "Just now";
+
+  return date.toLocaleString();
+}
+
+function formatNotificationTag(value: string) {
+  if (!value) return "Notification";
+
+  return value
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getTypeClass(tag: string) {
+  const normalized = tag.toLowerCase();
+
+  if (normalized.includes("appointment") || normalized.includes("reminder")) {
+    return "bg-[#16b46f]/15 text-[#16b46f]";
+  }
+
+  if (normalized.includes("subscription") || normalized.includes("payment")) {
+    return "bg-[#0aa4b4]/15 text-[#0aa4b4]";
+  }
+
+  return "bg-[#64748b]/15 text-[#64748b]";
+}
+
+function mapNotification(notification: PatientNotification): NotificationItem {
+  const tag = formatNotificationTag(
+    getStringValue(notification, ["type", "category"]),
+  );
+
+  return {
+    id: notification.id,
+    title:
+      getStringValue(notification, ["title", "subject"]) || "Notification",
+    description:
+      getStringValue(notification, ["message", "body", "content"]) ||
+      "You have a new update from DominionWell+.",
+    time: formatNotificationTime(notification.createdAt ?? notification.updatedAt),
+    typeClass: getTypeClass(tag),
+    tag,
+    unread: getNotificationUnreadState(notification),
+  };
+}
 
 export default function PatientNotificationsPage() {
   const profile = usePatientProfile();
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
-    if (typeof window === "undefined") {
-      return INITIAL_NOTIFICATIONS;
-    }
-
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-
-    if (!stored) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_NOTIFICATIONS));
-      return INITIAL_NOTIFICATIONS;
-    }
-
-    try {
-      const parsed = JSON.parse(stored) as NotificationItem[];
-      return Array.isArray(parsed) ? parsed : INITIAL_NOTIFICATIONS;
-    } catch {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_NOTIFICATIONS));
-      return INITIAL_NOTIFICATIONS;
-    }
-  });
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
-    window.dispatchEvent(new Event("dw-notifications-updated"));
-  }, [notifications]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [isMarkingAll, setIsMarkingAll] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const unreadCount = useMemo(
     () => notifications.filter((item) => item.unread).length,
     [notifications]
   );
 
-  const markAllAsRead = () => {
-    setNotifications((current) => current.map((item) => ({ ...item, unread: false })));
+  const loadNotifications = async () => {
+    try {
+      setIsLoading(true);
+      const response = await patientApiService.listNotifications();
+      setNotifications(getNotificationList(response.data).map(mapNotification));
+      setNotice("");
+    } catch (error) {
+      setNotice(getApiErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const toggleReadState = (id: string) => {
-    setNotifications((current) =>
-      current.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              unread: !item.unread,
-            }
-          : item
-      )
-    );
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadNotifications();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new Event("dw-notifications-updated"));
+  }, [unreadCount]);
+
+  const markAllAsRead = async () => {
+    setIsMarkingAll(true);
+    setNotice("");
+
+    try {
+      await patientApiService.markAllNotificationsAsRead();
+      setNotifications((current) =>
+        current.map((item) => ({ ...item, unread: false })),
+      );
+    } catch (error) {
+      setNotice(getApiErrorMessage(error));
+    } finally {
+      setIsMarkingAll(false);
+    }
+  };
+
+  const markAsRead = async (id: string) => {
+    setActionId(id);
+    setNotice("");
+
+    try {
+      await patientApiService.markNotificationAsRead(id);
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, unread: false } : item,
+        ),
+      );
+    } catch (error) {
+      setNotice(getApiErrorMessage(error));
+    } finally {
+      setActionId(null);
+    }
   };
 
   return (
@@ -192,16 +261,35 @@ export default function PatientNotificationsPage() {
               <button
                 type="button"
                 onClick={markAllAsRead}
-                className="rounded-lg border border-[#c6c6cf] px-2.5 py-1 text-[11px] font-semibold text-[#001b5e] hover:bg-[#f8fafc]"
+                disabled={isMarkingAll || unreadCount === 0}
+                className="rounded-lg border border-[#c6c6cf] px-2.5 py-1 text-[11px] font-semibold text-[#001b5e] hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Mark all read
+                {isMarkingAll ? "Marking..." : "Mark all read"}
               </button>
             </div>
           </div>
         </section>
 
+        {notice ? (
+          <p role="alert" className="mb-4 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c]">
+            {notice}
+          </p>
+        ) : null}
+
         <section className="space-y-3">
-          {notifications.map((item) => (
+          {isLoading ? (
+            <p className="rounded-2xl border border-[#c6c6cf] bg-white p-5 text-sm text-[#64748b] shadow-sm">
+              Loading notifications...
+            </p>
+          ) : null}
+
+          {!isLoading && notifications.length === 0 ? (
+            <p className="rounded-2xl border border-[#c6c6cf] bg-white p-5 text-sm text-[#64748b] shadow-sm">
+              No notifications yet.
+            </p>
+          ) : null}
+
+          {!isLoading ? notifications.map((item) => (
             <article key={item.id} className="rounded-2xl border border-[#c6c6cf] bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
@@ -217,15 +305,16 @@ export default function PatientNotificationsPage() {
                   <span className="text-[11px] text-[#64748b] sm:text-xs">{item.time}</span>
                   <button
                     type="button"
-                    onClick={() => toggleReadState(item.id)}
-                    className="rounded-lg border border-[#c6c6cf] px-2.5 py-1 text-[11px] font-semibold text-[#001b5e] hover:bg-[#f8fafc]"
+                    onClick={() => markAsRead(item.id)}
+                    disabled={!item.unread || actionId === item.id}
+                    className="rounded-lg border border-[#c6c6cf] px-2.5 py-1 text-[11px] font-semibold text-[#001b5e] hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {item.unread ? "Mark read" : "Mark unread"}
+                    {actionId === item.id ? "Marking..." : item.unread ? "Mark read" : "Read"}
                   </button>
                 </div>
               </div>
             </article>
-          ))}
+          )) : null}
         </section>
       </main>
     </div>

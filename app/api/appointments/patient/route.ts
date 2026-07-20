@@ -1,5 +1,5 @@
 const DEFAULT_API_BASE_URL =
-  "https://cf7f-105-127-10-124.ngrok-free.app/api";
+  "https://4794-102-88-55-59.ngrok-free.app/api";
 
 const API_BASE_URL =
   process.env.API_BASE_URL ??
@@ -27,6 +27,8 @@ export async function GET(request: Request) {
 
   const requestUrl = new URL(request.url);
   const upstreamUrl = new URL(`${API_BASE_URL}/appointments/patient`);
+  const status = requestUrl.searchParams.get("status");
+  if (status) upstreamUrl.searchParams.set("status", status);
   upstreamUrl.searchParams.set("page", requestUrl.searchParams.get("page") ?? "1");
   upstreamUrl.searchParams.set("limit", requestUrl.searchParams.get("limit") ?? "20");
 
