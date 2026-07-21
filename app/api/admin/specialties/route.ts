@@ -41,18 +41,15 @@ export async function GET(request: Request) {
   }
 
   try {
-    const upstreamResponse = await fetch(
-      `${API_BASE_URL}/admin/subscription-plans`,
-      {
-        method: "GET",
-        headers: {
-          Accept: "*/*",
-          Authorization: authorization,
-          "ngrok-skip-browser-warning": "true",
-        },
-        cache: "no-store",
+    const upstreamResponse = await fetch(`${API_BASE_URL}/admin/specialties`, {
+      method: "GET",
+      headers: {
+        Accept: "*/*",
+        Authorization: authorization,
+        "ngrok-skip-browser-warning": "true",
       },
-    );
+      cache: "no-store",
+    });
     const responseBody = await upstreamResponse.text();
 
     return proxyResponse(upstreamResponse, responseBody);
@@ -62,7 +59,7 @@ export async function GET(request: Request) {
         statusCode: 502,
         error: {
           message:
-            "Subscription plan service could not be reached. Please try again.",
+            "Medical specialties service could not be reached. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },
@@ -88,7 +85,7 @@ export async function POST(request: Request) {
       {
         statusCode: 400,
         error: {
-          message: "Subscription plan details are required.",
+          message: "Medical specialty details are required.",
           error: "Bad Request",
           statusCode: 400,
         },
@@ -98,20 +95,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const upstreamResponse = await fetch(
-      `${API_BASE_URL}/admin/subscription-plans`,
-      {
-        method: "POST",
-        headers: {
-          Accept: "*/*",
-          Authorization: authorization,
-          "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
-        },
-        body: JSON.stringify(body),
-        cache: "no-store",
+    const upstreamResponse = await fetch(`${API_BASE_URL}/admin/specialties`, {
+      method: "POST",
+      headers: {
+        Accept: "*/*",
+        Authorization: authorization,
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
       },
-    );
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
     const responseBody = await upstreamResponse.text();
 
     return proxyResponse(upstreamResponse, responseBody);
@@ -121,7 +115,7 @@ export async function POST(request: Request) {
         statusCode: 502,
         error: {
           message:
-            "Subscription plan service could not be reached. Please try again.",
+            "Medical specialties service could not be reached. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },

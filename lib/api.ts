@@ -17,7 +17,7 @@ import {
 } from "@/lib/admin-session";
 
 const DEFAULT_API_BASE_URL =
-  "https://4794-102-88-55-59.ngrok-free.app/api";
+  "https://8ce1-105-127-11-129.ngrok-free.app/api";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
 export const api = axios.create({
@@ -831,6 +831,20 @@ export interface CreateAdminSubscriptionPlanPayload {
   description: string;
 }
 
+export interface CreateAdminSpecialtyPayload {
+  name: string;
+  description: string;
+}
+
+export interface AdminSpecialty {
+  id: string;
+  name: string;
+  description: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AdminSubscriptionPlan extends Record<string, unknown> {
   id: string;
   name: string;
@@ -839,6 +853,9 @@ export interface AdminSubscriptionPlan extends Record<string, unknown> {
   priceCents?: number;
   consultationsPerMonth?: number;
   consultationCredits?: number;
+  consultationMinutes?: number;
+  durationDays?: number;
+  currency?: string;
   description?: string;
   isActive?: boolean;
   active?: boolean;
@@ -888,6 +905,135 @@ export interface AdminSubscriptionPayment extends Record<string, unknown> {
 export interface AdminSubscriptionPaymentsResponse {
   data: AdminSubscriptionPayment[];
   meta?: PaginationMeta;
+}
+
+export type AdminWithdrawalStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "APPROVED"
+  | "REJECTED";
+
+export interface AdminWithdrawal extends Record<string, unknown> {
+  id: string;
+  doctorId?: string;
+  amount?: number;
+  amountCents?: number;
+  status?: AdminWithdrawalStatus | string;
+  requestedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  doctor?: {
+    id?: string;
+    user?: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      username?: string | null;
+    } | null;
+  } | null;
+  bankAccount?: {
+    bankName?: string;
+    accountName?: string;
+    accountNumber?: string;
+  } | null;
+}
+
+export interface AdminWithdrawalsQuery {
+  status?: AdminWithdrawalStatus;
+  page?: number;
+  limit?: number;
+}
+
+export interface AdminWithdrawalsResponse {
+  data: AdminWithdrawal[];
+  meta: PaginationMeta;
+}
+
+export interface AdminReportsQuery {
+  doctorId?: string;
+  appointmentId?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface AdminConsultationReport extends Record<string, unknown> {
+  id: string;
+  doctorId?: string;
+  appointmentId?: string;
+  title?: string;
+  summary?: string;
+  content?: string;
+  notes?: string;
+  diagnosis?: string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  doctor?: {
+    id?: string;
+    user?: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      username?: string | null;
+    } | null;
+  } | null;
+  appointment?: {
+    id?: string;
+    status?: string;
+    scheduledAt?: string;
+    startsAt?: string;
+    patient?: {
+      user?: {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+      } | null;
+    } | null;
+  } | null;
+}
+
+export interface AdminReportsResponse {
+  data: AdminConsultationReport[];
+  meta: PaginationMeta;
+}
+
+export type AdminDoctorApplicationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface AdminDoctorApplication extends Record<string, unknown> {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  username: string;
+  specialtyId: string;
+  documentFileIds: string[];
+  status: AdminDoctorApplicationStatus | string;
+  rejectionReason: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  specialty?: AdminSpecialty | null;
+}
+
+export interface AdminDoctorApplicationsQuery {
+  status?: AdminDoctorApplicationStatus;
+  page?: number;
+  limit?: number;
+}
+
+export interface AdminDoctorApplicationsResponse {
+  data: AdminDoctorApplication[];
+  meta: PaginationMeta;
+}
+
+export interface SubmitDoctorApplicationPayload {
+  fullName: string;
+  email: string;
+  phone: string;
+  username: string;
+  specialtyId: string;
+  documents: File[];
 }
 
 export interface ApiResponse<T = unknown> {
@@ -1157,11 +1303,39 @@ export const patientDoctorsApiService = {
     ),
 };
 
+export const doctorApplicationsApiService = {
+  listSpecialties: () =>
+    publicGatewayApi.get<AdminSpecialty[]>(
+      "/api/doctor-applications/specialties",
+    ),
+  submit: (payload: SubmitDoctorApplicationPayload) => {
+    const formData = new FormData();
+    formData.append("fullName", payload.fullName);
+    formData.append("email", payload.email);
+    formData.append("phone", payload.phone);
+    formData.append("username", payload.username);
+    formData.append("specialtyId", payload.specialtyId);
+    payload.documents.forEach((document) => {
+      formData.append("documents", document);
+    });
+
+    return publicGatewayApi.post<AdminDoctorApplication>(
+      "/api/doctor-applications",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
+  },
+};
+
 export const adminApiService = {
   login: (payload: AdminLoginPayload) =>
     adminApi.post<AdminSession>("/admin/login", payload),
   getOverview: () =>
     adminUsersApi.get<AdminOverview>("/api/admin/overview"),
+  listSubscriptionPlans: () =>
+    adminUsersApi.get<AdminSubscriptionPlan[]>("/api/admin/subscription-plans"),
   createSubscriptionPlan: (payload: CreateAdminSubscriptionPlanPayload) =>
     adminUsersApi.post<AdminSubscriptionPlan>(
       "/api/admin/subscription-plans",
@@ -1180,6 +1354,46 @@ export const adminApiService = {
     adminUsersApi.get<AdminSubscriptionPaymentsResponse>(
       "/api/admin/subscription-payments",
     ),
+  listWithdrawals: (params: AdminWithdrawalsQuery = {}) =>
+    adminUsersApi.get<AdminWithdrawalsResponse>("/api/admin/withdrawals", {
+      params: { page: 1, limit: 20, ...params },
+    }),
+  markWithdrawalProcessing: (id: string) =>
+    adminUsersApi.patch<AdminWithdrawal>(
+      `/api/admin/withdrawals/${encodeURIComponent(id)}/processing`,
+    ),
+  markWithdrawalCompleted: (id: string) =>
+    adminUsersApi.patch<AdminWithdrawal>(
+      `/api/admin/withdrawals/${encodeURIComponent(id)}/completed`,
+    ),
+  listReports: (params: AdminReportsQuery = {}) =>
+    adminUsersApi.get<AdminReportsResponse>("/api/admin/reports", {
+      params: { page: 1, limit: 20, ...params },
+    }),
+  listDoctorApplications: (params: AdminDoctorApplicationsQuery = {}) =>
+    adminUsersApi.get<AdminDoctorApplicationsResponse>(
+      "/api/admin/doctor-applications",
+      { params: { page: 1, limit: 20, ...params } },
+    ),
+  approveDoctorApplication: (id: string) =>
+    adminUsersApi.patch<AdminDoctorApplication>(
+      `/api/admin/doctor-applications/${encodeURIComponent(id)}/approve`,
+    ),
+  rejectDoctorApplication: (id: string) =>
+    adminUsersApi.patch<AdminDoctorApplication>(
+      `/api/admin/doctor-applications/${encodeURIComponent(id)}/reject`,
+    ),
+  getDoctorApplicationDocument: (documentId: string) =>
+    adminUsersApi.get<Blob>(
+      `/api/admin/doctor-applications/documents/${documentId}`,
+      {
+        responseType: "blob",
+      },
+    ),
+  listSpecialties: () =>
+    adminUsersApi.get<AdminSpecialty[]>("/api/admin/specialties"),
+  createSpecialty: (payload: CreateAdminSpecialtyPayload) =>
+    adminUsersApi.post<AdminSpecialty>("/api/admin/specialties", payload),
   createDoctor: (payload: CreateDoctorPayload) =>
     adminApi.post<CreateDoctorResponse>("/admin/doctors", payload),
   listDoctors: (search?: string) =>

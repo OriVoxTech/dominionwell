@@ -1,5 +1,5 @@
 const DEFAULT_API_BASE_URL =
-  "https://4794-102-88-55-59.ngrok-free.app/api";
+  "https://8ce1-105-127-11-129.ngrok-free.app/api";
 
 const API_BASE_URL =
   process.env.API_BASE_URL ??

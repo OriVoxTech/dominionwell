@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
   ADMIN_UPDATED_EVENT,
   addSubscriptionPlan,
@@ -9,13 +9,34 @@ import {
   updateAdminSettings,
   type SubscriptionPlan,
 } from "@/lib/admin-portal";
-import { adminApiService, getApiErrorMessage } from "@/lib/api";
+import {
+  adminApiService,
+  getApiErrorMessage,
+  type AdminSubscriptionPlan,
+} from "@/lib/api";
+
+function mapApiPlanToSubscriptionPlan(plan: AdminSubscriptionPlan): SubscriptionPlan {
+  return {
+    id: plan.id,
+    name: plan.name,
+    monthlyPrice:
+      plan.monthlyPrice ??
+      plan.priceNaira ??
+      Math.floor((plan.priceCents ?? 0) / 100),
+    consultationsPerMonth:
+      plan.consultationsPerMonth ?? plan.consultationCredits ?? 0,
+    description: plan.description ?? "No description provided.",
+    active: plan.active ?? plan.isActive ?? true,
+  };
+}
 
 export default function AdminSubscriptionsPage() {
   const [plans, setPlans] = useState<SubscriptionPlan[]>(readSubscriptionPlans());
   const [pointValue, setPointValue] = useState(readAdminSettings().pointValue);
   const [isSavingPointValue, setIsSavingPointValue] = useState(false);
   const [isAddingPlan, setIsAddingPlan] = useState(false);
+  const [isLoadingPlans, setIsLoadingPlans] = useState(true);
+  const [plansError, setPlansError] = useState("");
   const [notice, setNotice] = useState("");
   const [form, setForm] = useState({
     name: "",
@@ -24,9 +45,22 @@ export default function AdminSubscriptionsPage() {
     description: "",
   });
 
+  const loadPlans = useCallback(async () => {
+    setPlansError("");
+    setIsLoadingPlans(true);
+
+    try {
+      const response = await adminApiService.listSubscriptionPlans();
+      setPlans(response.data.map(mapApiPlanToSubscriptionPlan));
+    } catch (error) {
+      setPlansError(getApiErrorMessage(error));
+    } finally {
+      setIsLoadingPlans(false);
+    }
+  }, []);
+
   useEffect(() => {
     const sync = () => {
-      setPlans(readSubscriptionPlans());
       setPointValue(readAdminSettings().pointValue);
     };
 
@@ -39,6 +73,16 @@ export default function AdminSubscriptionsPage() {
       window.removeEventListener(ADMIN_UPDATED_EVENT, sync);
     };
   }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadPlans();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [loadPlans]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -114,6 +158,12 @@ export default function AdminSubscriptionsPage() {
         description: response.data.description ?? payload.description,
         active: response.data.active ?? response.data.isActive ?? true,
       });
+      setPlans((current) => {
+        const createdPlan = mapApiPlanToSubscriptionPlan(response.data);
+        const existingPlans = current.filter((plan) => plan.id !== createdPlan.id);
+
+        return [createdPlan, ...existingPlans];
+      });
 
       setNotice("Subscription plan created successfully.");
     } catch (error) {
@@ -142,6 +192,19 @@ export default function AdminSubscriptionsPage() {
         <p className="rounded-xl border border-[#dbe4f0] bg-white px-4 py-3 text-sm text-[#334155]">
           {notice}
         </p>
+      ) : null}
+
+      {plansError ? (
+        <div role="alert" className="flex flex-col gap-3 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c] sm:flex-row sm:items-center sm:justify-between">
+          <span>{plansError}</span>
+          <button
+            type="button"
+            onClick={() => void loadPlans()}
+            className="rounded-lg border border-[#fca5a5] px-3 py-1.5 text-xs font-semibold hover:bg-white"
+          >
+            Try Again
+          </button>
+        </div>
       ) : null}
 
       <section className="rounded-xl border border-[#e2e8f0] p-4">
@@ -184,7 +247,23 @@ export default function AdminSubscriptionsPage() {
       </section>
 
       <section className="rounded-xl border border-[#e2e8f0] p-4">
-        <h3 className="mb-3 text-base font-semibold text-[#001b5e]">Existing Plans</h3>
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-base font-semibold text-[#001b5e]">Existing Plans</h3>
+          <button
+            type="button"
+            onClick={() => void loadPlans()}
+            disabled={isLoadingPlans}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] px-3 text-xs font-semibold text-[#001b5e] hover:bg-[#f8fafc] disabled:cursor-wait disabled:opacity-60"
+          >
+            <span className="material-symbols-outlined text-[17px]">refresh</span>
+            Refresh
+          </button>
+        </div>
+        {!isLoadingPlans && !plansError && plans.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-[#cbd5e1] p-4 text-center text-sm text-[#64748b]">
+            No active subscription plans found.
+          </p>
+        ) : null}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -196,6 +275,13 @@ export default function AdminSubscriptionsPage() {
               </tr>
             </thead>
             <tbody>
+              {isLoadingPlans ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-6 text-center text-sm text-[#64748b]">
+                    Loading subscription plans...
+                  </td>
+                </tr>
+              ) : null}
               {plans.map((plan) => (
                 <tr key={plan.id} className="border-b border-[#e2e8f0] last:border-b-0">
                   <td className="px-3 py-3">

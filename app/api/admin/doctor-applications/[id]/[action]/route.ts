@@ -6,7 +6,9 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   DEFAULT_API_BASE_URL;
 
-const ALLOWED_ACTIONS = new Set(["deactivate", "restore"]);
+const ALLOWED_ACTIONS = new Set(["approve", "reject"]);
+
+export const dynamic = "force-dynamic";
 
 export async function PATCH(
   request: Request,
@@ -29,12 +31,13 @@ export async function PATCH(
   }
 
   const { id, action } = await params;
+
   if (!ALLOWED_ACTIONS.has(action)) {
     return Response.json(
       {
         statusCode: 400,
         error: {
-          message: "Invalid user status action.",
+          message: "Unsupported doctor application action.",
           error: "Bad Request",
           statusCode: 400,
         },
@@ -43,17 +46,19 @@ export async function PATCH(
     );
   }
 
-  const upstreamUrl = `${API_BASE_URL}/admin/users/${encodeURIComponent(id)}/${action}`;
-
   try {
-    const upstreamResponse = await fetch(upstreamUrl, {
-      method: "PATCH",
-      headers: {
-        Accept: "*/*",
-        Authorization: authorization,
+    const upstreamResponse = await fetch(
+      `${API_BASE_URL}/admin/doctor-applications/${encodeURIComponent(id)}/${action}`,
+      {
+        method: "PATCH",
+        headers: {
+          Accept: "*/*",
+          Authorization: authorization,
+          "ngrok-skip-browser-warning": "true",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+    );
     const responseBody = await upstreamResponse.text();
 
     return new Response(responseBody || null, {
@@ -69,7 +74,8 @@ export async function PATCH(
       {
         statusCode: 502,
         error: {
-          message: "The user status could not be updated. Please try again.",
+          message:
+            "Doctor application status could not be updated. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },

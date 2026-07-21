@@ -9,20 +9,28 @@ const API_BASE_URL =
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const requestUrl = new URL(request.url);
-  const page = requestUrl.searchParams.get("page") ?? "1";
-  const limit = requestUrl.searchParams.get("limit") ?? "20";
-  const search = requestUrl.searchParams.get("search")?.trim();
-  const specialization = requestUrl.searchParams
-    .get("specialization")
-    ?.trim();
-  const upstreamUrl = new URL(`${API_BASE_URL}/doctors`);
+  const authorization = request.headers.get("authorization");
 
-  upstreamUrl.searchParams.set("page", page);
-  upstreamUrl.searchParams.set("limit", limit);
-  if (search) upstreamUrl.searchParams.set("search", search);
-  if (specialization) {
-    upstreamUrl.searchParams.set("specialization", specialization);
+  if (!authorization?.startsWith("Bearer ")) {
+    return Response.json(
+      {
+        statusCode: 401,
+        error: {
+          message: "Admin authentication is required. Please log in again.",
+          error: "Unauthorized",
+          statusCode: 401,
+        },
+      },
+      { status: 401 },
+    );
+  }
+
+  const incomingUrl = new URL(request.url);
+  const upstreamUrl = new URL(`${API_BASE_URL}/admin/reports`);
+
+  for (const key of ["doctorId", "appointmentId", "page", "limit"]) {
+    const value = incomingUrl.searchParams.get(key)?.trim();
+    if (value) upstreamUrl.searchParams.set(key, value);
   }
 
   try {
@@ -30,6 +38,7 @@ export async function GET(request: Request) {
       method: "GET",
       headers: {
         Accept: "*/*",
+        Authorization: authorization,
         "ngrok-skip-browser-warning": "true",
       },
       cache: "no-store",
@@ -49,7 +58,7 @@ export async function GET(request: Request) {
       {
         statusCode: 502,
         error: {
-          message: "The doctor directory could not be reached. Please try again.",
+          message: "Reports could not be reached. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },

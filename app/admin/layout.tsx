@@ -10,6 +10,7 @@ const links = [
   { href: "/admin/doctors", label: "Doctors Management" },
   { href: "/admin/patients", label: "Patients Management" },
   { href: "/admin/consultations", label: "Consultation Management" },
+  { href: "/admin/specialties", label: "Medical Specialties" },
   { href: "/admin/subscriptions", label: "Subscription Plans" },
   { href: "/admin/payments", label: "Payments" },
   { href: "/admin/reports", label: "Reports" },

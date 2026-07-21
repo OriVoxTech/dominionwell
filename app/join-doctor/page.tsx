@@ -1,38 +1,212 @@
 "use client";
 
 import Link from "next/link";
-import { type ChangeEvent, FormEvent, useRef, useState } from "react";
-import { addDoctorJoinRequest } from "@/lib/admin-portal";
+import {
+  type ChangeEvent,
+  FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  doctorApplicationsApiService,
+  getApiErrorMessage,
+  patientDoctorsApiService,
+  type AdminSpecialty,
+  type PublicDoctorsResponse,
+} from "@/lib/api";
 
 const MAX_DOCUMENT_FILES = 5;
 
-const specializationOptions = [
-  "GENERAL_PRACTICE",
-  "CARDIOLOGY",
-  "DERMATOLOGY",
-  "ENDOCRINOLOGY",
-  "GASTROENTEROLOGY",
-  "GYNECOLOGY",
-  "NEUROLOGY",
-  "ONCOLOGY",
-  "OPHTHALMOLOGY",
-  "ORTHOPEDICS",
-  "PEDIATRICS",
-  "PSYCHIATRY",
-  "UROLOGY",
-] as const;
-
-function formatSpecialization(value: string) {
-  return value
+function getDoctorUsernameBase(fullName: string) {
+  const nameParts = fullName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    .split(/[^a-z0-9]+/)
+    .filter((part) => part && part !== "dr" && part !== "doctor");
+  const baseName = nameParts.join("");
+
+  if (!baseName) return "";
+
+  return `dr${baseName}`;
+}
+
+function selectAvailableDoctorUsername(
+  fullName: string,
+  existingUsernames: Set<string>,
+) {
+  const usernameBase = getDoctorUsernameBase(fullName);
+
+  if (!usernameBase) return "";
+
+  if (!existingUsernames.has(usernameBase)) {
+    return usernameBase;
+  }
+
+  const hash = Array.from(usernameBase).reduce(
+    (total, character) => total + character.charCodeAt(0),
+    0,
+  );
+
+  for (let offset = 0; offset < 100; offset += 1) {
+    const suffix = String((hash + offset) % 100).padStart(2, "0");
+    const candidate = `${usernameBase}${suffix}`;
+
+    if (!existingUsernames.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  return "";
+}
+
+function normalizeNigerianPhoneInput(value: string) {
+  let digits = value.replace(/\D/g, "");
+
+  if (digits.startsWith("234")) {
+    digits = digits.slice(3);
+  }
+
+  digits = digits.replace(/^0+/, "");
+
+  return digits.slice(0, 10);
+}
+
+function extractSpecialties(responseData: unknown) {
+  if (Array.isArray(responseData)) {
+    return responseData as AdminSpecialty[];
+  }
+
+  if (
+    responseData &&
+    typeof responseData === "object" &&
+    "data" in responseData &&
+    Array.isArray(responseData.data)
+  ) {
+    return responseData.data as AdminSpecialty[];
+  }
+
+  return [];
+}
+
+function extractDoctorsResponse(responseData: unknown): PublicDoctorsResponse {
+  if (
+    responseData &&
+    typeof responseData === "object" &&
+    "data" in responseData &&
+    Array.isArray(responseData.data)
+  ) {
+    return responseData as PublicDoctorsResponse;
+  }
+
+  return {
+    data: [],
+    meta: {
+      total: 0,
+      page: 1,
+      limit: 100,
+      totalPages: 1,
+    },
+  };
 }
 
 export default function JoinDoctorPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [fullName, setFullName] = useState("");
+  const [phoneLocalNumber, setPhoneLocalNumber] = useState("");
+  const [specialties, setSpecialties] = useState<AdminSpecialty[]>([]);
+  const [existingDoctorUsernames, setExistingDoctorUsernames] = useState<
+    Set<string>
+  >(new Set());
+  const [doctorUsernamesError, setDoctorUsernamesError] = useState("");
+  const [isLoadingSpecialties, setIsLoadingSpecialties] = useState(true);
+  const [isLoadingDoctorUsernames, setIsLoadingDoctorUsernames] =
+    useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"info" | "success" | "error">(
+    "info",
+  );
+  const generatedUsername = selectAvailableDoctorUsername(
+    fullName,
+    existingDoctorUsernames,
+  );
+
+  const loadSpecialties = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setIsLoadingSpecialties(true);
+      setMessage("");
+    }
+
+    try {
+      const response = await doctorApplicationsApiService.listSpecialties();
+      const activeSpecialties = extractSpecialties(response.data).filter(
+        (specialty) => specialty.isActive !== false,
+      );
+      setSpecialties(activeSpecialties);
+    } catch (error) {
+      setSpecialties([]);
+      setMessageTone("error");
+      setMessage(getApiErrorMessage(error));
+    } finally {
+      setIsLoadingSpecialties(false);
+    }
+  }, []);
+
+  const loadExistingDoctorUsernames = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setIsLoadingDoctorUsernames(true);
+      setMessage("");
+    }
+    setDoctorUsernamesError("");
+
+    try {
+      const firstPage = await patientDoctorsApiService.list({
+        page: 1,
+        limit: 100,
+      });
+      const firstPageData = extractDoctorsResponse(firstPage.data);
+      const usernames = new Set(
+        firstPageData.data
+          .map((doctor) => doctor.user.username?.toLowerCase())
+          .filter((username): username is string => Boolean(username)),
+      );
+      const totalPages = firstPageData.meta.totalPages;
+
+      for (let page = 2; page <= totalPages; page += 1) {
+        const response = await patientDoctorsApiService.list({
+          page,
+          limit: 100,
+        });
+        extractDoctorsResponse(response.data).data.forEach((doctor) => {
+          if (doctor.user.username) {
+            usernames.add(doctor.user.username.toLowerCase());
+          }
+        });
+      }
+
+      setExistingDoctorUsernames(usernames);
+    } catch (error) {
+      setExistingDoctorUsernames(new Set());
+      setDoctorUsernamesError(getApiErrorMessage(error));
+      setMessageTone("error");
+      setMessage(getApiErrorMessage(error));
+    } finally {
+      setIsLoadingDoctorUsernames(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadSpecialties(false);
+      void loadExistingDoctorUsernames(false);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadExistingDoctorUsernames, loadSpecialties]);
 
   const handleFilesSelected = (event: ChangeEvent<HTMLInputElement>) => {
     const incomingFiles = Array.from(event.target.files ?? []);
@@ -70,43 +244,77 @@ export default function JoinDoctorPage() {
     );
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const name = String(formData.get("name") ?? "").trim();
+    const formElement = event.currentTarget;
+    const formData = new FormData(formElement);
+    const trimmedFullName = fullName.trim();
     const email = String(formData.get("email") ?? "").trim();
-    const phone = String(formData.get("phone") ?? "").trim();
-    const username = String(formData.get("username") ?? "").trim();
-    const specialty = String(formData.get("specialty") ?? "").trim();
+    const phone = phoneLocalNumber ? `+234${phoneLocalNumber}` : "";
+    const username = generatedUsername;
+    const specialtyId = String(formData.get("specialtyId") ?? "").trim();
 
-    if (!name || !email || !phone || !username || !specialty) {
+    if (!trimmedFullName || !email || !phone || !username || !specialtyId) {
+      setMessageTone("error");
       setMessage("Please complete all required fields before sending your request.");
       return;
     }
 
+    if (isLoadingDoctorUsernames || doctorUsernamesError) {
+      setMessageTone("error");
+      setMessage(
+        "Please wait while we confirm the generated username is available.",
+      );
+      return;
+    }
+
     if (selectedFiles.length === 0) {
+      setMessageTone("error");
       setMessage("Please attach at least one supporting document or license.");
       return;
     }
 
-    addDoctorJoinRequest({
-      name,
-      email,
-      phone,
-      username,
-      specialization: specialty,
-      documents: selectedFiles.map((file) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type || "Unknown",
-      })),
-    });
+    setIsSubmitting(true);
+    setMessage("");
 
-    event.currentTarget.reset();
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    setSelectedFiles([]);
-    setMessage("Your doctor application request has been sent. Our verification team will review it soon.");
+    try {
+      await doctorApplicationsApiService.submit({
+        fullName: trimmedFullName,
+        email,
+        phone,
+        username,
+        specialtyId,
+        documents: selectedFiles,
+      });
+
+      formElement.reset();
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setFullName("");
+      setPhoneLocalNumber("");
+      setSelectedFiles([]);
+      setMessageTone("success");
+      setMessage(
+        "Your doctor application request has been sent. Our verification team will review it soon.",
+      );
+    } catch (error) {
+      const errorMessage = getApiErrorMessage(error);
+      const hasPendingApplication = errorMessage
+        .toLowerCase()
+        .includes("pending application already exists");
+
+      setMessageTone(hasPendingApplication ? "info" : "error");
+      setMessage(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const messageStyles =
+    messageTone === "success"
+      ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]"
+      : messageTone === "error"
+        ? "border-[#fecaca] bg-[#fef2f2] text-[#b91c1c]"
+        : "border-[#dbe4f0] bg-[#f8fafc] text-[#334155]";
 
   return (
     <main className="min-h-screen bg-[#f7f9fc] text-[#191c1e]">
@@ -152,7 +360,14 @@ export default function JoinDoctorPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Full name *</span>
-              <input name="name" required className="mt-2 h-11 w-full rounded-xl border border-[#cbd5e1] px-3 text-sm outline-none focus:border-[#16b46f]" placeholder="Dr. Ada Lovelace" />
+              <input
+                name="fullName"
+                required
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                className="mt-2 h-11 w-full rounded-xl border border-[#cbd5e1] px-3 text-sm outline-none focus:border-[#16b46f]"
+                placeholder="Dr. Ada Lovelace"
+              />
             </label>
 
             <label className="block">
@@ -162,26 +377,93 @@ export default function JoinDoctorPage() {
 
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Phone *</span>
-              <input name="phone" required type="tel" className="mt-2 h-11 w-full rounded-xl border border-[#cbd5e1] px-3 text-sm outline-none focus:border-[#16b46f]" placeholder="+2348012345678" />
+              <div className="mt-2 flex h-11 w-full overflow-hidden rounded-xl border border-[#cbd5e1] focus-within:border-[#16b46f]">
+                <span className="flex items-center border-r border-[#cbd5e1] bg-[#f8fafc] px-3 text-sm font-semibold text-[#001b5e]">
+                  +234
+                </span>
+                <input
+                  name="phoneLocalNumber"
+                  required
+                  type="tel"
+                  inputMode="numeric"
+                  value={phoneLocalNumber}
+                  onChange={(event) =>
+                    setPhoneLocalNumber(
+                      normalizeNigerianPhoneInput(event.target.value),
+                    )
+                  }
+                  className="h-full min-w-0 flex-1 px-3 text-sm outline-none"
+                  placeholder="8012345678"
+                />
+              </div>
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Create username *</span>
-              <input name="username" required className="mt-2 h-11 w-full rounded-xl border border-[#cbd5e1] px-3 text-sm outline-none focus:border-[#16b46f]" placeholder="drada" />
+              <span className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Generated username *</span>
+              <input
+                name="username"
+                required
+                readOnly
+                value={generatedUsername}
+                className="mt-2 h-11 w-full rounded-xl border border-[#cbd5e1] bg-[#f8fafc] px-3 text-sm text-[#475569] outline-none"
+                placeholder={
+                  isLoadingDoctorUsernames
+                    ? "Checking existing usernames..."
+                    : "Generated from full name"
+                }
+              />
             </label>
 
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Specialty *</span>
-              <select name="specialty" required defaultValue="" className="mt-2 h-11 w-full rounded-xl border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#16b46f]">
-                <option value="" disabled>Select specialty</option>
-                {specializationOptions.map((specialty) => (
-                  <option key={specialty} value={specialty}>
-                    {formatSpecialization(specialty)}
+              <select
+                name="specialtyId"
+                required
+                defaultValue=""
+                disabled={isLoadingSpecialties || specialties.length === 0}
+                className="mt-2 h-11 w-full rounded-xl border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#16b46f] disabled:cursor-not-allowed disabled:bg-[#f1f5f9] disabled:text-[#94a3b8]"
+              >
+                <option value="" disabled>
+                  {isLoadingSpecialties
+                    ? "Loading specialties..."
+                    : specialties.length === 0
+                      ? "No specialties available"
+                      : "Select specialty"}
+                </option>
+                {specialties.map((specialty) => (
+                  <option key={specialty.id} value={specialty.id}>
+                    {specialty.name}
                   </option>
                 ))}
               </select>
             </label>
           </div>
+
+          {!isLoadingSpecialties && specialties.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c]">
+              <p>No active medical specialties are available right now.</p>
+              <button
+                type="button"
+                onClick={() => void loadSpecialties()}
+                className="mt-2 text-xs font-semibold underline"
+              >
+                Try again
+              </button>
+            </div>
+          ) : null}
+
+          {doctorUsernamesError ? (
+            <div className="mt-4 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c]">
+              <p>Unable to check existing doctor usernames.</p>
+              <button
+                type="button"
+                onClick={() => void loadExistingDoctorUsernames()}
+                className="mt-2 text-xs font-semibold underline"
+              >
+                Try again
+              </button>
+            </div>
+          ) : null}
 
           <div className="mt-5">
             <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
@@ -251,7 +533,7 @@ export default function JoinDoctorPage() {
           ) : null}
 
           {message ? (
-            <p className="mt-4 rounded-xl border border-[#dbe4f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#334155]">
+            <p className={`mt-4 rounded-xl border px-4 py-3 text-sm ${messageStyles}`}>
               {message}
             </p>
           ) : null}
@@ -260,8 +542,18 @@ export default function JoinDoctorPage() {
             <Link href="/" className="rounded-xl border border-[#c6c6cf] px-5 py-3 text-center text-sm font-semibold text-[#475569] hover:bg-[#f8fafc]">
               Back Home
             </Link>
-            <button type="submit" className="rounded-xl bg-[#16b46f] px-5 py-3 text-sm font-semibold text-white hover:bg-[#149660]">
-              Send Request
+            <button
+              type="submit"
+              disabled={
+                isSubmitting ||
+                isLoadingSpecialties ||
+                specialties.length === 0 ||
+                isLoadingDoctorUsernames ||
+                Boolean(doctorUsernamesError)
+              }
+              className="rounded-xl bg-[#16b46f] px-5 py-3 text-sm font-semibold text-white hover:bg-[#149660] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+            >
+              {isSubmitting ? "Sending..." : "Send Request"}
             </button>
           </div>
         </form>

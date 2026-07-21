@@ -4,19 +4,28 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ADMIN_UPDATED_EVENT,
   readAdminPatients,
-  readDoctorJoinRequests,
   readDoctorWithdrawalRequests,
-  updateDoctorJoinRequestStatus,
   updateDoctorWithdrawalRequestStatus,
   type AdminPatient,
   type AdminDoctor,
-  type DoctorJoinRequest,
   type DoctorWithdrawalRequest,
 } from "@/lib/admin-portal";
 import { APPOINTMENT_REQUESTS_UPDATED_EVENT, readAppointmentRequests } from "@/lib/appointments";
-import { adminApiService, getApiErrorMessage, type AdminDoctorUser } from "@/lib/api";
+import {
+  adminApiService,
+  getApiErrorMessage,
+  type AdminDoctorApplication,
+  type AdminDoctorApplicationStatus,
+  type AdminDoctorUser,
+} from "@/lib/api";
 
 type AddDoctorTab = "request" | "manual";
+
+type DocumentPreview = {
+  url: string;
+  name: string;
+  type: string;
+} | null;
 
 type NewDoctorForm = {
   firstName: string;
@@ -55,6 +64,13 @@ const SPECIALIZATION_OPTIONS = [
   "UROLOGY",
 ] as const;
 
+const APPLICATION_STATUS_OPTIONS: Array<AdminDoctorApplicationStatus | ""> = [
+  "",
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+];
+
 function mapApiUserToDoctor(user: AdminDoctorUser): AdminDoctor {
   const rawSpecialization = user.doctor?.specializations[0] ?? "GENERAL_PRACTICE";
   const firstName = user.firstName.trim();
@@ -84,10 +100,15 @@ function mapApiUserToDoctor(user: AdminDoctorUser): AdminDoctor {
   };
 }
 
+function getDocumentFileName(documentId: string) {
+  return documentId.split("/").at(-1) ?? documentId;
+}
+
 export default function AdminDoctorsPage() {
   const [doctors, setDoctors] = useState<AdminDoctor[]>([]);
   const [patients, setPatients] = useState<AdminPatient[]>(readAdminPatients());
-  const [doctorJoinRequests, setDoctorJoinRequests] = useState<DoctorJoinRequest[]>(readDoctorJoinRequests());
+  const [doctorApplications, setDoctorApplications] = useState<AdminDoctorApplication[]>([]);
+  const [applicationStatus, setApplicationStatus] = useState<AdminDoctorApplicationStatus | "">("");
   const [withdrawalRequests, setWithdrawalRequests] = useState<DoctorWithdrawalRequest[]>(readDoctorWithdrawalRequests());
   const [appointments, setAppointments] = useState(readAppointmentRequests());
   const [selectedDoctorId, setSelectedDoctorId] = useState("");
@@ -101,7 +122,13 @@ export default function AdminDoctorsPage() {
   const [doctorTotal, setDoctorTotal] = useState(0);
   const [statusUpdatingUserId, setStatusUpdatingUserId] = useState("");
   const [requestActionId, setRequestActionId] = useState("");
+  const [viewingDocumentId, setViewingDocumentId] = useState("");
+  const [documentPreview, setDocumentPreview] = useState<DocumentPreview>(null);
+  const [documentPreviewError, setDocumentPreviewError] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
+  const [isLoadingApplications, setIsLoadingApplications] = useState(true);
+  const [applicationsError, setApplicationsError] = useState("");
+  const [applicationsTotal, setApplicationsTotal] = useState(0);
   const isCreateDoctorValid =
     Boolean(form.firstName.trim()) &&
     Boolean(form.lastName.trim()) &&
@@ -126,6 +153,23 @@ export default function AdminDoctorsPage() {
       setIsLoadingDoctors(false);
     }
   }, []);
+
+  const loadDoctorApplications = useCallback(async () => {
+    setApplicationsError("");
+    setIsLoadingApplications(true);
+
+    try {
+      const response = await adminApiService.listDoctorApplications({
+        status: applicationStatus || undefined,
+      });
+      setDoctorApplications(response.data.data ?? []);
+      setApplicationsTotal(response.data.meta.total);
+    } catch (error) {
+      setApplicationsError(getApiErrorMessage(error));
+    } finally {
+      setIsLoadingApplications(false);
+    }
+  }, [applicationStatus]);
 
   const handleDoctorStatusChange = async (doctor: AdminDoctor) => {
     if (!doctor.userId || statusUpdatingUserId) return;
@@ -156,9 +200,16 @@ export default function AdminDoctorsPage() {
   }, [loadDoctors]);
 
   useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadDoctorApplications();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadDoctorApplications]);
+
+  useEffect(() => {
     const sync = () => {
       setPatients(readAdminPatients());
-      setDoctorJoinRequests(readDoctorJoinRequests());
       setWithdrawalRequests(readDoctorWithdrawalRequests());
       setAppointments(readAppointmentRequests());
     };
@@ -277,46 +328,25 @@ export default function AdminDoctorsPage() {
     [doctors],
   );
   const pendingDoctorJoinRequests = useMemo(
-    () => doctorJoinRequests.filter((request) => request.status === "Pending"),
-    [doctorJoinRequests],
+    () => doctorApplications.filter((request) => request.status === "PENDING"),
+    [doctorApplications],
   );
 
   const reviewedDoctorJoinRequests = useMemo(
-    () => doctorJoinRequests.filter((request) => request.status !== "Pending"),
-    [doctorJoinRequests],
+    () => doctorApplications.filter((request) => request.status !== "PENDING"),
+    [doctorApplications],
   );
 
-  const buildDoctorPayloadFromRequest = (request: DoctorJoinRequest) => {
-    const cleanedName = request.name.replace(/^dr\.?\s+/i, "").trim();
-    const nameParts = cleanedName.split(/\s+/).filter(Boolean);
-    const firstName = nameParts[0] ?? request.username;
-    const lastName = nameParts.slice(1).join(" ") || "Doctor";
-
-    return {
-      firstName,
-      lastName,
-      email: request.email.trim().toLowerCase(),
-      phone: request.phone.trim(),
-      specialization: request.specialization.trim().toUpperCase(),
-      username: request.username.trim(),
-    };
-  };
-
-  const handleAcceptJoinRequest = async (request: DoctorJoinRequest) => {
+  const handleAcceptJoinRequest = async (request: AdminDoctorApplication) => {
     if (requestActionId) return;
 
     setRequestMessage("");
     setRequestActionId(request.id);
 
     try {
-      await adminApiService.createDoctor(buildDoctorPayloadFromRequest(request));
-      updateDoctorJoinRequestStatus(
-        request.id,
-        "Accepted",
-        "Accepted by admin. Existing create doctor API was called with the supplied application details.",
-      );
-      setDoctorJoinRequests(readDoctorJoinRequests());
-      setRequestMessage(`${request.name} has been accepted and a doctor account was created.`);
+      await adminApiService.approveDoctorApplication(request.id);
+      setRequestMessage(`${request.fullName} has been approved.`);
+      await loadDoctorApplications();
       await loadDoctors();
     } catch (error) {
       setRequestMessage(getApiErrorMessage(error));
@@ -325,18 +355,54 @@ export default function AdminDoctorsPage() {
     }
   };
 
-  const handleRejectJoinRequest = (request: DoctorJoinRequest) => {
+  const handleRejectJoinRequest = async (request: AdminDoctorApplication) => {
     if (requestActionId) return;
 
-    setRequestMessage(
-      `${request.name} was rejected. Backend email sending API is not ready yet, so this is marked locally for now.`,
-    );
-    updateDoctorJoinRequestStatus(
-      request.id,
-      "Rejected",
-      "Rejected by admin. Future backend integration should send the rejection email to the applicant.",
-    );
-    setDoctorJoinRequests(readDoctorJoinRequests());
+    setRequestMessage("");
+    setRequestActionId(request.id);
+
+    try {
+      await adminApiService.rejectDoctorApplication(request.id);
+      setRequestMessage(`${request.fullName} has been rejected.`);
+      await loadDoctorApplications();
+    } catch (error) {
+      setRequestMessage(getApiErrorMessage(error));
+    } finally {
+      setRequestActionId("");
+    }
+  };
+
+  const handleViewApplicationDocument = async (documentId: string) => {
+    if (viewingDocumentId) return;
+
+    setRequestMessage("");
+    setDocumentPreview(null);
+    setDocumentPreviewError("");
+    setViewingDocumentId(documentId);
+
+    try {
+      const response =
+        await adminApiService.getDoctorApplicationDocument(documentId);
+      const blobUrl = window.URL.createObjectURL(response.data);
+      setDocumentPreview({
+        url: blobUrl,
+        name: getDocumentFileName(documentId),
+        type: response.data.type,
+      });
+    } catch (error) {
+      setDocumentPreviewError(getApiErrorMessage(error));
+    } finally {
+      setViewingDocumentId("");
+    }
+  };
+
+  const closeDocumentPreview = () => {
+    if (documentPreview?.url) {
+      window.URL.revokeObjectURL(documentPreview.url);
+    }
+
+    setDocumentPreview(null);
+    setDocumentPreviewError("");
   };
 
   const handleAddDoctor = async (event: FormEvent<HTMLFormElement>) => {
@@ -370,6 +436,101 @@ export default function AdminDoctorsPage() {
 
   return (
     <div className="space-y-6">
+      {documentPreview || documentPreviewError || viewingDocumentId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 sm:p-6">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between gap-3 border-b border-[#dbe4f0] px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[#001b5e]">
+                  Application document
+                </p>
+                <p className="truncate text-xs text-[#64748b]">
+                  {documentPreview?.name ??
+                    (viewingDocumentId
+                      ? getDocumentFileName(viewingDocumentId)
+                      : "Preview")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeDocumentPreview}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#cbd5e1] text-[#001b5e] hover:bg-[#f8fafc]"
+                aria-label="Close document preview"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  close
+                </span>
+              </button>
+            </div>
+
+            <div className="min-h-[360px] overflow-auto bg-[#f8fafc] p-4">
+              {viewingDocumentId ? (
+                <div className="flex min-h-[320px] flex-col items-center justify-center text-center text-sm text-[#64748b]">
+                  <span className="material-symbols-outlined mb-3 animate-spin text-3xl text-[#001b5e]">
+                    progress_activity
+                  </span>
+                  Opening document...
+                </div>
+              ) : null}
+
+              {documentPreviewError ? (
+                <div className="mx-auto flex min-h-[320px] max-w-md flex-col items-center justify-center text-center">
+                  <span className="material-symbols-outlined mb-3 text-4xl text-[#b91c1c]">
+                    error
+                  </span>
+                  <p className="text-sm font-semibold text-[#001b5e]">
+                    Could not open this document
+                  </p>
+                  <p className="mt-2 text-sm text-[#64748b]">
+                    {documentPreviewError}
+                  </p>
+                </div>
+              ) : null}
+
+              {documentPreview ? (
+                documentPreview.type.startsWith("image/") ? (
+                  <object
+                    data={documentPreview.url}
+                    type={documentPreview.type}
+                    className="mx-auto max-h-[72vh] max-w-full rounded-xl object-contain"
+                  >
+                    <a
+                      href={documentPreview.url}
+                      download={documentPreview.name}
+                      className="text-sm font-semibold text-[#001b5e] underline"
+                    >
+                      Download {documentPreview.name}
+                    </a>
+                  </object>
+                ) : documentPreview.type === "application/pdf" ? (
+                  <iframe
+                    src={documentPreview.url}
+                    title={documentPreview.name}
+                    className="h-[72vh] w-full rounded-xl border border-[#dbe4f0] bg-white"
+                  />
+                ) : (
+                  <div className="mx-auto flex min-h-[320px] max-w-md flex-col items-center justify-center text-center">
+                    <span className="material-symbols-outlined mb-3 text-4xl text-[#001b5e]">
+                      description
+                    </span>
+                    <p className="text-sm font-semibold text-[#001b5e]">
+                      Preview is not available for this file type.
+                    </p>
+                    <a
+                      href={documentPreview.url}
+                      download={documentPreview.name}
+                      className="mt-4 rounded-lg bg-[#001b5e] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b2b75]"
+                    >
+                      Download document
+                    </a>
+                  </div>
+                )
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div>
         <h2 className="text-2xl font-semibold text-[#001b5e]">Doctors Management</h2>
         <p className="mt-1 text-sm text-[#475569]">Manage doctor accounts, monitor consultations, and process wallet withdrawals.</p>
@@ -435,16 +596,41 @@ export default function AdminDoctorsPage() {
 
         {addDoctorTab === "request" ? (
           <>
-        <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
           <div>
             <h3 className="text-base font-semibold text-[#001b5e]">Doctor Applications</h3>
             <p className="mt-1 text-sm text-[#64748b]">
-              Review applications submitted from the public “Join as a Doctor” form. Accept calls the current create-doctor API; reject is ready for the future backend email API.
+              Review applications submitted from the public “Join as a Doctor” form.
             </p>
           </div>
-          <span className="w-fit rounded-full bg-[#f59e0b]/15 px-3 py-1 text-xs font-semibold text-[#b45309]">
-            {pendingDoctorJoinRequests.length} pending
-          </span>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <select
+              value={applicationStatus}
+              onChange={(event) =>
+                setApplicationStatus(event.target.value as AdminDoctorApplicationStatus | "")
+              }
+              className="h-9 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-semibold text-[#334155] outline-none focus:border-[#16b46f]"
+              aria-label="Filter doctor application status"
+            >
+              {APPLICATION_STATUS_OPTIONS.map((status) => (
+                <option key={status || "ALL"} value={status}>
+                  {status || "ALL STATUSES"}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => void loadDoctorApplications()}
+              disabled={isLoadingApplications}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] px-3 text-xs font-semibold text-[#001b5e] hover:bg-[#f8fafc] disabled:cursor-wait disabled:opacity-60"
+            >
+              <span className="material-symbols-outlined text-[17px]">refresh</span>
+              Refresh
+            </button>
+            <span className="w-fit rounded-full bg-[#f59e0b]/15 px-3 py-1 text-xs font-semibold text-[#b45309]">
+              {isLoadingApplications ? "Loading..." : `${applicationsTotal} applications`}
+            </span>
+          </div>
         </div>
 
         {requestMessage ? (
@@ -453,18 +639,41 @@ export default function AdminDoctorsPage() {
           </p>
         ) : null}
 
-        {pendingDoctorJoinRequests.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
-            No pending doctor application requests.
+        {applicationsError ? (
+          <div role="alert" className="mb-4 flex flex-col gap-3 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c] sm:flex-row sm:items-center sm:justify-between">
+            <span>{applicationsError}</span>
+            <button
+              type="button"
+              onClick={() => void loadDoctorApplications()}
+              className="rounded-lg border border-[#fca5a5] px-3 py-1.5 text-xs font-semibold hover:bg-white"
+            >
+              Try Again
+            </button>
           </div>
-        ) : (
+        ) : null}
+
+        {isLoadingApplications ? (
+          <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
+            Loading doctor applications...
+          </div>
+        ) : null}
+
+        {!isLoadingApplications && pendingDoctorJoinRequests.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
+            No pending doctor applications found.
+          </div>
+        ) : null}
+
+        {!isLoadingApplications && pendingDoctorJoinRequests.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
             {pendingDoctorJoinRequests.map((request) => (
               <article key={request.id} className="rounded-xl border border-[#e2e8f0] bg-[#f8fbff] p-4">
                 <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
                   <div>
-                    <p className="text-base font-semibold text-[#001b5e]">{request.name}</p>
-                    <p className="text-xs text-[#64748b]">@{request.username} · {request.specialization.replaceAll("_", " ")}</p>
+                    <p className="text-base font-semibold text-[#001b5e]">{request.fullName}</p>
+                    <p className="text-xs text-[#64748b]">
+                      @{request.username} · {request.specialty?.name ?? request.specialtyId}
+                    </p>
                   </div>
                   <span className="w-fit rounded-full bg-[#f59e0b]/15 px-2 py-1 text-[11px] font-semibold text-[#b45309]">
                     {request.status}
@@ -474,19 +683,39 @@ export default function AdminDoctorsPage() {
                 <div className="grid grid-cols-1 gap-2 text-xs text-[#475569] sm:grid-cols-2">
                   <p>Email: <span className="font-semibold">{request.email}</span></p>
                   <p>Phone: <span className="font-semibold">{request.phone}</span></p>
-                  <p>Requested: <span className="font-semibold">{new Date(request.requestedAt).toLocaleString()}</span></p>
+                  <p>Requested: <span className="font-semibold">{new Date(request.createdAt).toLocaleString()}</span></p>
+                  <p>Specialty ID: <span className="font-semibold">{request.specialtyId}</span></p>
                 </div>
 
                 <div className="mt-3 rounded-lg border border-[#dbe4f0] bg-white p-3">
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">Supporting documents and licenses</p>
-                  {request.documents.length === 0 ? (
+                  {request.documentFileIds.length === 0 ? (
                     <p className="text-xs text-[#94a3b8]">No documents attached.</p>
                   ) : (
                     <ul className="space-y-1 text-xs text-[#475569]">
-                      {request.documents.map((document) => (
-                        <li key={`${request.id}-${document.name}-${document.size}`} className="flex items-center justify-between gap-3">
-                          <span className="truncate">{document.name}</span>
-                          <span className="shrink-0 text-[#64748b]">{Math.ceil(document.size / 1024)} KB</span>
+                      {request.documentFileIds.map((documentId) => (
+                        <li key={`${request.id}-${documentId}`} className="flex items-center justify-between gap-3">
+                          <button
+                            type="button"
+                            disabled={Boolean(viewingDocumentId)}
+                            onClick={() =>
+                              void handleViewApplicationDocument(documentId)
+                            }
+                            className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1 text-left text-[#001b5e] hover:bg-[#eff6ff] disabled:cursor-wait disabled:text-[#94a3b8]"
+                            title={documentId}
+                          >
+                            <span className="material-symbols-outlined shrink-0 text-[16px]">
+                              description
+                            </span>
+                            <span className="truncate">
+                              {getDocumentFileName(documentId)}
+                            </span>
+                          </button>
+                          <span className="shrink-0 text-[11px] font-semibold text-[#64748b]">
+                            {viewingDocumentId === documentId
+                              ? "Opening..."
+                              : "View"}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -505,16 +734,16 @@ export default function AdminDoctorsPage() {
                   <button
                     type="button"
                     disabled={Boolean(requestActionId)}
-                    onClick={() => handleRejectJoinRequest(request)}
+                    onClick={() => void handleRejectJoinRequest(request)}
                     className="rounded-lg border border-[#ef4444]/40 px-3 py-2 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2] disabled:cursor-wait disabled:opacity-60"
                   >
-                    Reject
+                    {requestActionId === request.id ? "Rejecting..." : "Reject"}
                   </button>
                 </div>
               </article>
             ))}
           </div>
-        )}
+        ) : null}
 
         {reviewedDoctorJoinRequests.length > 0 ? (
           <details className="mt-4 rounded-xl border border-[#e2e8f0] bg-white p-3">
@@ -535,11 +764,11 @@ export default function AdminDoctorsPage() {
                 <tbody>
                   {reviewedDoctorJoinRequests.map((request) => (
                     <tr key={request.id} className="border-b border-[#e2e8f0] last:border-b-0">
-                      <td className="px-3 py-2 text-[#334155]">{request.name}</td>
-                      <td className="px-3 py-2 text-[#334155]">{request.specialization.replaceAll("_", " ")}</td>
+                      <td className="px-3 py-2 text-[#334155]">{request.fullName}</td>
+                      <td className="px-3 py-2 text-[#334155]">{request.specialty?.name ?? request.specialtyId}</td>
                       <td className="px-3 py-2 text-[#334155]">{request.status}</td>
-                      <td className="px-3 py-2 text-[#334155]">{request.reviewedAt ? new Date(request.reviewedAt).toLocaleString() : "—"}</td>
-                      <td className="px-3 py-2 text-[#334155]">{request.reviewNote ?? "—"}</td>
+                      <td className="px-3 py-2 text-[#334155]">{request.resolvedAt ? new Date(request.resolvedAt).toLocaleString() : "-"}</td>
+                      <td className="px-3 py-2 text-[#334155]">{request.rejectionReason ?? "-"}</td>
                     </tr>
                   ))}
                 </tbody>
