@@ -10,9 +10,10 @@ import {
   getDoctorDisplayName,
   useDoctorProfile,
 } from "@/lib/use-doctor-profile";
-import { doctorApiService, type DoctorAppointment } from "@/lib/api";
-
-const DOCTOR_NOTIFICATIONS_KEY = "dwDoctorNotifications";
+import {
+  doctorApiService,
+  type DoctorAppointment,
+} from "@/lib/api";
 
 function asRecord(value: unknown) {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
@@ -184,29 +185,31 @@ export default function ConsultantDashboardPage() {
 
   useEffect(() => {
     const refreshUnreadCount = () => {
-      const stored = window.localStorage.getItem(DOCTOR_NOTIFICATIONS_KEY);
+      void doctorApiService
+        .getUnreadNotificationCount()
+        .then((response) => {
+          setUnreadNotifications(response.data.unreadCount);
+        })
+        .catch(() => setUnreadNotifications(0));
+    };
 
-      if (!stored) {
-        setUnreadNotifications(0);
+    const handleNotificationsUpdated = (event: Event) => {
+      const unreadCount = (event as CustomEvent<{ unreadCount?: number }>).detail
+        ?.unreadCount;
+
+      if (typeof unreadCount === "number") {
+        setUnreadNotifications(unreadCount);
         return;
       }
 
-      try {
-        const parsed = JSON.parse(stored) as Array<{ unread?: boolean }>;
-        const unreadCount = Array.isArray(parsed) ? parsed.filter((item) => item.unread).length : 0;
-        setUnreadNotifications(unreadCount);
-      } catch {
-        setUnreadNotifications(0);
-      }
+      refreshUnreadCount();
     };
 
     refreshUnreadCount();
-    window.addEventListener("storage", refreshUnreadCount);
-    window.addEventListener("dw-notifications-updated", refreshUnreadCount);
+    window.addEventListener("dw-notifications-updated", handleNotificationsUpdated);
 
     return () => {
-      window.removeEventListener("storage", refreshUnreadCount);
-      window.removeEventListener("dw-notifications-updated", refreshUnreadCount);
+      window.removeEventListener("dw-notifications-updated", handleNotificationsUpdated);
     };
   }, []);
 

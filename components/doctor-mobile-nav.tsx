@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import DoctorLogoutButton from "@/components/doctor-logout-button";
 import DoctorProfileSummary from "@/components/doctor-profile-summary";
+import { doctorApiService } from "@/lib/api";
 
 const menuItems = [
   { label: "Dashboard", icon: "dashboard", href: "/dashboard/doctor" },
@@ -24,29 +25,31 @@ export default function DoctorMobileNav() {
 
   useEffect(() => {
     const refreshUnreadCount = () => {
-      const stored = window.localStorage.getItem("dwDoctorNotifications");
+      void doctorApiService
+        .getUnreadNotificationCount()
+        .then((response) => {
+          setUnreadNotifications(response.data.unreadCount);
+        })
+        .catch(() => setUnreadNotifications(0));
+    };
 
-      if (!stored) {
-        setUnreadNotifications(0);
+    const handleNotificationsUpdated = (event: Event) => {
+      const unreadCount = (event as CustomEvent<{ unreadCount?: number }>).detail
+        ?.unreadCount;
+
+      if (typeof unreadCount === "number") {
+        setUnreadNotifications(unreadCount);
         return;
       }
 
-      try {
-        const parsed = JSON.parse(stored) as Array<{ unread?: boolean }>;
-        const unreadCount = Array.isArray(parsed) ? parsed.filter((item) => item.unread).length : 0;
-        setUnreadNotifications(unreadCount);
-      } catch {
-        setUnreadNotifications(0);
-      }
+      refreshUnreadCount();
     };
 
     refreshUnreadCount();
-    window.addEventListener("storage", refreshUnreadCount);
-    window.addEventListener("dw-notifications-updated", refreshUnreadCount);
+    window.addEventListener("dw-notifications-updated", handleNotificationsUpdated);
 
     return () => {
-      window.removeEventListener("storage", refreshUnreadCount);
-      window.removeEventListener("dw-notifications-updated", refreshUnreadCount);
+      window.removeEventListener("dw-notifications-updated", handleNotificationsUpdated);
     };
   }, []);
 

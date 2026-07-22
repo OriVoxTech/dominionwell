@@ -8,31 +8,36 @@ const API_BASE_URL =
 
 export const dynamic = "force-dynamic";
 
+function unauthorizedResponse() {
+  return Response.json(
+    {
+      statusCode: 401,
+      error: {
+        message: "Doctor authentication is required. Please log in again.",
+        error: "Unauthorized",
+        statusCode: 401,
+      },
+    },
+    { status: 401 },
+  );
+}
+
 export async function GET(request: Request) {
   const authorization = request.headers.get("authorization");
 
   if (!authorization?.startsWith("Bearer ")) {
-    return Response.json(
-      {
-        statusCode: 401,
-        error: {
-          message: "Authentication is required. Please log in again.",
-          error: "Unauthorized",
-          statusCode: 401,
-        },
-      },
-      { status: 401 },
-    );
+    return unauthorizedResponse();
+  }
+
+  const incomingUrl = new URL(request.url);
+  const upstreamUrl = new URL(`${API_BASE_URL}/doctors/me/patients`);
+
+  for (const key of ["page", "limit"]) {
+    const value = incomingUrl.searchParams.get(key)?.trim();
+    if (value) upstreamUrl.searchParams.set(key, value);
   }
 
   try {
-    const requestUrl = new URL(request.url);
-    const upstreamUrl = new URL(`${API_BASE_URL}/notifications`);
-
-    requestUrl.searchParams.forEach((value, key) => {
-      upstreamUrl.searchParams.set(key, value);
-    });
-
     const upstreamResponse = await fetch(upstreamUrl, {
       method: "GET",
       headers: {
@@ -57,7 +62,7 @@ export async function GET(request: Request) {
       {
         statusCode: 502,
         error: {
-          message: "Notifications could not be reached. Please try again.",
+          message: "Doctor patients could not be reached. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },

@@ -16,7 +16,7 @@ export async function PATCH(request: Request) {
       {
         statusCode: 401,
         error: {
-          message: "Patient authentication is required. Please log in again.",
+          message: "Authentication is required. Please log in again.",
           error: "Unauthorized",
           statusCode: 401,
         },

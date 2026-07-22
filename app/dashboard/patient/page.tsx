@@ -46,6 +46,20 @@ function getDoctorVerifiedDate(doctor: PublicDoctor) {
         : "Verified";
 }
 
+function getDoctorConsultationCount(doctor: PublicDoctor | null | undefined) {
+    if (!doctor) return "";
+
+    const record = doctor as PublicDoctor & Record<string, unknown>;
+    const value =
+        record.consultationCount ??
+        record.consultationsCount ??
+        record.completedConsultations ??
+        record.totalConsultations ??
+        record.visitCount;
+
+    return typeof value === "number" ? String(value) : "";
+}
+
 function getSubscriptionValue(
     subscription: Record<string, unknown> | null | undefined,
     keys: string[],
@@ -97,6 +111,8 @@ export default function PatientDashboardPage() {
         "endsAt",
     ]);
     const recentDoctors = dashboard?.recentDoctors ?? [];
+    const mostVisitedDoctor = dashboard?.mostVisitedDoctor ?? null;
+    const mostVisitedDoctorConsultationCount = getDoctorConsultationCount(mostVisitedDoctor);
     const badges = dashboard?.badges ?? [];
 
     const loadDashboard = useCallback(async () => {
@@ -278,29 +294,47 @@ export default function PatientDashboardPage() {
                         <div className="relative h-full overflow-hidden rounded-2xl bg-[#001b5e] p-5 text-white shadow-xl">
                             <h3 className="mb-5 text-md font-semibold">Most Consulted</h3>
 
-                            <div className="space-y-4">
+                            {mostVisitedDoctor ? (
                                 <div className="rounded-xl border border-white/20 bg-white/10 p-4">
-                                    <h4 className="mb-2 text-sm font-semibold">Dr. Richardson</h4>
-                                    <p className="mb-3 text-[11px] text-[#d8e2ff]">Routine Cardiovascular Review</p>
+                                    <div className="mb-3 flex items-center gap-3">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/15 text-sm font-bold text-white">
+                                            {mostVisitedDoctor.user.firstName?.charAt(0) || mostVisitedDoctor.user.username.charAt(0)}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h4 className="truncate text-sm font-semibold">{getDoctorName(mostVisitedDoctor)}</h4>
+                                            <p className="mt-1 text-[11px] capitalize text-[#d8e2ff]">{getDoctorSpecialty(mostVisitedDoctor)}</p>
+                                        </div>
+                                    </div>
+                                    {mostVisitedDoctorConsultationCount ? (
+                                        <p className="mb-3 text-[11px] text-[#bfd2ff]">
+                                            {mostVisitedDoctorConsultationCount} completed consultation{mostVisitedDoctorConsultationCount === "1" ? "" : "s"}
+                                        </p>
+                                    ) : (
+                                        <p className="mb-3 text-[11px] text-[#bfd2ff]">
+                                            Your most consulted doctor.
+                                        </p>
+                                    )}
                                     <Link
-                                        href={`/dashboard/patient/doctors?query=${encodeURIComponent("Dr. Richardson")}`}
+                                        href={`/dashboard/patient/doctors/${mostVisitedDoctor.id}`}
                                         className="block w-full rounded-lg bg-white py-2 text-center text-xs font-semibold text-[#001b5e]"
                                     >
-                                        Start Consultation
+                                        View Doctor
                                     </Link>
                                 </div>
-
-                                <div className="rounded-xl border border-white/10 bg-white/5 p-4 opacity-90">
-                                    <h4 className="mb-2 text-sm font-semibold">Dr. Emily Stone</h4>
-                                    <p className="mb-3 text-[11px] text-[#bfd2ff]">Dermatology Check-up</p>
+                            ) : (
+                                <div className="rounded-xl border border-white/20 bg-white/10 p-4">
+                                    <h4 className="mb-2 text-sm font-semibold">No doctor yet</h4>
+                                    <p className="mb-3 text-[11px] text-[#d8e2ff]">
+                                        Complete a consultation and your most consulted doctor will appear here.
+                                    </p>
                                     <Link
-                                        href={`/dashboard/patient/doctors?query=${encodeURIComponent("Dr. Emily Stone")}`}
+                                        href="/dashboard/patient/doctors"
                                         className="block w-full rounded-lg bg-white py-2 text-center text-xs font-semibold text-[#001b5e]"
                                     >
-                                        Start Consultation
+                                        Browse Doctors
                                     </Link>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
 

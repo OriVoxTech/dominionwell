@@ -36,6 +36,32 @@ function getDoctorInitials(doctor: PublicDoctor) {
     .join("") || "DR";
 }
 
+function getPresenceStatusMeta(status: PublicDoctor["presenceStatus"]) {
+  const normalized = typeof status === "string" ? status.toUpperCase() : "OFFLINE";
+
+  if (normalized === "AVAILABLE") {
+    return {
+      label: "Available",
+      className: "bg-[#16b36c]/15 text-[#15803d]",
+      dotClassName: "bg-[#16b36c]",
+    };
+  }
+
+  if (normalized === "BUSY") {
+    return {
+      label: "Busy",
+      className: "bg-[#f59e0b]/15 text-[#b45309]",
+      dotClassName: "bg-[#f59e0b]",
+    };
+  }
+
+  return {
+    label: "Offline",
+    className: "bg-[#64748b]/15 text-[#475569]",
+    dotClassName: "bg-[#64748b]",
+  };
+}
+
 function getReviewPatientName(review: DoctorReview) {
   const user = review.patient?.user;
   const name = [user?.firstName, user?.lastName]
@@ -125,6 +151,7 @@ export default function DoctorProfilePage() {
   }, [loadDoctor, loadReviews]);
 
   const doctorName = doctor ? getDoctorName(doctor) : "Doctor Profile";
+  const presenceStatus = doctor ? getPresenceStatusMeta(doctor.presenceStatus) : null;
   const averageRating = reviews?.satisfaction.averageRating ?? null;
   const reviewCount = reviews?.satisfaction.reviewCount ?? 0;
 
@@ -177,10 +204,18 @@ export default function DoctorProfilePage() {
                     <p className="mt-1 text-sm text-[#64748b]">@{doctor.user.username}</p>
                   </div>
                 </div>
-                <span className="inline-flex w-fit items-center gap-1 rounded-full bg-[#dcfce7] px-3 py-1 text-xs font-semibold text-[#15803d]">
-                  <span className="material-symbols-outlined text-[16px]">verified</span>
-                  Verified Doctor
-                </span>
+                <div className="flex flex-wrap gap-2 sm:justify-end">
+                  <span className="inline-flex w-fit items-center gap-1 rounded-full bg-[#dcfce7] px-3 py-1 text-xs font-semibold text-[#15803d]">
+                    <span className="material-symbols-outlined text-[16px]">verified</span>
+                    Verified Doctor
+                  </span>
+                  {presenceStatus ? (
+                    <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${presenceStatus.className}`}>
+                      <span className={`h-2 w-2 rounded-full ${presenceStatus.dotClassName}`} />
+                      {presenceStatus.label}
+                    </span>
+                  ) : null}
+                </div>
               </div>
 
               <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">

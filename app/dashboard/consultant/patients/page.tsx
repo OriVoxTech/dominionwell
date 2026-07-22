@@ -2,57 +2,72 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
 import DoctorProfileSummary from "@/components/doctor-profile-summary";
 import DoctorLogoutButton from "@/components/doctor-logout-button";
+import {
+  doctorApiService,
+  getApiErrorMessage,
+  type DoctorPatientSummary,
+} from "@/lib/api";
 
-type PatientConsultationSummary = {
-  id: string;
-  patientName: string;
-  patientId: string;
-  consultationsWithDoctor: number;
-  rating: number;
-};
+function getPatientName(patient: DoctorPatientSummary) {
+  const firstName =
+    patient.patient?.user?.firstName ?? patient.user?.firstName ?? patient.firstName;
+  const lastName =
+    patient.patient?.user?.lastName ?? patient.user?.lastName ?? patient.lastName;
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
 
-const patientSummaries: PatientConsultationSummary[] = [
-  {
-    id: "pt-1",
-    patientName: "Arthur Morgan",
-    patientId: "DW-10021",
-    consultationsWithDoctor: 4,
-    rating: 5.0,
-  },
-  {
-    id: "pt-2",
-    patientName: "Sarah Williams",
-    patientId: "DW-10032",
-    consultationsWithDoctor: 3,
-    rating: 4.8,
-  },
-  {
-    id: "pt-3",
-    patientName: "Daniel Okafor",
-    patientId: "DW-10047",
-    consultationsWithDoctor: 2,
-    rating: 4.9,
-  },
-  {
-    id: "pt-4",
-    patientName: "Grace Bennett",
-    patientId: "DW-10058",
-    consultationsWithDoctor: 1,
-    rating: 4.6,
-  },
-  {
-    id: "pt-5",
-    patientName: "Rita Adeyemi",
-    patientId: "DW-10076",
-    consultationsWithDoctor: 5,
-    rating: 5.0,
-  },
-];
+  return patient.patientName ?? (fullName || "Unnamed patient");
+}
+
+function getPatientId(patient: DoctorPatientSummary) {
+  return patient.patient?.id ?? patient.patientId ?? patient.id ?? "Not provided";
+}
+
+function getConsultationCount(patient: DoctorPatientSummary) {
+  return (
+    patient.consultationsWithDoctor ??
+    patient.completedConsultations ??
+    patient.consultationCount ??
+    0
+  );
+}
+
+function getPatientRating(patient: DoctorPatientSummary) {
+  return patient.averageRating ?? patient.rating ?? 0;
+}
 
 export default function ConsultantPatientsPage() {
+  const [patients, setPatients] = useState<DoctorPatientSummary[]>([]);
+  const [patientTotal, setPatientTotal] = useState(0);
+  const [patientsError, setPatientsError] = useState("");
+  const [isLoadingPatients, setIsLoadingPatients] = useState(true);
+
+  const loadPatients = useCallback(async () => {
+    setIsLoadingPatients(true);
+    setPatientsError("");
+
+    try {
+      const response = await doctorApiService.listPatients();
+      setPatients(response.data.data);
+      setPatientTotal(response.data.meta.total);
+    } catch (error) {
+      setPatientsError(getApiErrorMessage(error));
+    } finally {
+      setIsLoadingPatients(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadPatients();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadPatients]);
+
   return (
     <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
       <DoctorMobileNav />
@@ -132,8 +147,21 @@ export default function ConsultantPatientsPage() {
         <section className="rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-1xl font-semibold text-[#00020d]">Patient Consultation History</h2>
-            <p className="text-xs text-[#64748b]">Total: {patientSummaries.length}</p>
+            <p className="text-xs text-[#64748b]">Total: {patientTotal}</p>
           </div>
+
+          {patientsError ? (
+            <div role="alert" className="mb-4 flex flex-col gap-3 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c] sm:flex-row sm:items-center sm:justify-between">
+              <span>{patientsError}</span>
+              <button
+                type="button"
+                onClick={() => void loadPatients()}
+                className="rounded-lg border border-[#fca5a5] px-3 py-1.5 text-xs font-semibold hover:bg-white"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : null}
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -146,15 +174,27 @@ export default function ConsultantPatientsPage() {
                 </tr>
               </thead>
               <tbody>
-                {patientSummaries.map((patient) => (
-                  <tr key={patient.id} className="border-b border-[#e2e8f0] last:border-b-0">
-                    <td className="px-3 py-3 font-semibold text-[#001b5e]">{patient.patientName}</td>
-                    <td className="px-3 py-3 text-[#475569]">{patient.patientId}</td>
-                    <td className="px-3 py-3 text-[#475569]">{patient.consultationsWithDoctor}</td>
+                {isLoadingPatients ? (
+                  <tr>
+                    <td colSpan={4} className="px-3 py-6 text-center text-[#64748b]">
+                      Loading patients...
+                    </td>
+                  </tr>
+                ) : patients.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-3 py-6 text-center text-[#64748b]">
+                      No patients have completed consultations with you yet.
+                    </td>
+                  </tr>
+                ) : patients.map((patient) => (
+                  <tr key={getPatientId(patient)} className="border-b border-[#e2e8f0] last:border-b-0">
+                    <td className="px-3 py-3 font-semibold text-[#001b5e]">{getPatientName(patient)}</td>
+                    <td className="px-3 py-3 text-[#475569]">{getPatientId(patient)}</td>
+                    <td className="px-3 py-3 text-[#475569]">{getConsultationCount(patient)}</td>
                     <td className="px-3 py-3">
                       <span className="inline-flex items-center gap-1 rounded-full bg-[#16b36c]/15 px-2 py-1 text-[10px] font-semibold text-[#16b36c]">
                         <span className="material-symbols-outlined text-[14px]">star</span>
-                        {patient.rating.toFixed(1)}
+                        {getPatientRating(patient).toFixed(1)}
                       </span>
                     </td>
                   </tr>

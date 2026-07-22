@@ -13,30 +13,16 @@ import PatientMobileNav from "@/components/patient-mobile-nav";
 import PatientLogoutButton from "@/components/patient-logout-button";
 import PatientProfileSummary from "@/components/patient-profile-summary";
 import {
+  doctorApplicationsApiService,
   getApiErrorMessage,
   patientApiService,
   patientDoctorsApiService,
+  type AdminSpecialty,
   type DoctorAvailabilitySlot,
   type PublicDoctor,
   type PublicDoctorsResponse,
 } from "@/lib/api";
 import { usePatientProfile } from "@/lib/use-patient-profile";
-
-const SPECIALIZATION_OPTIONS = [
-  "GENERAL_PRACTICE",
-  "CARDIOLOGY",
-  "DERMATOLOGY",
-  "ENDOCRINOLOGY",
-  "GASTROENTEROLOGY",
-  "GYNECOLOGY",
-  "NEUROLOGY",
-  "ONCOLOGY",
-  "OPHTHALMOLOGY",
-  "ORTHOPEDICS",
-  "PEDIATRICS",
-  "PSYCHIATRY",
-  "UROLOGY",
-] as const;
 
 const EMPTY_RESPONSE: PublicDoctorsResponse = {
   data: [],
@@ -64,6 +50,36 @@ function getDoctorInitials(doctor: PublicDoctor) {
     .map((part) => part.trim().charAt(0).toUpperCase())
     .filter(Boolean)
     .join("") || "DR";
+}
+
+function getPresenceStatusMeta(status: PublicDoctor["presenceStatus"]) {
+  const normalized = typeof status === "string" ? status.toUpperCase() : "OFFLINE";
+
+  if (normalized === "AVAILABLE") {
+    return {
+      label: "Available",
+      className: "bg-[#16b36c]/15 text-[#15803d]",
+      dotClassName: "bg-[#16b36c]",
+    };
+  }
+
+  if (normalized === "BUSY") {
+    return {
+      label: "Busy",
+      className: "bg-[#f59e0b]/15 text-[#b45309]",
+      dotClassName: "bg-[#f59e0b]",
+    };
+  }
+
+  return {
+    label: "Offline",
+    className: "bg-[#64748b]/15 text-[#475569]",
+    dotClassName: "bg-[#64748b]",
+  };
+}
+
+function isDoctorOffline(doctor: PublicDoctor) {
+  return String(doctor.presenceStatus ?? "OFFLINE").toUpperCase() === "OFFLINE";
 }
 
 function formatSlotDate(value: string) {
@@ -99,6 +115,9 @@ function BrowseDoctorsContent() {
     useState<PublicDoctorsResponse>(EMPTY_RESPONSE);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [specialties, setSpecialties] = useState<AdminSpecialty[]>([]);
+  const [isLoadingSpecialties, setIsLoadingSpecialties] = useState(true);
+  const [specialtiesError, setSpecialtiesError] = useState("");
   const [bookingDoctor, setBookingDoctor] = useState<PublicDoctor | null>(null);
   const [availabilitySlots, setAvailabilitySlots] = useState<DoctorAvailabilitySlot[]>([]);
   const [selectedDate, setSelectedDate] = useState("");
@@ -155,7 +174,37 @@ function BrowseDoctorsContent() {
     return () => window.clearTimeout(timeoutId);
   }, [loadDoctors]);
 
+  const loadSpecialties = useCallback(async () => {
+    setSpecialtiesError("");
+    setIsLoadingSpecialties(true);
+
+    try {
+      const response = await doctorApplicationsApiService.listSpecialties();
+      setSpecialties(
+        response.data.filter((specialty) => specialty.isActive !== false),
+      );
+    } catch (error) {
+      setSpecialtiesError(getApiErrorMessage(error));
+      setSpecialties([]);
+    } finally {
+      setIsLoadingSpecialties(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadSpecialties();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadSpecialties]);
+
   const openBookingFlow = async (doctor: PublicDoctor) => {
+    if (isDoctorOffline(doctor)) {
+      setErrorMessage("This doctor is currently offline and cannot be booked.");
+      return;
+    }
+
     setBookingDoctor(doctor);
     setAvailabilitySlots([]);
     setSelectedDate("");
@@ -343,13 +392,29 @@ function BrowseDoctorsContent() {
                 setPage(1);
               }}
               aria-label="Filter by specialization"
+              disabled={isLoadingSpecialties}
             >
               <option value="">All specializations</option>
-              {SPECIALIZATION_OPTIONS.map((option) => (
-                <option key={option} value={option}>{formatSpecialization(option)}</option>
+              {isLoadingSpecialties ? (
+                <option value="">Loading specialties...</option>
+              ) : null}
+              {specialties.map((option) => (
+                <option key={option.id} value={option.name}>{option.name}</option>
               ))}
             </select>
           </div>
+          {specialtiesError ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs text-[#b91c1c]">
+              <span>{specialtiesError}</span>
+              <button
+                type="button"
+                onClick={() => void loadSpecialties()}
+                className="font-semibold text-[#001b5e] underline"
+              >
+                Try again
+              </button>
+            </div>
+          ) : null}
         </section>
 
         <section className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
@@ -380,6 +445,8 @@ function BrowseDoctorsContent() {
           <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {directory.data.map((doctor) => {
               const doctorName = getDoctorName(doctor);
+              const presenceStatus = getPresenceStatusMeta(doctor.presenceStatus);
+              const isOffline = isDoctorOffline(doctor);
 
               return (
                 <article key={doctor.id} className="flex flex-col rounded-2xl border border-[#c6c6cf] bg-white p-4 shadow-sm sm:p-5">
@@ -391,7 +458,13 @@ function BrowseDoctorsContent() {
                       <h4 className="truncate text-sm font-semibold text-[#001b5e] sm:text-[15px]">{doctorName}</h4>
                       <p className="mt-1 text-xs text-[#64748b]">@{doctor.user.username}</p>
                     </div>
-                    <span className="ml-auto shrink-0 rounded-full bg-[#dcfce7] px-2 py-1 text-[10px] font-semibold uppercase text-[#15803d]">Verified</span>
+                    <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
+                      <span className="rounded-full bg-[#dcfce7] px-2 py-1 text-[10px] font-semibold uppercase text-[#15803d]">Verified</span>
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${presenceStatus.className}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${presenceStatus.dotClassName}`} />
+                        {presenceStatus.label}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="mb-4 flex flex-wrap gap-2">
@@ -413,9 +486,15 @@ function BrowseDoctorsContent() {
                       <button
                         type="button"
                         onClick={() => void openBookingFlow(doctor)}
-                        className="rounded-lg bg-[#001b5e] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0b2b75]"
+                        disabled={isOffline}
+                        className="rounded-lg bg-[#001b5e] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+                        title={
+                          isOffline
+                            ? "This doctor is currently offline"
+                            : "Book an appointment"
+                        }
                       >
-                        Book Appointment
+                        {isOffline ? "Doctor Offline" : "Book Appointment"}
                       </button>
                     </div>
                   </div>

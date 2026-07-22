@@ -6,6 +6,12 @@ import { useEffect, useMemo, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
 import DoctorProfileSummary from "@/components/doctor-profile-summary";
 import DoctorLogoutButton from "@/components/doctor-logout-button";
+import {
+  doctorApiService,
+  getApiErrorMessage,
+  type PatientNotification,
+  type PatientNotificationsResponse,
+} from "@/lib/api";
 
 type NotificationItem = {
   id: string;
@@ -17,94 +23,170 @@ type NotificationItem = {
   unread: boolean;
 };
 
-const STORAGE_KEY = "dwDoctorNotifications";
+function getNotificationList(
+  response: PatientNotificationsResponse | PatientNotification[],
+) {
+  return Array.isArray(response) ? response : (response.data ?? []);
+}
 
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "d-n-1",
-    title: "New Consultation Request",
-    description: "Arthur Morgan submitted a cardiology consultation request.",
-    time: "5 minutes ago",
-    typeClass: "bg-[#16b36c]/15 text-[#16b36c]",
-    tag: "Request",
-    unread: true,
-  },
-  {
-    id: "d-n-2",
-    title: "Lab Result Ready",
-    description: "Quest Diagnostics uploaded results for patient #3302.",
-    time: "1 hour ago",
-    typeClass: "bg-[#67d6e7]/20 text-[#0093a2]",
-    tag: "Lab",
-    unread: true,
-  },
-  {
-    id: "d-n-3",
-    title: "Schedule Reminder",
-    description: "Post-op review with Jim Halpert starts in 30 minutes.",
-    time: "Today",
-    typeClass: "bg-[#64748b]/15 text-[#64748b]",
-    tag: "Schedule",
-    unread: false,
-  },
-  {
-    id: "d-n-4",
-    title: "System Notice",
-    description: "DominionWell platform maintenance is scheduled for Sunday.",
-    time: "Yesterday",
-    typeClass: "bg-[#64748b]/15 text-[#64748b]",
-    tag: "System",
-    unread: false,
-  },
-];
+function getStringValue(
+  notification: PatientNotification,
+  keys: Array<keyof PatientNotification>,
+) {
+  for (const key of keys) {
+    const value = notification[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function getNotificationUnreadState(notification: PatientNotification) {
+  if (typeof notification.isRead === "boolean") return !notification.isRead;
+  if (typeof notification.read === "boolean") return !notification.read;
+  if (typeof notification.unread === "boolean") return notification.unread;
+  return !notification.readAt;
+}
+
+function formatNotificationTime(value?: string) {
+  if (!value) return "Just now";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "Just now";
+
+  return date.toLocaleString();
+}
+
+function formatNotificationTag(value: string) {
+  if (!value) return "Notification";
+
+  return value
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getTypeClass(tag: string) {
+  const normalized = tag.toLowerCase();
+
+  if (
+    normalized.includes("appointment") ||
+    normalized.includes("consultation") ||
+    normalized.includes("reminder")
+  ) {
+    return "bg-[#16b36c]/15 text-[#16b36c]";
+  }
+
+  if (
+    normalized.includes("wallet") ||
+    normalized.includes("withdrawal") ||
+    normalized.includes("payment")
+  ) {
+    return "bg-[#67d6e7]/20 text-[#0093a2]";
+  }
+
+  return "bg-[#64748b]/15 text-[#64748b]";
+}
+
+function mapNotification(notification: PatientNotification): NotificationItem {
+  const tag = formatNotificationTag(
+    getStringValue(notification, ["type", "category"]),
+  );
+
+  return {
+    id: notification.id,
+    title:
+      getStringValue(notification, ["title", "subject"]) || "Notification",
+    description:
+      getStringValue(notification, ["message", "body", "content"]) ||
+      "You have a new update from DominionWell+.",
+    time: formatNotificationTime(notification.createdAt ?? notification.updatedAt),
+    typeClass: getTypeClass(tag),
+    tag,
+    unread: getNotificationUnreadState(notification),
+  };
+}
 
 export default function ConsultantNotificationsPage() {
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
-    if (typeof window === "undefined") {
-      return INITIAL_NOTIFICATIONS;
-    }
-
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-
-    if (!stored) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_NOTIFICATIONS));
-      return INITIAL_NOTIFICATIONS;
-    }
-
-    try {
-      const parsed = JSON.parse(stored) as NotificationItem[];
-      return Array.isArray(parsed) ? parsed : INITIAL_NOTIFICATIONS;
-    } catch {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_NOTIFICATIONS));
-      return INITIAL_NOTIFICATIONS;
-    }
-  });
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
-    window.dispatchEvent(new Event("dw-notifications-updated"));
-  }, [notifications]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [notice, setNotice] = useState("");
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [isMarkingAll, setIsMarkingAll] = useState(false);
 
   const unreadCount = useMemo(
     () => notifications.filter((item) => item.unread).length,
     [notifications]
   );
 
-  const markAllAsRead = () => {
-    setNotifications((current) => current.map((item) => ({ ...item, unread: false })));
+  const loadNotifications = async () => {
+    setIsLoading(true);
+    setNotice("");
+
+    try {
+      const response = await doctorApiService.listNotifications();
+      setNotifications(getNotificationList(response.data).map(mapNotification));
+    } catch (error) {
+      setNotice(getApiErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const toggleReadState = (id: string) => {
-    setNotifications((current) =>
-      current.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              unread: !item.unread,
-            }
-          : item
-      )
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadNotifications();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("dw-notifications-updated", {
+        detail: { unreadCount },
+      }),
     );
+  }, [unreadCount]);
+
+  const markAllAsRead = async () => {
+    setIsMarkingAll(true);
+    setNotice("");
+
+    try {
+      await doctorApiService.markAllNotificationsAsRead();
+      setNotifications((current) =>
+        current.map((item) => ({ ...item, unread: false })),
+      );
+    } catch (error) {
+      setNotice(getApiErrorMessage(error));
+    } finally {
+      setIsMarkingAll(false);
+    }
+  };
+
+  const markAsRead = async (id: string) => {
+    setActionId(id);
+    setNotice("");
+
+    try {
+      await doctorApiService.markNotificationAsRead(id);
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, unread: false } : item,
+        ),
+      );
+    } catch (error) {
+      setNotice(getApiErrorMessage(error));
+    } finally {
+      setActionId(null);
+    }
   };
 
   return (
@@ -194,17 +276,42 @@ export default function ConsultantNotificationsPage() {
               </span>
               <button
                 type="button"
-                onClick={markAllAsRead}
-                className="rounded-lg border border-[#c6c6cf] px-2.5 py-1 text-[11px] font-semibold text-[#00020d] hover:bg-[#f8fafc]"
+                onClick={() => void markAllAsRead()}
+                disabled={isMarkingAll || unreadCount === 0}
+                className="rounded-lg border border-[#c6c6cf] px-2.5 py-1 text-[11px] font-semibold text-[#00020d] hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Mark all read
+                {isMarkingAll ? "Saving..." : "Mark all read"}
               </button>
             </div>
           </div>
+          {notice ? (
+            <div role="alert" className="mt-3 flex flex-col gap-2 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs text-[#b91c1c] sm:flex-row sm:items-center sm:justify-between">
+              <span>{notice}</span>
+              <button
+                type="button"
+                onClick={() => void loadNotifications()}
+                className="rounded-md border border-[#fca5a5] px-2 py-1 text-xs font-semibold hover:bg-white"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : null}
         </section>
 
         <section className="space-y-3">
-          {notifications.map((item) => (
+          {isLoading ? (
+            <div className="rounded-2xl border border-[#eaecf0] bg-white p-5 text-sm text-[#64748b] shadow-sm">
+              Loading notifications...
+            </div>
+          ) : null}
+
+          {!isLoading && notifications.length === 0 ? (
+            <div className="rounded-2xl border border-[#eaecf0] bg-white p-5 text-sm text-[#64748b] shadow-sm">
+              No notifications yet.
+            </div>
+          ) : null}
+
+          {!isLoading ? notifications.map((item) => (
             <article key={item.id} className="rounded-2xl border border-[#eaecf0] bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
@@ -218,17 +325,20 @@ export default function ConsultantNotificationsPage() {
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${item.typeClass}`}>{item.tag}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] text-[#64748b] sm:text-xs">{item.time}</span>
-                  <button
-                    type="button"
-                    onClick={() => toggleReadState(item.id)}
-                    className="rounded-lg border border-[#c6c6cf] px-2.5 py-1 text-[11px] font-semibold text-[#00020d] hover:bg-[#f8fafc]"
-                  >
-                    {item.unread ? "Mark read" : "Mark unread"}
-                  </button>
+                  {item.unread ? (
+                    <button
+                      type="button"
+                      onClick={() => void markAsRead(item.id)}
+                      disabled={actionId === item.id}
+                      className="rounded-lg border border-[#c6c6cf] px-2.5 py-1 text-[11px] font-semibold text-[#00020d] hover:bg-[#f8fafc] disabled:cursor-wait disabled:opacity-60"
+                    >
+                      {actionId === item.id ? "Saving..." : "Mark read"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </article>
-          ))}
+          )) : null}
         </section>
       </main>
     </div>

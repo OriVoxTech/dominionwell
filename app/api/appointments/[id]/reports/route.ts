@@ -8,7 +8,7 @@ const API_BASE_URL =
 
 export const dynamic = "force-dynamic";
 
-export async function PATCH(
+export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -19,7 +19,7 @@ export async function PATCH(
       {
         statusCode: 401,
         error: {
-          message: "Authentication is required. Please log in again.",
+          message: "Doctor authentication is required. Please log in again.",
           error: "Unauthorized",
           statusCode: 401,
         },
@@ -28,18 +28,38 @@ export async function PATCH(
     );
   }
 
+  let body: unknown;
+
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json(
+      {
+        statusCode: 400,
+        error: {
+          message: "Report summary is required.",
+          error: "Bad Request",
+          statusCode: 400,
+        },
+      },
+      { status: 400 },
+    );
+  }
+
   const { id } = await params;
 
   try {
     const upstreamResponse = await fetch(
-      `${API_BASE_URL}/notifications/${encodeURIComponent(id)}/read`,
+      `${API_BASE_URL}/appointments/${encodeURIComponent(id)}/reports`,
       {
-        method: "PATCH",
+        method: "POST",
         headers: {
           Accept: "*/*",
           Authorization: authorization,
+          "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true",
         },
+        body: JSON.stringify(body),
         cache: "no-store",
       },
     );
@@ -58,7 +78,7 @@ export async function PATCH(
       {
         statusCode: 502,
         error: {
-          message: "Notification could not be marked as read. Please try again.",
+          message: "Consultation report could not be reached. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },

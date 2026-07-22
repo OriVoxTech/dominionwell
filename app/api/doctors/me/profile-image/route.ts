@@ -8,10 +8,7 @@ const API_BASE_URL =
 
 export const dynamic = "force-dynamic";
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: Request) {
   const authorization = request.headers.get("authorization");
 
   if (!authorization?.startsWith("Bearer ")) {
@@ -19,7 +16,7 @@ export async function PATCH(
       {
         statusCode: 401,
         error: {
-          message: "Authentication is required. Please log in again.",
+          message: "Doctor authentication is required. Please log in again.",
           error: "Unauthorized",
           statusCode: 401,
         },
@@ -28,18 +25,28 @@ export async function PATCH(
     );
   }
 
-  const { id } = await params;
+  let formData: FormData;
+
+  try {
+    formData = await request.formData();
+  } catch {
+    return Response.json(
+      { error: { message: "A profile image file is required." } },
+      { status: 400 },
+    );
+  }
 
   try {
     const upstreamResponse = await fetch(
-      `${API_BASE_URL}/notifications/${encodeURIComponent(id)}/read`,
+      `${API_BASE_URL}/doctors/me/profile-image`,
       {
-        method: "PATCH",
+        method: "POST",
         headers: {
           Accept: "*/*",
           Authorization: authorization,
           "ngrok-skip-browser-warning": "true",
         },
+        body: formData,
         cache: "no-store",
       },
     );
@@ -58,7 +65,7 @@ export async function PATCH(
       {
         statusCode: 502,
         error: {
-          message: "Notification could not be marked as read. Please try again.",
+          message: "The profile image could not be uploaded. Please try again.",
           error: "Bad Gateway",
           statusCode: 502,
         },

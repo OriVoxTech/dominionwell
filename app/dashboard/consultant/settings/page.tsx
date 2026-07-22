@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
 import DoctorChangePasswordModal from "@/components/doctor-change-password-modal";
 import DoctorLogoutButton from "@/components/doctor-logout-button";
@@ -11,14 +11,18 @@ import {
   updateDoctorBankDetails,
   type DoctorBankDetails,
 } from "@/lib/admin-portal";
+import { setCachedDoctorProfile } from "@/lib/use-doctor-profile";
 import {
   getCurrentMonthKey,
   type DoctorDayAvailability,
 } from "@/lib/doctor-availability";
 import {
   doctorApiService,
+  doctorApplicationsApiService,
   getApiErrorMessage,
+  type AdminSpecialty,
   type DoctorAvailabilityCalendarResponse,
+  type UpdateDoctorProfilePayload,
 } from "@/lib/api";
 
 type AvailabilityStatus = "Available" | "Busy" | "Offline";
@@ -70,22 +74,6 @@ const nigerianBanks = [
   { name: "VFD Microfinance Bank", code: "566" },
   { name: "Wema Bank", code: "035" },
   { name: "Zenith Bank", code: "057" },
-] as const;
-
-const specializationOptions = [
-  "GENERAL_PRACTICE",
-  "CARDIOLOGY",
-  "DERMATOLOGY",
-  "ENDOCRINOLOGY",
-  "GASTROENTEROLOGY",
-  "GYNECOLOGY",
-  "NEUROLOGY",
-  "ONCOLOGY",
-  "OPHTHALMOLOGY",
-  "ORTHOPEDICS",
-  "PEDIATRICS",
-  "PSYCHIATRY",
-  "UROLOGY",
 ] as const;
 
 function formatSpecialization(value: string) {
@@ -259,17 +247,23 @@ export default function ConsultantSettingsPage() {
   const [fullName, setFullName] = useState("Doctor");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [specialization, setSpecialization] = useState("Not provided");
+  const [specialization, setSpecialization] = useState("");
   const [yearsOfExperience, setYearsOfExperience] = useState("0");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState<string | null>(null);
   const [verifiedAt, setVerifiedAt] = useState<string | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState("");
+  const [specialties, setSpecialties] = useState<AdminSpecialty[]>([]);
+  const [specialtiesError, setSpecialtiesError] = useState("");
+  const [isLoadingSpecialties, setIsLoadingSpecialties] = useState(true);
   const [profileError, setProfileError] = useState("");
   const [profileSaveError, setProfileSaveError] = useState("");
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSavingStatus, setIsSavingStatus] = useState(false);
+  const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey());
   const [monthAvailability, setMonthAvailability] = useState<DoctorDayAvailability>({});
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -306,7 +300,7 @@ export default function ConsultantSettingsPage() {
       setFirstName(profile.user.firstName);
       setLastName(profile.user.lastName);
       setSpecialization(
-        profile.specializations[0] || "GENERAL_PRACTICE",
+        profile.specializations[0] || "",
       );
       setAvailabilityStatus(getAvailabilityStatusFromPresenceStatus(profile.presenceStatus));
       setYearsOfExperience(String(profile.yearsOfExperience ?? 0));
@@ -330,7 +324,34 @@ export default function ConsultantSettingsPage() {
     return () => window.clearTimeout(timeoutId);
   }, [loadDoctorProfile]);
 
-  const saveProfile = async () => {
+  const loadSpecialties = useCallback(async () => {
+    setSpecialtiesError("");
+    setIsLoadingSpecialties(true);
+
+    try {
+      const response = await doctorApplicationsApiService.listSpecialties();
+      setSpecialties(
+        response.data.filter((specialty) => specialty.isActive !== false),
+      );
+    } catch (error) {
+      setSpecialtiesError(getApiErrorMessage(error));
+      setSpecialties([]);
+    } finally {
+      setIsLoadingSpecialties(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadSpecialties();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadSpecialties]);
+
+  const getProfilePayload = (
+    nextAvailabilityStatus = availabilityStatus,
+  ): { payload: UpdateDoctorProfilePayload; selectedBank?: (typeof nigerianBanks)[number] } | { error: string } => {
     const normalizedSpecialization = specialization.trim();
     const normalizedYearsOfExperience = Math.max(
       0,
@@ -341,14 +362,16 @@ export default function ConsultantSettingsPage() {
       !firstName.trim() ||
       !lastName.trim() ||
       !phone.trim() ||
-      !specializationOptions.includes(
-        normalizedSpecialization as (typeof specializationOptions)[number],
-      )
+      !normalizedSpecialization ||
+      (specialties.length > 0 &&
+        !specialties.some(
+          (specialty) => specialty.name === normalizedSpecialization,
+        ))
     ) {
-      setProfileSaveError(
-        "First name, last name, phone number, and specialization are required.",
-      );
-      return;
+      return {
+        error:
+          "First name, last name, phone number, and specialization are required.",
+      };
     }
 
     const selectedBank = nigerianBanks.find(
@@ -362,33 +385,26 @@ export default function ConsultantSettingsPage() {
 
     if (hasAnyBankDetail) {
       if (!selectedBank) {
-        setProfileSaveError("Please select a bank from the dropdown.");
-        return;
+        return { error: "Please select a bank from the dropdown." };
       }
 
       if (!bankDetails.accountName.trim()) {
-        setProfileSaveError("Account name is required for bank details.");
-        return;
+        return { error: "Account name is required for bank details." };
       }
 
       if (!/^\d{10}$/.test(bankDetails.accountNumber)) {
-        setProfileSaveError("Account number must be exactly 10 digits.");
-        return;
+        return { error: "Account number must be exactly 10 digits." };
       }
     }
 
-    setProfileSaveError("");
-    setSuccessMessage("");
-    setIsSavingProfile(true);
-
-    try {
-      const response = await doctorApiService.updateProfile({
+    return {
+      payload: {
         bio: bio?.trim() ?? "",
         specializations: [normalizedSpecialization],
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         phone: phone.trim(),
-        presenceStatus: getPresenceStatusFromAvailability(availabilityStatus),
+        presenceStatus: getPresenceStatusFromAvailability(nextAvailabilityStatus),
         yearsOfExperience: normalizedYearsOfExperience,
         ...(hasAnyBankDetail && selectedBank
           ? {
@@ -398,33 +414,89 @@ export default function ConsultantSettingsPage() {
               bankAccountNumber: bankDetails.accountNumber.trim(),
             }
           : {}),
-      });
-      const profile = response.data;
-      const name = [profile.user.firstName, profile.user.lastName]
-        .filter(Boolean)
-        .join(" ");
+      },
+      selectedBank,
+    };
+  };
 
-      setFullName(name ? `Dr. ${name}` : profile.user.username);
-      setFirstName(profile.user.firstName);
-      setLastName(profile.user.lastName);
-      setPhone(profile.user.phone ?? "");
-      setBio(profile.bio);
-      setSpecialization(
-        profile.specializations[0] || normalizedSpecialization,
-      );
-      setYearsOfExperience(String(profile.yearsOfExperience ?? normalizedYearsOfExperience));
-      setAvailabilityStatus(getAvailabilityStatusFromPresenceStatus(profile.presenceStatus));
+  const applyProfileResponse = (
+    profile: Awaited<ReturnType<typeof doctorApiService.updateProfile>>["data"],
+    fallbackSpecialization = specialization.trim(),
+    fallbackYearsOfExperience = Math.max(
+      0,
+      Math.floor(Number(yearsOfExperience) || 0),
+    ),
+  ) => {
+    const name = [profile.user.firstName, profile.user.lastName]
+      .filter(Boolean)
+      .join(" ");
 
-      if (hasAnyBankDetail && selectedBank) {
+    setFullName(name ? `Dr. ${name}` : profile.user.username);
+    setFirstName(profile.user.firstName);
+    setLastName(profile.user.lastName);
+    setPhone(profile.user.phone ?? "");
+    setBio(profile.bio);
+    setSpecialization(
+      profile.specializations[0] || fallbackSpecialization,
+    );
+    setYearsOfExperience(String(profile.yearsOfExperience ?? fallbackYearsOfExperience));
+    setAvailabilityStatus(getAvailabilityStatusFromPresenceStatus(profile.presenceStatus));
+  };
+
+  const handleProfileImageUpload = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const selectedFile = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!selectedFile) {
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(selectedFile);
+    setProfileImagePreview(previewUrl);
+    setProfileSaveError("");
+    setSuccessMessage("");
+    setIsUploadingProfileImage(true);
+
+    try {
+      const response = await doctorApiService.uploadProfileImage(selectedFile);
+      setCachedDoctorProfile(response.data);
+      applyProfileResponse(response.data);
+      setSuccessMessage("Profile image uploaded successfully.");
+    } catch (error) {
+      setProfileSaveError(getApiErrorMessage(error));
+    } finally {
+      setIsUploadingProfileImage(false);
+    }
+  };
+
+  const saveProfile = async () => {
+    const profilePayload = getProfilePayload();
+
+    if ("error" in profilePayload) {
+      setProfileSaveError(profilePayload.error);
+      return;
+    }
+
+    setProfileSaveError("");
+    setSuccessMessage("");
+    setIsSavingProfile(true);
+
+    try {
+      const response = await doctorApiService.updateProfile(profilePayload.payload);
+      applyProfileResponse(response.data);
+
+      if (profilePayload.selectedBank) {
         updateDoctorBankDetails(CURRENT_DOCTOR_ID, {
-          bankName: selectedBank.name,
+          bankName: profilePayload.selectedBank.name,
           accountName: bankDetails.accountName.trim(),
           accountNumber: bankDetails.accountNumber.trim(),
         });
       }
 
       setSuccessMessage(
-        hasAnyBankDetail
+        profilePayload.selectedBank
           ? "Profile and bank details updated successfully."
           : "Profile updated successfully.",
       );
@@ -432,6 +504,36 @@ export default function ConsultantSettingsPage() {
       setProfileSaveError(getApiErrorMessage(error));
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const updatePresenceStatus = async (nextStatus: AvailabilityStatus) => {
+    if (nextStatus === availabilityStatus || isLoadingProfile || isSavingProfile || isSavingStatus) {
+      return;
+    }
+
+    const previousStatus = availabilityStatus;
+    const profilePayload = getProfilePayload(nextStatus);
+
+    if ("error" in profilePayload) {
+      setProfileSaveError(profilePayload.error);
+      return;
+    }
+
+    setProfileSaveError("");
+    setSuccessMessage("");
+    setAvailabilityStatus(nextStatus);
+    setIsSavingStatus(true);
+
+    try {
+      const response = await doctorApiService.updateProfile(profilePayload.payload);
+      applyProfileResponse(response.data);
+      setSuccessMessage(`Status updated to ${nextStatus}.`);
+    } catch (error) {
+      setAvailabilityStatus(previousStatus);
+      setProfileSaveError(getApiErrorMessage(error));
+    } finally {
+      setIsSavingStatus(false);
     }
   };
 
@@ -697,6 +799,12 @@ export default function ConsultantSettingsPage() {
     }
   };
 
+  const doctorInitials =
+    [firstName, lastName]
+      .map((part) => part.trim().charAt(0).toUpperCase())
+      .filter(Boolean)
+      .join("") || "DR";
+
   return (
     <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
       <DoctorMobileNav />
@@ -708,18 +816,26 @@ export default function ConsultantSettingsPage() {
 
         <div className="mb-8 flex items-center gap-4 px-2">
           <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#16b36c] bg-[#e0e3e6]">
-            <Image
-              className="object-cover"
-              alt={fullName}
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBveWw5sJYO4vcFdjWVdbuGQDlC0JKaMeg6jsjDDSJkIwdRjG_4H_Ao7x2stxD6kTx4oY4DP80Tf-kMczLWJQqZw7ajzN4HpSFJ0W7qcoFs9bxbSpMN7PrAqivavfdvvECjYhZNcT_25wMoRamMlavt1GZ5bU5v1LXmZRreRkSDQzcoG5jXyD19NtcvpsAZFGHlPJkNdm6Vme6nV5SmbMT-CGGHwt91t_aHyC2bbT4qoU6rYhO4t232jYBYnX0OKrxpnI_i4VeK-yJ_"
-              fill
-              sizes="48px"
-              unoptimized
-            />
+            {profileImagePreview ? (
+              <Image
+                className="object-cover"
+                alt={fullName}
+                src={profileImagePreview}
+                fill
+                sizes="48px"
+                unoptimized
+              />
+            ) : (
+              <div className="grid h-full w-full place-items-center text-sm font-bold text-[#001b5e]">
+                {doctorInitials}
+              </div>
+            )}
           </div>
           <div>
             <p className="font-semibold text-[#7784ac]">{fullName}</p>
-            <p className="text-xs text-[#7784ac]/80">{formatSpecialization(specialization)}</p>
+            <p className="text-xs text-[#7784ac]/80">
+              {specialization ? formatSpecialization(specialization) : "Specialization not provided"}
+            </p>
           </div>
         </div>
 
@@ -792,18 +908,20 @@ export default function ConsultantSettingsPage() {
             <div className="flex flex-wrap items-center gap-2">
               {availabilityOptions.map((option) => {
                 const isActive = availabilityStatus === option.value;
+                const isUpdatingThisStatus = isSavingStatus && isActive;
 
                 return (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setAvailabilityStatus(option.value)}
+                    onClick={() => void updatePresenceStatus(option.value)}
+                    disabled={isLoadingProfile || isSavingProfile || isSavingStatus}
                     className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition ${
                       isActive ? option.className : "bg-[#e2e8f0] text-[#475569] hover:bg-[#cbd5e1]"
-                    }`}
+                    } disabled:cursor-wait disabled:opacity-70`}
                   >
                     <span className="material-symbols-outlined text-[16px]">power_settings_new</span>
-                    {option.label}
+                    {isUpdatingThisStatus ? "Updating..." : option.label}
                   </button>
                 );
               })}
@@ -1079,6 +1197,43 @@ export default function ConsultantSettingsPage() {
             </div>
           ) : null}
 
+          {!isLoadingProfile && !profileError ? (
+            <div className="mb-4 flex flex-col gap-4 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4 sm:flex-row sm:items-center">
+              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-[#c6c6cf] bg-white">
+                {profileImagePreview ? (
+                  <Image
+                    className="object-cover"
+                    src={profileImagePreview}
+                    alt={fullName}
+                    fill
+                    sizes="80px"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="grid h-full w-full place-items-center text-xl font-bold text-[#001b5e]">
+                    {doctorInitials}
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[#001b5e]">Profile Image</p>
+                <p className="mt-1 text-xs text-[#64748b]">
+                  Upload or replace the photo patients see on your doctor profile.
+                </p>
+                <label className="mt-3 inline-flex cursor-pointer items-center rounded-lg border border-[#c6c6cf] bg-white px-3 py-1.5 text-xs font-semibold text-[#001b5e] hover:bg-[#f8fafc] has-disabled:cursor-wait has-disabled:opacity-60">
+                  {isUploadingProfileImage ? "Uploading..." : "Update Image"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleProfileImageUpload}
+                    disabled={isUploadingProfileImage}
+                  />
+                </label>
+              </div>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-[#334155]">First Name</span>
@@ -1107,15 +1262,38 @@ export default function ConsultantSettingsPage() {
               <select
                 value={specialization}
                 onChange={(event) => setSpecialization(event.target.value)}
-                disabled={isLoadingProfile || isSavingProfile}
+                disabled={isLoadingProfile || isSavingProfile || isLoadingSpecialties}
                 className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
               >
-                {specializationOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {formatSpecialization(option)}
+                {specialization && !specialties.some((option) => option.name === specialization) ? (
+                  <option value={specialization}>
+                    {formatSpecialization(specialization)}
+                  </option>
+                ) : null}
+                {isLoadingSpecialties ? (
+                  <option value={specialization || ""}>Loading specialties...</option>
+                ) : null}
+                {!isLoadingSpecialties && specialties.length === 0 ? (
+                  <option value={specialization || ""}>No specialties available</option>
+                ) : null}
+                {specialties.map((option) => (
+                  <option key={option.id} value={option.name}>
+                    {option.name}
                   </option>
                 ))}
               </select>
+              {specialtiesError ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#b91c1c]">
+                  <span>{specialtiesError}</span>
+                  <button
+                    type="button"
+                    onClick={() => void loadSpecialties()}
+                    className="font-semibold text-[#001b5e] underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : null}
             </label>
 
             <label className="block text-sm">

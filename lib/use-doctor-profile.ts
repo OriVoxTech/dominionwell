@@ -53,26 +53,39 @@ export function getDoctorSpecialization(profile: DoctorProfile | null) {
     .join(", ") || "Specialization not provided";
 }
 
+export function setCachedDoctorProfile(profile: DoctorProfile) {
+  cachedDoctorProfile = profile;
+  cachedAccessToken = getDoctorAccessToken();
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("dw-doctor-profile-updated"));
+  }
+}
+
 export function useDoctorProfile() {
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
 
   useEffect(() => {
-    if (profile) return;
-
     let isCancelled = false;
 
-    void requestDoctorProfile()
-      .then((nextProfile) => {
-        if (!isCancelled) setProfile(nextProfile);
-      })
-      .catch(() => {
-        // Authenticated request errors and redirects are handled by the API client.
-      });
+    const loadProfile = () => {
+      void requestDoctorProfile()
+        .then((nextProfile) => {
+          if (!isCancelled) setProfile(nextProfile);
+        })
+        .catch(() => {
+          // Authenticated request errors and redirects are handled by the API client.
+        });
+    };
+
+    window.addEventListener("dw-doctor-profile-updated", loadProfile);
+    loadProfile();
 
     return () => {
       isCancelled = true;
+      window.removeEventListener("dw-doctor-profile-updated", loadProfile);
     };
-  }, [profile]);
+  }, []);
 
   return profile;
 }

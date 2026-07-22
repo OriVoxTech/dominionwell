@@ -268,6 +268,7 @@ export interface DoctorProfile {
   id: string;
   userId: string;
   bio: string | null;
+  profileImageFileId?: string | null;
   specializations: string[];
   presenceStatus?: "AVAILABLE" | "BUSY" | "OFFLINE";
   yearsOfExperience?: number | null;
@@ -344,10 +345,65 @@ export interface DoctorWithdrawalResponse {
   id?: string;
   doctorId?: string;
   amount?: number;
+  amountCents?: number;
+  points?: number;
   status?: string;
+  requestedAt?: string;
   createdAt?: string;
   updatedAt?: string;
   [key: string]: unknown;
+}
+
+export interface DoctorWithdrawalsResponse {
+  data: DoctorWithdrawalResponse[];
+  meta: PaginationMeta;
+}
+
+export interface DoctorWithdrawalsQuery {
+  status?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface DoctorPatientsQuery {
+  page?: number;
+  limit?: number;
+}
+
+export interface DoctorPatientSummary extends Record<string, unknown> {
+  id?: string;
+  patientId?: string;
+  patientName?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string | null;
+  consultationsWithDoctor?: number;
+  completedConsultations?: number;
+  consultationCount?: number;
+  rating?: number;
+  averageRating?: number;
+  patient?: {
+    id?: string;
+    userId?: string;
+    user?: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      phone?: string | null;
+    } | null;
+  } | null;
+  user?: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string | null;
+  } | null;
+}
+
+export interface DoctorPatientsResponse {
+  data: DoctorPatientSummary[];
+  meta: PaginationMeta;
 }
 
 export interface PatientProfile {
@@ -384,6 +440,7 @@ export interface PatientDashboardResponse {
     completed: number;
   };
   recentDoctors: PublicDoctor[];
+  mostVisitedDoctor: PublicDoctor | null;
   currentSubscription: Record<string, unknown> | null;
   badges: string[];
 }
@@ -445,8 +502,14 @@ export interface PaginationMeta {
 
 export interface PatientNotificationsResponse {
   data?: PatientNotification[];
+  unreadCount?: number;
   meta?: PaginationMeta;
   [key: string]: unknown;
+}
+
+export interface NotificationsQuery {
+  page?: number;
+  limit?: number;
 }
 
 export interface NotificationUnreadCountResponse {
@@ -482,6 +545,18 @@ export interface DoctorAppointmentsResponse {
     limit: number;
     totalPages: number;
   };
+}
+
+export interface CreateAppointmentReportPayload {
+  summary: string;
+}
+
+export interface AppointmentReportResponse extends Record<string, unknown> {
+  id?: string;
+  appointmentId?: string;
+  summary?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PatientAppointmentsQuery {
@@ -650,7 +725,10 @@ export interface CreateDoctorAvailabilityResponse {
 export interface PublicDoctor {
   id: string;
   bio: string | null;
+  profileImageFileId?: string | null;
   specializations: string[];
+  presenceStatus?: "AVAILABLE" | "BUSY" | "OFFLINE" | string | null;
+  yearsOfExperience?: number | null;
   verifiedAt: string;
   createdAt: string;
   updatedAt: string;
@@ -1214,9 +1292,10 @@ export const patientApiService = {
     patientGatewayApi.get<VerifySubscriptionPaymentResponse>(
       `/api/subscriptions/verify/${encodeURIComponent(reference)}`,
     ),
-  listNotifications: () =>
+  listNotifications: (params: NotificationsQuery = {}) =>
     patientGatewayApi.get<PatientNotificationsResponse | PatientNotification[]>(
       "/api/notifications",
+      { params: { page: 1, limit: 20, ...params } },
     ),
   getUnreadNotificationCount: () =>
     patientGatewayApi.get<NotificationUnreadCountResponse>(
@@ -1247,8 +1326,37 @@ export const doctorApiService = {
   getProfile: () => doctorGatewayApi.get<DoctorProfile>("/api/doctors/me"),
   updateProfile: (payload: UpdateDoctorProfilePayload) =>
     doctorGatewayApi.patch<DoctorProfile>("/api/doctors/me", payload),
+  uploadProfileImage: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    return doctorGatewayApi.post<DoctorProfile>(
+      "/api/doctors/me/profile-image",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
+  },
   updateBankAccount: (payload: UpdateDoctorBankAccountPayload) =>
     doctorGatewayApi.put<ApiResponse>("/api/doctors/me/bank-account", payload),
+  listNotifications: (params: NotificationsQuery = {}) =>
+    doctorGatewayApi.get<PatientNotificationsResponse | PatientNotification[]>(
+      "/api/notifications",
+      { params: { page: 1, limit: 20, ...params } },
+    ),
+  getUnreadNotificationCount: () =>
+    doctorGatewayApi.get<NotificationUnreadCountResponse>(
+      "/api/notifications/unread-count",
+    ),
+  markAllNotificationsAsRead: () =>
+    doctorGatewayApi.patch<MarkNotificationsReadResponse>(
+      "/api/notifications/read-all",
+    ),
+  markNotificationAsRead: (notificationId: string) =>
+    doctorGatewayApi.patch<PatientNotification | MarkNotificationsReadResponse>(
+      `/api/notifications/${encodeURIComponent(notificationId)}/read`,
+    ),
   getWallet: (doctorId: string) =>
     doctorGatewayApi.get<DoctorWallet>(
       `/api/wallets/doctors/${encodeURIComponent(doctorId)}`,
@@ -1257,6 +1365,15 @@ export const doctorApiService = {
     doctorGatewayApi.post<DoctorWithdrawalResponse>(
       "/api/withdrawals",
       payload,
+    ),
+  listWithdrawals: (params: DoctorWithdrawalsQuery = {}) =>
+    doctorGatewayApi.get<DoctorWithdrawalsResponse>("/api/withdrawals", {
+      params: { page: 1, limit: 20, ...params },
+    }),
+  listPatients: (params: DoctorPatientsQuery = {}) =>
+    doctorGatewayApi.get<DoctorPatientsResponse>(
+      "/api/doctors/me/patients",
+      { params: { page: 1, limit: 20, ...params } },
     ),
   listAppointments: (params: DoctorAppointmentsQuery = {}) =>
     doctorGatewayApi.get<DoctorAppointmentsResponse>(
@@ -1270,6 +1387,14 @@ export const doctorApiService = {
   completeAppointment: (appointmentId: string) =>
     doctorGatewayApi.patch<DoctorAppointment>(
       `/api/appointments/${encodeURIComponent(appointmentId)}/complete`,
+    ),
+  createAppointmentReport: (
+    appointmentId: string,
+    payload: CreateAppointmentReportPayload,
+  ) =>
+    doctorGatewayApi.post<AppointmentReportResponse>(
+      `/api/appointments/${encodeURIComponent(appointmentId)}/reports`,
+      payload,
     ),
   createAvailability: (payload: CreateDoctorAvailabilityPayload) =>
     doctorGatewayApi.put<CreateDoctorAvailabilityResponse>(

@@ -197,6 +197,18 @@ export default function ConsultantConsultationsPage() {
   const [actionMessage, setActionMessage] = useState("");
   const [actionError, setActionError] = useState("");
   const [actingAppointmentId, setActingAppointmentId] = useState("");
+  const [reportAppointmentId, setReportAppointmentId] = useState("");
+  const [reportSummary, setReportSummary] = useState("");
+  const [reportSubmittingAppointmentId, setReportSubmittingAppointmentId] =
+    useState("");
+
+  const reportAppointment = useMemo(
+    () =>
+      doctorAppointments.find(
+        (appointment) => appointment.id === reportAppointmentId,
+      ) ?? null,
+    [doctorAppointments, reportAppointmentId],
+  );
 
   const loadDoctorAppointments = useCallback(async () => {
     setDoctorAppointmentsError("");
@@ -296,10 +308,115 @@ export default function ConsultantConsultationsPage() {
     }
   };
 
+  const openReportModal = (appointmentId: string) => {
+    setActionMessage("");
+    setActionError("");
+    setReportSummary("");
+    setReportAppointmentId(appointmentId);
+  };
+
+  const closeReportModal = () => {
+    if (reportSubmittingAppointmentId) return;
+
+    setReportAppointmentId("");
+    setReportSummary("");
+  };
+
+  const submitAppointmentReport = async () => {
+    const summary = reportSummary.trim();
+
+    if (!reportAppointmentId || !summary) {
+      setActionError("Add a report summary before submitting.");
+      return;
+    }
+
+    setActionMessage("");
+    setActionError("");
+    setReportSubmittingAppointmentId(reportAppointmentId);
+
+    try {
+      await doctorApiService.createAppointmentReport(reportAppointmentId, {
+        summary,
+      });
+      setActionMessage("Consultation report added successfully.");
+      setReportAppointmentId("");
+      setReportSummary("");
+    } catch (error) {
+      setActionError(getApiErrorMessage(error));
+    } finally {
+      setReportSubmittingAppointmentId("");
+    }
+  };
+
   const showPagination = activeConsultationTab === "all" && appointmentMeta.totalPages > 1;
 
   return (
     <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
+      {reportAppointmentId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[#001b5e]">
+                  Add consultation report
+                </h2>
+                <p className="mt-1 text-xs text-[#64748b]">
+                  {reportAppointment
+                    ? `${getAppointmentPatient(reportAppointment)} · ${formatAppointmentDate(reportAppointment)}`
+                    : reportAppointmentId}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeReportModal}
+                disabled={Boolean(reportSubmittingAppointmentId)}
+                className="grid h-9 w-9 place-items-center rounded-full border border-[#cbd5e1] text-[#001b5e] hover:bg-[#f8fafc] disabled:cursor-wait disabled:opacity-60"
+                aria-label="Close report modal"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  close
+                </span>
+              </button>
+            </div>
+
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">
+                Report summary
+              </span>
+              <textarea
+                value={reportSummary}
+                onChange={(event) => setReportSummary(event.target.value)}
+                rows={7}
+                className="mt-2 w-full rounded-xl border border-[#cbd5e1] px-3 py-2 text-sm text-[#334155] outline-none focus:border-[#0aa4b4]"
+                placeholder="Write the consultation summary, diagnosis notes, prescriptions, or follow-up advice..."
+              />
+            </label>
+
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeReportModal}
+                disabled={Boolean(reportSubmittingAppointmentId)}
+                className="rounded-lg border border-[#c6c6cf] px-4 py-2 text-sm font-semibold text-[#475569] hover:bg-[#f8fafc] disabled:cursor-wait disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void submitAppointmentReport()}
+                disabled={
+                  Boolean(reportSubmittingAppointmentId) ||
+                  !reportSummary.trim()
+                }
+                className="rounded-lg bg-[#001b5e] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+              >
+                {reportSubmittingAppointmentId ? "Saving..." : "Save Report"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <DoctorMobileNav />
 
       <aside className="fixed left-0 top-0 z-40 hidden h-full w-[280px] flex-col bg-[#0d1b3d] px-4 py-8 text-white shadow-md lg:flex">
@@ -487,6 +604,7 @@ export default function ConsultantConsultationsPage() {
                     const canAct = activeConsultationTab === "upcoming" && status === "BOOKED";
                     const isActing = actingAppointmentId === appointment.id;
                     const canComplete = canCompleteAppointment(appointment);
+                    const isCompleted = status === "COMPLETED";
 
                     return (
                       <tr key={appointment.id} className="border-b border-[#e2e8f0] last:border-b-0">
@@ -529,6 +647,14 @@ export default function ConsultantConsultationsPage() {
                                 </p>
                               ) : null}
                             </div>
+                          ) : isCompleted ? (
+                            <button
+                              type="button"
+                              onClick={() => openReportModal(appointment.id)}
+                              className="rounded-lg bg-[#001b5e] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0b2b75]"
+                            >
+                              Add Report
+                            </button>
                           ) : (
                             <span className="text-xs text-[#64748b]">No action</span>
                           )}
