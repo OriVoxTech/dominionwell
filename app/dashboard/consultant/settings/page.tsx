@@ -1,11 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
 import DoctorChangePasswordModal from "@/components/doctor-change-password-modal";
-import DoctorLogoutButton from "@/components/doctor-logout-button";
+import DoctorPageHeader from "@/components/doctor-page-header";
+import DoctorSidebar from "@/components/doctor-sidebar";
 import {
   readDoctorBankDetails,
   updateDoctorBankDetails,
@@ -806,76 +806,13 @@ export default function ConsultantSettingsPage() {
       .join("") || "DR";
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
+    <div className="min-h-screen bg-[#f4f7fb] text-[#17223b]">
       <DoctorMobileNav />
 
-      <aside className="fixed left-0 top-0 z-40 hidden h-full w-[280px] flex-col bg-[#0d1b3d] px-4 py-8 text-white shadow-md lg:flex">
-        <div className="mb-8 px-2">
-          <span className="text-1xl font-extrabold text-[#7784ac]">DominionWell+</span>
-        </div>
+      <DoctorSidebar active="settings" />
 
-        <div className="mb-8 flex items-center gap-4 px-2">
-          <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#16b36c] bg-[#e0e3e6]">
-            {profileImagePreview ? (
-              <Image
-                className="object-cover"
-                alt={fullName}
-                src={profileImagePreview}
-                fill
-                sizes="48px"
-                unoptimized
-              />
-            ) : (
-              <div className="grid h-full w-full place-items-center text-sm font-bold text-[#001b5e]">
-                {doctorInitials}
-              </div>
-            )}
-          </div>
-          <div>
-            <p className="font-semibold text-[#7784ac]">{fullName}</p>
-            <p className="text-xs text-[#7784ac]/80">
-              {specialization ? formatSpecialization(specialization) : "Specialization not provided"}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex-grow space-y-2 text-sm">
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor">
-            <span className="material-symbols-outlined">dashboard</span>
-            <span>Dashboard</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/consultations">
-            <span className="material-symbols-outlined">medical_services</span>
-            <span>Consultations</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/patients">
-            <span className="material-symbols-outlined">group</span>
-            <span>Patients</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/reports">
-            <span className="material-symbols-outlined">analytics</span>
-            <span>Reports</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/wallet">
-            <span className="material-symbols-outlined">wallet</span>
-            <span>Wallet</span>
-          </Link>
-          <div className="flex items-center gap-3 rounded-lg border-l-4 border-[#16b36c] bg-[#74fcad] p-3 text-[#007443]">
-            <span className="material-symbols-outlined">settings</span>
-            <span>Settings</span>
-          </div>
-        </div>
-
-        <div className="mt-auto space-y-2 border-t border-[#7784ac]/10 pt-6 text-sm">
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/notifications">
-            <span className="material-symbols-outlined">notifications</span>
-            <span>Notifications</span>
-          </Link>
-          <DoctorLogoutButton className="flex w-full items-center gap-3 p-3 text-left text-[#7784ac]/85 hover:bg-[#00020d]/10" />
-        </div>
-      </aside>
-
-      <main className="min-h-screen p-4 sm:p-6 md:p-10 lg:ml-[280px]">
+      <main className="dw-modern-dashboard min-h-screen lg:ml-[264px]">
+        <div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
         {availabilityToastMessage ? (
           <div className="fixed right-4 top-4 z-50 w-full max-w-sm rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-3 shadow-lg sm:right-6 sm:top-6 lg:right-8">
             <div className="flex items-start gap-2">
@@ -885,25 +822,13 @@ export default function ConsultantSettingsPage() {
           </div>
         ) : null}
 
-        <header className="mb-6 sm:mb-8">
-          <div className="mb-2 flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/dashboard/doctor"
-              aria-label="Back"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            </Link>
-            <h1 className="text-xl font-semibold text-[#00020d] sm:text-2xl">Settings</h1>
-          </div>
-          <p className="text-xs text-[#45464e] sm:text-sm">Manage doctor availability and update profile details.</p>
-        </header>
+        <DoctorPageHeader title="Settings" description="Manage availability, account security, professional details, and payout information from one place." icon="settings" />
 
-        <section className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+        <section className="mb-5 overflow-hidden rounded-[1.5rem] bg-[linear-gradient(120deg,#001b5e,#073377_65%,#087964_135%)] p-5 text-white shadow-[0_18px_45px_rgba(0,27,94,0.15)] sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-base font-semibold text-[#00020d]">Availability</h2>
-              <p className="text-sm text-[#475569]">Switch your current consultation status between available, busy, and offline.</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8df0bb]">Live presence</p><h2 className="mt-1 text-lg font-bold text-white">Consultation status</h2>
+              <p className="mt-1 text-xs text-[#cbd8f4]">Switch between available, busy, and offline without saving the full profile.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {availabilityOptions.map((option) => {
@@ -917,7 +842,7 @@ export default function ConsultantSettingsPage() {
                     onClick={() => void updatePresenceStatus(option.value)}
                     disabled={isLoadingProfile || isSavingProfile || isSavingStatus}
                     className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition ${
-                      isActive ? option.className : "bg-[#e2e8f0] text-[#475569] hover:bg-[#cbd5e1]"
+                      isActive ? option.className : "bg-white/10 text-white hover:bg-white/20"
                     } disabled:cursor-wait disabled:opacity-70`}
                   >
                     <span className="material-symbols-outlined text-[16px]">power_settings_new</span>
@@ -929,7 +854,7 @@ export default function ConsultantSettingsPage() {
           </div>
         </section>
 
-        <section className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+        <section className="mb-5 rounded-[1.5rem] border border-[#e0e7ef] bg-white p-4 shadow-[0_8px_28px_rgba(30,52,83,0.05)] sm:p-6">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-[#00020d]">Monthly Availability Calendar</h2>
@@ -951,7 +876,7 @@ export default function ConsultantSettingsPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
-            <div className="rounded-xl border border-[#e2e8f0] p-3">
+            <div className="overflow-x-auto rounded-xl border border-[#e2e8f0] p-3">
               <h3 className="mb-3 text-sm font-semibold text-[#001b5e]">{getMonthLabel(selectedMonth)}</h3>
               {calendarError ? (
                 <div role="alert" className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-[#fecaca] bg-[#fef2f2] p-2 text-xs text-[#b91c1c]">
@@ -960,7 +885,7 @@ export default function ConsultantSettingsPage() {
                 </div>
               ) : null}
               {isLoadingCalendar ? <p className="mb-3 text-xs text-[#64748b]">Loading saved slots...</p> : null}
-              <div className="mb-2 grid grid-cols-7 text-center text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">
+              <div className="mb-2 grid min-w-[560px] grid-cols-7 text-center text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">
                 <div>Sun</div>
                 <div>Mon</div>
                 <div>Tue</div>
@@ -969,7 +894,7 @@ export default function ConsultantSettingsPage() {
                 <div>Fri</div>
                 <div>Sat</div>
               </div>
-              <div className="grid grid-cols-7 gap-2">
+              <div className="grid min-w-[560px] grid-cols-7 gap-2">
                 {monthCells.map((cell) => {
                   if (!cell.isInMonth) {
                     return <div key={cell.date} className="h-[82px] rounded-lg bg-transparent" />;
@@ -1156,7 +1081,7 @@ export default function ConsultantSettingsPage() {
           </div>
         </section>
 
-        <section className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+        <section className="mb-5 rounded-[1.5rem] border border-[#e0e7ef] bg-white p-4 shadow-[0_8px_28px_rgba(30,52,83,0.05)] sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-[#00020d]">Security</h2>
@@ -1177,7 +1102,7 @@ export default function ConsultantSettingsPage() {
           {securityMessage ? <p role="status" className="mt-3 rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm text-[#15803d]">{securityMessage}</p> : null}
         </section>
 
-        <section className="rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+        <section className="rounded-[1.5rem] border border-[#e0e7ef] bg-white p-4 shadow-[0_8px_28px_rgba(30,52,83,0.05)] sm:p-6">
           <h2 className="mb-4 text-base font-semibold text-[#00020d]">Update Profile</h2>
 
           {profileError ? (
@@ -1422,12 +1347,13 @@ export default function ConsultantSettingsPage() {
                 !phone.trim() ||
                 !specialization.trim()
               }
-              className="rounded-lg bg-[#001b5e] px-4 py-2 text-xs font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+              className="rounded-xl bg-[#16b36c] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#118d57] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
             >
               {isSavingProfile ? "Saving..." : "Save Profile"}
             </button>
           </div>
         </section>
+        </div>
       </main>
 
       {isChangePasswordOpen ? (

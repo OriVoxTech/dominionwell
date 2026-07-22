@@ -60,23 +60,26 @@ export default function PatientMobileNav({ active }: PatientMobileNavProps) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-[#c6c6cf] bg-white/95 backdrop-blur lg:hidden">
+      <header className="sticky top-0 z-30 border-b border-[#dde5ef] bg-white/90 backdrop-blur-xl lg:hidden">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="grid h-9 w-9 place-items-center rounded-lg border border-[#c6c6cf] text-[#001b5e]"
+              className="grid h-9 w-9 place-items-center rounded-xl border border-[#d9e2ec] text-[#001b5e]"
               aria-label="Open navigation menu"
               onClick={() => setIsOpen(true)}
             >
               <span className="material-symbols-outlined text-[20px]">menu</span>
             </button>
-            <p className="text-base font-extrabold tracking-tight text-[#001b5e]">DominionWell+</p>
+            <div>
+              <p className="text-sm font-extrabold tracking-[-0.025em] text-[#001b5e]">DominionWell<span className="text-[#16a968]">+</span></p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#8a96a8]">Patient</p>
+            </div>
           </div>
 
           <Link
             href="/dashboard/patient/doctors"
-            className="rounded-lg bg-[#16b46f] px-3 py-1.5 text-xs font-semibold text-white"
+            className="rounded-xl bg-[#16a968] px-3 py-2 text-xs font-bold text-white shadow-sm"
           >
             Book Consult
           </Link>
@@ -92,7 +95,7 @@ export default function PatientMobileNav({ active }: PatientMobileNavProps) {
             onClick={() => setIsOpen(false)}
           />
 
-          <aside className="relative z-10 h-full w-[82%] max-w-xs bg-[#001b5e] p-4 text-white shadow-2xl">
+          <aside className="relative z-10 h-full w-[84%] max-w-xs bg-[#001b5e] p-4 text-white shadow-2xl">
             <div className="mb-5 flex items-center justify-between">
               <p className="text-lg font-extrabold tracking-tight">DominionWell+</p>
               <button
@@ -105,7 +108,7 @@ export default function PatientMobileNav({ active }: PatientMobileNavProps) {
               </button>
             </div>
 
-            <div className="mb-5 flex items-center gap-3 rounded-xl bg-white/10 p-3">
+            <div className="mb-5 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.07] p-3">
               <PatientAvatar profile={profile} />
               <PatientProfileSummary />
             </div>
@@ -119,8 +122,8 @@ export default function PatientMobileNav({ active }: PatientMobileNavProps) {
                     key={item.key}
                     href={item.href}
                     onClick={() => setIsOpen(false)}
-                    className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold ${
-                      isActive ? "bg-[#16b46f]/20 text-[#d7ffe9]" : "text-[#d8e2ff]"
+                    className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold ${
+                      isActive ? "bg-white text-[#001b5e]" : "text-[#cad7f4]"
                     }`}
                   >
                     <span className="material-symbols-outlined text-[18px]">{item.icon}</span>

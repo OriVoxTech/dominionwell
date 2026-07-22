@@ -268,7 +268,7 @@ export default function PatientDashboardPage() {
         </div>
       </aside>
 
-      <main className="min-h-screen lg:ml-[264px]">
+      <main className="dw-modern-dashboard min-h-screen lg:ml-[264px]">
         <div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
           <header className="mb-6 flex items-center justify-between gap-4">
             <div className="min-w-0">
@@ -319,7 +319,7 @@ export default function PatientDashboardPage() {
                   <span className="material-symbols-outlined text-[16px]">favorite</span>
                   Your care, in one place
                 </span>
-                <h2 className="mt-4 text-2xl font-bold tracking-[-0.035em] sm:text-3xl">How can we support your health today?</h2>
+                <h2 className="mt-4 text-xl font-bold tracking-[-0.03em] sm:text-2xl">How can we support your health today?</h2>
                 <p className="mt-3 max-w-lg text-sm leading-6 text-[#cbd8f4]">
                   Browse verified specialists, book an appointment, or review your ongoing care.
                 </p>
@@ -339,14 +339,14 @@ export default function PatientDashboardPage() {
                   <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-[#8df0bb]">
                     <span className="material-symbols-outlined text-[19px]">event_upcoming</span>
                   </span>
-                  <p className="mt-5 text-2xl font-bold">{upcomingAppointments}</p>
+                  <p className="mt-5 text-xl font-bold">{upcomingAppointments}</p>
                   <p className="mt-1 text-[11px] text-[#cbd8f4]">Upcoming</p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
                   <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-[#8df0bb]">
                     <span className="material-symbols-outlined text-[19px]">task_alt</span>
                   </span>
-                  <p className="mt-5 text-2xl font-bold">{completedAppointments}</p>
+                  <p className="mt-5 text-xl font-bold">{completedAppointments}</p>
                   <p className="mt-1 text-[11px] text-[#cbd8f4]">Completed</p>
                 </div>
               </div>
@@ -365,7 +365,7 @@ export default function PatientDashboardPage() {
                     </span>
                     <Link href="/dashboard/patient/subscription" className="text-[11px] font-bold text-[#0b9459]">Manage</Link>
                   </div>
-                  <p className="mt-5 text-2xl font-bold text-[#001b5e]">{remainingConsultations}</p>
+                  <p className="mt-5 text-xl font-bold text-[#001b5e]">{remainingConsultations}</p>
                   <p className="mt-1 text-sm font-semibold text-[#44536a]">Consultation credits</p>
                   <p className="mt-1 text-xs text-[#8a96a8]">Available on your account</p>
                 </article>
@@ -377,7 +377,7 @@ export default function PatientDashboardPage() {
                     </span>
                     <Link href="/dashboard/patient/appointments" className="text-[11px] font-bold text-[#315ead]">View all</Link>
                   </div>
-                  <p className="mt-5 text-2xl font-bold text-[#001b5e]">{upcomingAppointments}</p>
+                  <p className="mt-5 text-xl font-bold text-[#001b5e]">{upcomingAppointments}</p>
                   <p className="mt-1 text-sm font-semibold text-[#44536a]">Upcoming appointments</p>
                   <p className="mt-1 text-xs text-[#8a96a8]">Your scheduled consultations</p>
                 </article>
@@ -388,7 +388,7 @@ export default function PatientDashboardPage() {
                       <span className="material-symbols-outlined text-[22px]">clinical_notes</span>
                     </span>
                   </div>
-                  <p className="mt-5 text-2xl font-bold text-[#001b5e]">{completedAppointments}</p>
+                  <p className="mt-5 text-xl font-bold text-[#001b5e]">{completedAppointments}</p>
                   <p className="mt-1 text-sm font-semibold text-[#44536a]">Completed consultations</p>
                   <p className="mt-1 text-xs text-[#8a96a8]">Your completed care sessions</p>
                 </article>

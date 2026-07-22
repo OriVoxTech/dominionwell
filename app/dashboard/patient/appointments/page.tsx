@@ -1,17 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import PatientAvatar from "@/components/patient-avatar";
 import PatientMobileNav from "@/components/patient-mobile-nav";
-import PatientLogoutButton from "@/components/patient-logout-button";
-import PatientProfileSummary from "@/components/patient-profile-summary";
+import PatientPageHeader from "@/components/patient-page-header";
+import PatientSidebar from "@/components/patient-sidebar";
 import {
     getApiErrorMessage,
     patientApiService,
     type PatientAppointment,
 } from "@/lib/api";
-import { usePatientProfile } from "@/lib/use-patient-profile";
 
 type AppointmentsTab = "upcoming" | "history";
 
@@ -195,14 +192,14 @@ function getServerAppointmentStatus(appointment: PatientAppointment) {
 }
 
 export default function PatientAppointmentsPage() {
-    const profile = usePatientProfile();
     const [activeTab, setActiveTab] = useState<AppointmentsTab>("upcoming");
     const [patientAppointments, setPatientAppointments] = useState<PatientAppointment[]>([]);
     const [appointmentsMeta, setAppointmentsMeta] = useState({ total: 0, page: 1, limit: 20, totalPages: 0 });
     const [isLoadingPatientAppointments, setIsLoadingPatientAppointments] = useState(true);
     const [appointmentsError, setAppointmentsError] = useState("");
     const [reviewAppointment, setReviewAppointment] = useState<PatientAppointment | null>(null);
-    const [reviewRating, setReviewRating] = useState(5);
+    const [reviewRating, setReviewRating] = useState(0);
+    const [hoveredRating, setHoveredRating] = useState(0);
     const [reviewComment, setReviewComment] = useState("");
     const [reviewMessage, setReviewMessage] = useState("");
     const [isSubmittingReview, setIsSubmittingReview] = useState(false);
@@ -256,7 +253,8 @@ export default function PatientAppointmentsPage() {
 
     const openReviewModal = (appointment: PatientAppointment) => {
         setReviewAppointment(appointment);
-        setReviewRating(5);
+        setReviewRating(0);
+        setHoveredRating(0);
         setReviewComment("");
         setReviewMessage("");
     };
@@ -276,6 +274,11 @@ export default function PatientAppointmentsPage() {
 
         if (!doctorId) {
             setReviewMessage("Doctor information is missing for this appointment.");
+            return;
+        }
+
+        if (reviewRating < 1 || reviewRating > 5) {
+            setReviewMessage("Please select a rating from 1 to 5 stars.");
             return;
         }
 
@@ -307,73 +310,14 @@ export default function PatientAppointmentsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
+        <div className="min-h-screen bg-[#f4f7fb] text-[#17223b]">
             <PatientMobileNav active="appointments" />
+            <PatientSidebar active="appointments" />
 
-            <aside className="fixed left-0 top-0 z-40 hidden h-full w-[250px] flex-col bg-[#001b5e] px-3 py-6 text-white shadow-md lg:flex">
-                <div className="mb-8 px-2">
-                    <h1 className="text-1xl font-extrabold tracking-tight">DominionWell+</h1>
-                </div>
+            <main className="dw-modern-dashboard min-h-screen lg:ml-[264px]"><div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
+                <PatientPageHeader title="Appointments" description="Review upcoming consultations, completed sessions, and doctor notes." icon="calendar_month" />
 
-                <div className="mb-6 flex items-center gap-3 px-2">
-                    <PatientAvatar profile={profile} />
-                    <PatientProfileSummary />
-                </div>
-
-                <nav className="flex-1 space-y-1 text-sm">
-                    <Link href="/dashboard/patient" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-                        <span className="material-symbols-outlined text-[20px]">dashboard</span>
-                        <span>Dashboard</span>
-                    </Link>
-                    <div className="flex items-center gap-3 rounded-lg border-l-4 border-[#16b46f] bg-[#16b46f]/20 px-3 py-2 text-[#d7ffe9]">
-                        <span className="material-symbols-outlined text-[20px]">calendar_month</span>
-                        <span>Appointments</span>
-                    </div>
-                    <Link href="/dashboard/patient/doctors" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-                        <span className="material-symbols-outlined text-[20px]">medical_services</span>
-                        <span>Browse Doctors</span>
-                    </Link>
-                    <Link href="/dashboard/patient/subscription" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-                        <span className="material-symbols-outlined text-[20px]">card_membership</span>
-                        <span>Subscription</span>
-                    </Link>
-                    <Link href="/dashboard/patient/payments" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-                        <span className="material-symbols-outlined text-[20px]">receipt_long</span>
-                        <span>Payments</span>
-                    </Link>
-                    <Link href="/dashboard/patient/settings" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-                        <span className="material-symbols-outlined text-[20px]">settings</span>
-                        <span>Settings</span>
-                    </Link>
-                </nav>
-
-                <button className="mb-6 mt-4 rounded-xl bg-[#16b46f] py-2.5 text-sm font-semibold text-white">Book New Consult</button>
-
-                <div className="space-y-1 border-t border-white/10 pt-4 text-sm text-[#d8e2ff]">
-                    <Link href="/dashboard/patient/help-center" className="flex items-center gap-3 px-3 py-2 hover:bg-white/10">
-                        <span className="material-symbols-outlined text-[20px]">help</span>
-                        <span>Help Center</span>
-                    </Link>
-                    <PatientLogoutButton className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60" />
-                </div>
-            </aside>
-
-            <main className="min-h-screen p-4 sm:p-6 md:p-8 lg:ml-[250px]">
-                <header className="mb-6">
-                    <div className="mb-2 flex items-center gap-2">
-                        <Link
-                            href="/dashboard/patient"
-                            aria-label="Back"
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
-                        >
-                            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-                        </Link>
-                        <h2 className="text-2xl font-semibold text-[#001b5e]">Appointments</h2>
-                    </div>
-                    <p className="text-sm text-[#475569]">Review your consultation history and doctor notes.</p>
-                </header>
-
-                <section className="mb-6 rounded-2xl border border-[#c6c6cf] bg-white p-2 shadow-sm">
+                <section className="mb-5 rounded-2xl border border-[#e0e7ef] bg-white p-2 shadow-[0_8px_26px_rgba(30,52,83,0.05)]">
                     <div className="grid grid-cols-2 gap-2">
                         <button
                             type="button"
@@ -401,7 +345,7 @@ export default function PatientAppointmentsPage() {
                 </section>
 
                 {activeTab === "upcoming" ? (
-                    <section className="mb-6 rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
+                    <section className="mb-5 rounded-[1.5rem] border border-[#e0e7ef] bg-white p-4 shadow-[0_8px_28px_rgba(30,52,83,0.05)] sm:p-6">
                         <div className="mb-4 flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-[#001b5e]">Upcoming Appointments</h3>
                             <p className="text-xs text-[#64748b]">
@@ -460,7 +404,7 @@ export default function PatientAppointmentsPage() {
                         )}
                     </section>
                 ) : (
-                    <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
+                    <section className="rounded-[1.5rem] border border-[#e0e7ef] bg-white p-4 shadow-[0_8px_28px_rgba(30,52,83,0.05)] sm:p-6">
                         <div className="mb-4 flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-[#001b5e]">Consultation History</h3>
                             <p className="text-xs text-[#64748b]">{historyAppointments.length} records</p>
@@ -523,7 +467,7 @@ export default function PatientAppointmentsPage() {
                         )}
                     </section>
                 )}
-            </main>
+            </div></main>
 
             {reviewAppointment ? (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/45 p-4">
@@ -554,21 +498,42 @@ export default function PatientAppointmentsPage() {
                             </button>
                         </div>
 
-                        <div className="mb-4">
-                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#64748b]">Rating</p>
-                            <div className="flex gap-1" role="radiogroup" aria-label="Doctor rating">
+                        <div className="mb-4 rounded-2xl border border-[#fde7b0] bg-[#fffbeb] p-4">
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-[#8a5a09]">Your rating</p>
+                                <span className="text-xs font-bold text-[#9a650b]">
+                                    {reviewRating ? `${reviewRating} out of 5` : "Select a star"}
+                                </span>
+                            </div>
+                            <div
+                                className="flex items-center gap-1"
+                                role="radiogroup"
+                                aria-label="Doctor rating"
+                                onMouseLeave={() => setHoveredRating(0)}
+                            >
                                 {[1, 2, 3, 4, 5].map((rating) => (
                                     <button
                                         key={rating}
                                         type="button"
                                         role="radio"
                                         aria-checked={reviewRating === rating}
-                                        onClick={() => setReviewRating(rating)}
-                                        className="rounded-md p-1 text-[#f59e0b] hover:bg-[#fef3c7]"
+                                        onClick={() => {
+                                            setReviewRating(rating);
+                                            setReviewMessage("");
+                                        }}
+                                        onMouseEnter={() => setHoveredRating(rating)}
+                                        onFocus={() => setHoveredRating(rating)}
+                                        onBlur={() => setHoveredRating(0)}
+                                        className="grid h-11 w-11 place-items-center rounded-xl text-[#f59e0b] transition hover:scale-105 hover:bg-[#fef3c7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f59e0b] focus-visible:ring-offset-2"
                                         aria-label={`${rating} star${rating === 1 ? "" : "s"}`}
                                     >
-                                        <span className="material-symbols-outlined text-3xl">
-                                            {rating <= reviewRating ? "star" : "star_outline"}
+                                        <span
+                                            className="material-symbols-outlined pointer-events-none text-[32px] transition-transform"
+                                            style={{
+                                                fontVariationSettings: `'FILL' ${rating <= (hoveredRating || reviewRating) ? 1 : 0}, 'wght' 500, 'GRAD' 0, 'opsz' 32`,
+                                            }}
+                                        >
+                                            star
                                         </span>
                                     </button>
                                 ))}
@@ -602,7 +567,7 @@ export default function PatientAppointmentsPage() {
                             </button>
                             <button
                                 type="submit"
-                                disabled={isSubmittingReview}
+                                disabled={isSubmittingReview || reviewRating === 0 || !reviewComment.trim()}
                                 className="rounded-lg bg-[#001b5e] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
                             >
                                 {isSubmittingReview ? "Submitting..." : "Submit Review"}

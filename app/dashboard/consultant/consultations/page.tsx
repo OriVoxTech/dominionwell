@@ -1,11 +1,9 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
-import DoctorProfileSummary from "@/components/doctor-profile-summary";
-import DoctorLogoutButton from "@/components/doctor-logout-button";
+import DoctorPageHeader from "@/components/doctor-page-header";
+import DoctorSidebar from "@/components/doctor-sidebar";
 import {
   doctorApiService,
   getApiErrorMessage,
@@ -16,6 +14,8 @@ import {
 type ConsultationTab = "upcoming" | "all";
 
 const CONSULTATION_PAST_GRACE_MINUTES = 10;
+const CANCELLATION_LOCK_MINUTES = 5;
+const DEFAULT_CONSULTATION_DURATION_MINUTES = 60;
 
 const doctorAppointmentStatuses: DoctorAppointmentStatus[] = [
   "BOOKED",
@@ -120,6 +120,20 @@ function getAppointmentStartDate(appointment: DoctorAppointment) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function getAppointmentEndDate(appointment: DoctorAppointment) {
+  const endsAt = getAppointmentEnd(appointment);
+
+  if (endsAt) {
+    const date = new Date(endsAt);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+
+  const startsAt = getAppointmentStartDate(appointment);
+  return startsAt
+    ? new Date(startsAt.getTime() + DEFAULT_CONSULTATION_DURATION_MINUTES * 60 * 1000)
+    : null;
+}
+
 function formatAppointmentDate(appointment: DoctorAppointment) {
   const startsAt = getAppointmentStart(appointment);
   if (!startsAt) return "-";
@@ -162,26 +176,31 @@ function isUpcomingAppointment(
   now = new Date(),
 ) {
   const status = getAppointmentStatus(appointment, overrides);
-  const startsAt = getAppointmentStartDate(appointment);
+  const endsAt = getAppointmentEndDate(appointment);
 
-  if (status !== "BOOKED" || !startsAt) return false;
+  if (status !== "BOOKED" || !endsAt) return false;
 
   const pastThreshold = new Date(
-    startsAt.getTime() + CONSULTATION_PAST_GRACE_MINUTES * 60 * 1000,
+    endsAt.getTime() + CONSULTATION_PAST_GRACE_MINUTES * 60 * 1000,
   );
 
   return now < pastThreshold;
 }
 
 function canCompleteAppointment(appointment: DoctorAppointment, now = new Date()) {
+  const endsAt = getAppointmentEndDate(appointment);
+  return Boolean(endsAt && now >= endsAt);
+}
+
+function canCancelAppointment(appointment: DoctorAppointment, now = new Date()) {
   const startsAt = getAppointmentStartDate(appointment);
   if (!startsAt) return false;
 
-  const completionThreshold = new Date(
-    startsAt.getTime() + CONSULTATION_PAST_GRACE_MINUTES * 60 * 1000,
+  const cancellationDeadline = new Date(
+    startsAt.getTime() - CANCELLATION_LOCK_MINUTES * 60 * 1000,
   );
 
-  return now >= completionThreshold;
+  return now < cancellationDeadline;
 }
 
 export default function ConsultantConsultationsPage() {
@@ -201,6 +220,7 @@ export default function ConsultantConsultationsPage() {
   const [reportSummary, setReportSummary] = useState("");
   const [reportSubmittingAppointmentId, setReportSubmittingAppointmentId] =
     useState("");
+  const [currentTime, setCurrentTime] = useState(() => new Date());
 
   const reportAppointment = useMemo(
     () =>
@@ -257,23 +277,40 @@ export default function ConsultantConsultationsPage() {
     return () => window.clearTimeout(timeoutId);
   }, [loadAllConsultationsTotal]);
 
+  useEffect(() => {
+    const timerId = window.setInterval(() => setCurrentTime(new Date()), 15_000);
+    return () => window.clearInterval(timerId);
+  }, []);
+
   const upcomingAppointments = useMemo(
     () =>
       doctorAppointments
-        .filter((appointment) => isUpcomingAppointment(appointment, statusOverrides))
+        .filter((appointment) => isUpcomingAppointment(appointment, statusOverrides, currentTime))
         .sort(
           (first, second) =>
             (getAppointmentStartDate(first)?.getTime() ?? 0) -
             (getAppointmentStartDate(second)?.getTime() ?? 0),
         ),
-    [doctorAppointments, statusOverrides],
+    [currentTime, doctorAppointments, statusOverrides],
   );
 
   const visibleAppointments = activeConsultationTab === "upcoming" ? upcomingAppointments : doctorAppointments;
 
-  const updateAppointmentStatus = async (appointmentId: string, status: "CANCELLED" | "COMPLETED") => {
+  const updateAppointmentStatus = async (appointment: DoctorAppointment, status: "CANCELLED" | "COMPLETED") => {
     setActionMessage("");
     setActionError("");
+    const appointmentId = appointment.id;
+
+    if (status === "CANCELLED" && !canCancelAppointment(appointment, new Date())) {
+      setActionError("This consultation can no longer be cancelled because it starts in 5 minutes or less.");
+      return;
+    }
+
+    if (status === "COMPLETED" && !canCompleteAppointment(appointment, new Date())) {
+      setActionError("This consultation can only be completed after its scheduled end time.");
+      return;
+    }
+
     setActingAppointmentId(appointmentId);
 
     try {
@@ -351,7 +388,7 @@ export default function ConsultantConsultationsPage() {
   const showPagination = activeConsultationTab === "all" && appointmentMeta.totalPages > 1;
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
+    <div className="min-h-screen bg-[#f4f7fb] text-[#17223b]">
       {reportAppointmentId ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
           <div className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl">
@@ -419,77 +456,17 @@ export default function ConsultantConsultationsPage() {
 
       <DoctorMobileNav />
 
-      <aside className="fixed left-0 top-0 z-40 hidden h-full w-[280px] flex-col bg-[#0d1b3d] px-4 py-8 text-white shadow-md lg:flex">
-        <div className="mb-8 px-2">
-          <span className="text-1xl font-extrabold text-[#7784ac]">DominionWell+</span>
-        </div>
+      <DoctorSidebar active="consultations" />
 
-        <div className="mb-8 flex items-center gap-4 px-2">
-          <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#16b36c] bg-[#e0e3e6]">
-            <Image
-              className="object-cover"
-              alt="Doctor profile"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBveWw5sJYO4vcFdjWVdbuGQDlC0JKaMeg6jsjDDSJkIwdRjG_4H_Ao7x2stxD6kTx4oY4DP80Tf-kMczLWJQqZw7ajzN4HpSFJ0W7qcoFs9bxbSpMN7PrAqivavfdvvECjYhZNcT_25wMoRamMlavt1GZ5bU5v1LXmZRreRkSDQzcoG5jXyD19NtcvpsAZFGHlPJkNdm6Vme6nV5SmbMT-CGGHwt91t_aHyC2bbT4qoU6rYhO4t232jYBYnX0OKrxpnI_i4VeK-yJ_"
-              fill
-              sizes="48px"
-              unoptimized
-            />
-          </div>
-          <DoctorProfileSummary />
-        </div>
+      <main className="dw-modern-dashboard min-h-screen lg:ml-[264px]">
+        <div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
+        <DoctorPageHeader
+          title="Consultations"
+          description="Review scheduled sessions, manage time-sensitive actions, and complete patient follow-ups."
+          icon="medical_services"
+        />
 
-        <div className="flex-grow space-y-2 text-sm">
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor">
-            <span className="material-symbols-outlined">dashboard</span>
-            <span>Dashboard</span>
-          </Link>
-          <div className="flex items-center gap-3 rounded-lg border-l-4 border-[#16b36c] bg-[#74fcad] p-3 text-[#007443]">
-            <span className="material-symbols-outlined">medical_services</span>
-            <span>Consultations</span>
-          </div>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/patients">
-            <span className="material-symbols-outlined">group</span>
-            <span>Patients</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/reports">
-            <span className="material-symbols-outlined">analytics</span>
-            <span>Reports</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/wallet">
-            <span className="material-symbols-outlined">wallet</span>
-            <span>Wallet</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/settings">
-            <span className="material-symbols-outlined">settings</span>
-            <span>Settings</span>
-          </Link>
-        </div>
-
-        <div className="mt-auto space-y-2 border-t border-[#7784ac]/10 pt-6 text-sm">
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/notifications">
-            <span className="material-symbols-outlined">notifications</span>
-            <span>Notifications</span>
-          </Link>
-          <DoctorLogoutButton className="flex w-full items-center gap-3 p-3 text-left text-[#7784ac]/85 hover:bg-[#00020d]/10" />
-        </div>
-      </aside>
-
-      <main className="min-h-screen p-4 sm:p-6 md:p-10 lg:ml-[280px]">
-        <header className="mb-6 sm:mb-8">
-          <div className="mb-2 flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/dashboard/doctor"
-              aria-label="Back"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            </Link>
-            <h1 className="text-xl font-semibold text-[#00020d] sm:text-2xl">Consultations</h1>
-          </div>
-          <p className="text-xs text-[#45464e] sm:text-sm">View upcoming and all doctor consultations.</p>
-        </header>
-
-        <section className="mb-6 rounded-xl border border-[#eaecf0] bg-white/80 p-2 shadow-sm backdrop-blur-sm">
+        <section className="mb-5 rounded-2xl border border-[#e0e7ef] bg-white p-2 shadow-[0_8px_26px_rgba(30,52,83,0.05)]">
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -534,7 +511,7 @@ export default function ConsultantConsultationsPage() {
           </section>
         ) : null}
 
-        <section className="rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
+        <section className="rounded-[1.5rem] border border-[#e0e7ef] bg-white p-4 shadow-[0_8px_28px_rgba(30,52,83,0.05)] sm:p-6">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-[#00020d]">
@@ -601,9 +578,10 @@ export default function ConsultantConsultationsPage() {
                 <tbody>
                   {visibleAppointments.map((appointment) => {
                     const status = getAppointmentStatus(appointment, statusOverrides);
-                    const canAct = activeConsultationTab === "upcoming" && status === "BOOKED";
+                    const canAct = status === "BOOKED";
                     const isActing = actingAppointmentId === appointment.id;
-                    const canComplete = canCompleteAppointment(appointment);
+                    const canComplete = canCompleteAppointment(appointment, currentTime);
+                    const canCancel = canCancelAppointment(appointment, currentTime);
                     const isCompleted = status === "COMPLETED";
 
                     return (
@@ -622,28 +600,34 @@ export default function ConsultantConsultationsPage() {
                             <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"
-                                disabled={isActing}
-                                onClick={() => void updateAppointmentStatus(appointment.id, "CANCELLED")}
-                                className="rounded-lg border border-[#ef4444]/40 px-3 py-1.5 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2]"
+                                disabled={isActing || !canCancel}
+                                onClick={() => void updateAppointmentStatus(appointment, "CANCELLED")}
+                                className="rounded-lg border border-[#ef4444]/40 px-3 py-1.5 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2] disabled:cursor-not-allowed disabled:border-[#cbd5e1] disabled:bg-[#f1f5f9] disabled:text-[#94a3b8]"
+                                title={canCancel ? "Cancel consultation" : "Cancellation closes 5 minutes before the consultation starts"}
                               >
                                 {isActing ? "Saving..." : "Cancel"}
                               </button>
                               <button
                                 type="button"
                                 disabled={isActing || !canComplete}
-                                onClick={() => void updateAppointmentStatus(appointment.id, "COMPLETED")}
-                                className="rounded-lg bg-[#16b36c] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#149660] disabled:cursor-wait disabled:bg-[#94a3b8]"
+                                onClick={() => void updateAppointmentStatus(appointment, "COMPLETED")}
+                                className="rounded-lg bg-[#16b36c] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#149660] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
                                 title={
                                   canComplete
                                     ? "Mark this consultation as completed"
-                                    : "You can complete this consultation 10 minutes after its appointment time"
+                                    : "You can complete this consultation after its scheduled end time"
                                 }
                               >
                                 {isActing ? "Saving..." : "Mark as Completed"}
                               </button>
                               {!canComplete ? (
                                 <p className="basis-full text-[11px] text-[#64748b]">
-                                  Completion unlocks 10 minutes after appointment time.
+                                  Completion unlocks when the consultation ends.
+                                </p>
+                              ) : null}
+                              {!canCancel ? (
+                                <p className="basis-full text-[11px] text-[#b45309]">
+                                  Cancellation closed 5 minutes before the start time.
                                 </p>
                               ) : null}
                             </div>
@@ -689,6 +673,7 @@ export default function ConsultantConsultationsPage() {
             </div>
           ) : null}
         </section>
+        </div>
       </main>
     </div>
   );

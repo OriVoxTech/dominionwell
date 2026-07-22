@@ -11,10 +11,10 @@ export default function DoctorProfileSummary() {
 
   return (
     <div className="min-w-0">
-      <p className="truncate font-semibold text-[#7784ac]">
+      <p className="truncate text-sm font-bold text-white">
         {getDoctorDisplayName(profile)}
       </p>
-      <p className="truncate text-xs text-[#7784ac]/80">
+      <p className="mt-0.5 truncate text-[10px] font-medium text-[#aebee0]">
         {getDoctorSpecialization(profile)}
       </p>
     </div>

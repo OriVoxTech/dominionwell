@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import PatientMobileNav from "@/components/patient-mobile-nav";
+import PatientPageHeader from "@/components/patient-page-header";
+import PatientSidebar from "@/components/patient-sidebar";
 import {
     getApiErrorMessage,
     patientApiService,
@@ -193,15 +195,6 @@ export default function SubscriptionPage() {
                 ? "Switch to another plan that fits your current care needs."
                 : "Choose a plan to continue speaking with doctors.";
 
-    const handleGoBack = () => {
-        if (typeof window !== "undefined" && window.history.length > 1) {
-            router.back();
-            return;
-        }
-
-        router.push("/dashboard/patient");
-    };
-
     const handleChoosePlan = async (plan: SubscriptionPlan) => {
         setError("");
         setSuccessMessage("");
@@ -233,49 +226,28 @@ export default function SubscriptionPage() {
     const balance = subscription?.consultationBalance ?? 0;
 
     return (
-        <div className="min-h-screen bg-[#f9fafb] px-6 py-8 text-[#191c1e] md:px-10">
+        <div className="min-h-screen bg-[#f4f7fb] text-[#17223b]">
             <PatientMobileNav active="subscription" />
-            <div className="mx-auto w-full max-w-5xl">
-                <header className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-                    <div>
-                        <div className="mb-2 flex items-center gap-2 sm:gap-3">
-                            <button
-                                type="button"
-                                onClick={handleGoBack}
-                                aria-label="Back"
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
-                            >
-                                <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-                            </button>
-                            <h1 className="text-2xl font-semibold text-[#001b5e]">{pageTitle}</h1>
-                        </div>
-                        <p className="text-[13px] mt-2 text-[#475569]">{pageSubtitle}</p>
-                    </div>
+            <PatientSidebar active="subscription" />
+            <main className="dw-modern-dashboard min-h-screen lg:ml-[264px]"><div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
+                <PatientPageHeader title={pageTitle} description={pageSubtitle} icon="card_membership" action={<Link href="/dashboard/patient/payments" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#d9e2ec] bg-white px-4 text-xs font-bold text-[#001b5e] shadow-sm hover:bg-[#f8fafc]"><span className="material-symbols-outlined text-[17px]">receipt_long</span>Payment history</Link>} />
 
-                    <Link
-                        href="/dashboard/patient/payments"
-                        className="inline-flex items-center justify-center rounded-lg border border-[#c6c6cf] px-4 py-2 text-sm font-semibold text-[#001b5e] hover:bg-white"
-                    >
-                        View Payment History
-                    </Link>
-                </header>
-
-                <section className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
-                    <div className="rounded-xl border border-[#c6c6cf] bg-white p-4">
-                        <p className="text-xs uppercase tracking-wide text-[#64748b]">Current plan</p>
-                        <p className="mt-1 text-sm font-semibold text-[#001b5e]">{activePlanName}</p>
+                <section className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div className="rounded-2xl bg-[#001b5e] p-5 text-white shadow-[0_16px_35px_rgba(0,27,94,0.15)]">
+                        <p className="text-xs uppercase tracking-wide text-[#aebee0]">Current plan</p>
+                        <p className="mt-2 text-lg font-bold">{activePlanName}</p>
                     </div>
-                    <div className="rounded-xl border border-[#c6c6cf] bg-white p-4">
+                    <div className="rounded-2xl border border-[#e0e7ef] bg-white p-5 shadow-[0_8px_26px_rgba(30,52,83,0.05)]">
                         <p className="text-xs uppercase tracking-wide text-[#64748b]">Consultation balance</p>
-                        <p className="mt-1 text-sm font-semibold text-[#001b5e]">{balance}</p>
+                        <p className="mt-2 text-lg font-bold text-[#001b5e]">{balance}</p>
                     </div>
-                    <div className="rounded-xl border border-[#c6c6cf] bg-white p-4">
+                    <div className="rounded-2xl border border-[#e0e7ef] bg-white p-5 shadow-[0_8px_26px_rgba(30,52,83,0.05)]">
                         <p className="text-xs uppercase tracking-wide text-[#64748b]">Subscription records</p>
-                        <p className="mt-1 text-sm font-semibold text-[#001b5e]">{subscription?.subscriptions.length ?? 0}</p>
+                        <p className="mt-2 text-lg font-bold text-[#001b5e]">{subscription?.subscriptions.length ?? 0}</p>
                     </div>
                 </section>
 
-                <section className="mb-6 rounded-xl border border-[#c6c6cf] bg-white p-4">
+                <section className="mb-5 rounded-2xl border border-[#d7efe2] bg-[#f4fbf7] p-4">
                     <p className="text-sm font-semibold text-[#001b5e]">Consultation Duration Policy</p>
                     <p className="mt-1 text-sm text-[#475569]">
                         Each consultation lasts for a maximum of 1 hour. To extend a consultation, you need to book again.
@@ -309,7 +281,7 @@ export default function SubscriptionPage() {
                         </div>
                     ) : (
                         plans.map((plan) => (
-                            <article key={plan.id} className="flex flex-col rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
+                            <article key={plan.id} className="flex flex-col rounded-[1.5rem] border border-[#e0e7ef] bg-white p-5 shadow-[0_8px_28px_rgba(30,52,83,0.05)] transition hover:-translate-y-1 hover:shadow-[0_16px_38px_rgba(30,52,83,0.1)]">
                                 <h2 className="text-lg font-semibold text-[#001b5e]">{plan.name}</h2>
                                 <p className="mt-1 text-sm text-[#64748b]">{plan.consultationCredits} consultation{plan.consultationCredits === 1 ? "" : "s"}</p>
                                 <p className="mt-1 text-xs text-[#64748b]">Max {plan.consultationMinutes} minutes per consultation</p>
@@ -318,7 +290,7 @@ export default function SubscriptionPage() {
                                 <button
                                     type="button"
                                     disabled={Boolean(isStartingCheckout)}
-                                    className="mt-5 w-full rounded-lg bg-[#001b5e] py-2 text-sm font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+                                    className="mt-5 w-full rounded-xl bg-[#16b36c] py-2.5 text-sm font-bold text-white hover:bg-[#118d57] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
                                     onClick={() => void handleChoosePlan(plan)}
                                 >
                                     {isStartingCheckout === plan.id ? "Opening checkout..." : `Choose ${plan.name}`}
@@ -328,7 +300,7 @@ export default function SubscriptionPage() {
                     )}
                 </section>
 
-            </div>
+            </div></main>
         </div>
     );
 }

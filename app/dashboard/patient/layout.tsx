@@ -6,5 +6,9 @@ export default function PatientDashboardLayout({
 }: {
   children: ReactNode;
 }) {
-  return <PatientAuthGuard>{children}</PatientAuthGuard>;
+  return (
+    <PatientAuthGuard>
+      <div className="dw-patient-workspace">{children}</div>
+    </PatientAuthGuard>
+  );
 }

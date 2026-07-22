@@ -1,11 +1,9 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
-import DoctorProfileSummary from "@/components/doctor-profile-summary";
-import DoctorLogoutButton from "@/components/doctor-logout-button";
+import DoctorPageHeader from "@/components/doctor-page-header";
+import DoctorSidebar from "@/components/doctor-sidebar";
 import {
   doctorApiService,
   getApiErrorMessage,
@@ -69,140 +67,56 @@ export default function ConsultantPatientsPage() {
   }, [loadPatients]);
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
+    <div className="min-h-screen bg-[#f4f7fb] text-[#17223b]">
       <DoctorMobileNav />
+      <DoctorSidebar active="patients" />
 
-      <aside className="fixed left-0 top-0 z-40 hidden h-full w-[280px] flex-col bg-[#0d1b3d] px-4 py-8 text-white shadow-md lg:flex">
-        <div className="mb-8 px-2">
-          <span className="text-1xl font-extrabold text-[#7784ac]">DominionWell+</span>
-        </div>
+      <main className="dw-modern-dashboard min-h-screen lg:ml-[264px]">
+        <div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
+          <DoctorPageHeader
+            title="Patients"
+            description="A private directory of patients who have completed at least one consultation with you."
+            icon="group"
+            action={
+              <button type="button" onClick={() => void loadPatients()} disabled={isLoadingPatients} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#d9e2ec] bg-white px-4 text-xs font-bold text-[#001b5e] shadow-sm hover:bg-[#f8fafc] disabled:opacity-60">
+                <span className="material-symbols-outlined text-[17px]">refresh</span>
+                Refresh
+              </button>
+            }
+          />
 
-        <div className="mb-8 flex items-center gap-4 px-2">
-          <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#16b36c] bg-[#e0e3e6]">
-            <Image
-              className="object-cover"
-              alt="Doctor profile"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBveWw5sJYO4vcFdjWVdbuGQDlC0JKaMeg6jsjDDSJkIwdRjG_4H_Ao7x2stxD6kTx4oY4DP80Tf-kMczLWJQqZw7ajzN4HpSFJ0W7qcoFs9bxbSpMN7PrAqivavfdvvECjYhZNcT_25wMoRamMlavt1GZ5bU5v1LXmZRreRkSDQzcoG5jXyD19NtcvpsAZFGHlPJkNdm6Vme6nV5SmbMT-CGGHwt91t_aHyC2bbT4qoU6rYhO4t232jYBYnX0OKrxpnI_i4VeK-yJ_"
-              fill
-              sizes="48px"
-              unoptimized
-            />
-          </div>
-          <DoctorProfileSummary />
-        </div>
-
-        <div className="flex-grow space-y-2 text-sm">
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor">
-            <span className="material-symbols-outlined">dashboard</span>
-            <span>Dashboard</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/consultations">
-            <span className="material-symbols-outlined">medical_services</span>
-            <span>Consultations</span>
-          </Link>
-          <div className="flex items-center gap-3 rounded-lg border-l-4 border-[#16b36c] bg-[#74fcad] p-3 text-[#007443]">
-            <span className="material-symbols-outlined">group</span>
-            <span>Patients</span>
-          </div>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/reports">
-            <span className="material-symbols-outlined">analytics</span>
-            <span>Reports</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/wallet">
-            <span className="material-symbols-outlined">wallet</span>
-            <span>Wallet</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/settings">
-            <span className="material-symbols-outlined">settings</span>
-            <span>Settings</span>
-          </Link>
-        </div>
-
-        <div className="mt-auto space-y-2 border-t border-[#7784ac]/10 pt-6 text-sm">
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/notifications">
-            <span className="material-symbols-outlined">notifications</span>
-            <span>Notifications</span>
-          </Link>
-          <DoctorLogoutButton className="flex w-full items-center gap-3 p-3 text-left text-[#7784ac]/85 hover:bg-[#00020d]/10" />
-        </div>
-      </aside>
-
-      <main className="min-h-screen p-4 sm:p-6 md:p-10 lg:ml-[280px]">
-        <header className="mb-6 sm:mb-8">
-          <div className="mb-2 flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/dashboard/doctor"
-              aria-label="Back"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            </Link>
-            <h1 className="text-xl font-semibold text-[#00020d] sm:text-2xl">Patients</h1>
-          </div>
-          <p className="text-xs text-[#45464e] sm:text-sm">
-            Patients who have completed consultations with you, including consultation count and rating.
-          </p>
-        </header>
-
-        <section className="rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-1xl font-semibold text-[#00020d]">Patient Consultation History</h2>
-            <p className="text-xs text-[#64748b]">Total: {patientTotal}</p>
-          </div>
+          <section className="mb-5 overflow-hidden rounded-[1.5rem] bg-[linear-gradient(120deg,#001b5e,#073377_65%,#087964_135%)] p-5 text-white shadow-[0_18px_45px_rgba(0,27,94,0.15)] sm:p-6">
+            <div className="flex items-center justify-between gap-5">
+              <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8df0bb]">Care relationships</p><h2 className="mt-2 text-xl font-bold">{isLoadingPatients ? "—" : patientTotal} patients</h2><p className="mt-2 max-w-xl text-xs leading-5 text-[#cbd8f4]">Every patient shown here has an established consultation history with your practice.</p></div>
+              <span className="hidden h-16 w-16 place-items-center rounded-2xl bg-white/10 text-[#8df0bb] sm:grid"><span className="material-symbols-outlined text-[30px]">group</span></span>
+            </div>
+          </section>
 
           {patientsError ? (
-            <div role="alert" className="mb-4 flex flex-col gap-3 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c] sm:flex-row sm:items-center sm:justify-between">
-              <span>{patientsError}</span>
-              <button
-                type="button"
-                onClick={() => void loadPatients()}
-                className="rounded-lg border border-[#fca5a5] px-3 py-1.5 text-xs font-semibold hover:bg-white"
-              >
-                Try Again
-              </button>
-            </div>
+            <div role="alert" className="mb-5 flex flex-col gap-3 rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c] sm:flex-row sm:items-center sm:justify-between"><span>{patientsError}</span><button type="button" onClick={() => void loadPatients()} className="rounded-lg border border-[#fca5a5] px-3 py-1.5 text-xs font-semibold hover:bg-white">Try Again</button></div>
           ) : null}
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="bg-[#f2f4f7] text-[11px] uppercase tracking-wide text-[#64748b]">
-                  <th className="rounded-l-lg px-3 py-3">Patient Name</th>
-                  <th className="px-3 py-3">Patient ID</th>
-                  <th className="px-3 py-3">Consultations with Doctor</th>
-                  <th className="rounded-r-lg px-3 py-3">Patient Rating</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoadingPatients ? (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-6 text-center text-[#64748b]">
-                      Loading patients...
-                    </td>
-                  </tr>
-                ) : patients.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-6 text-center text-[#64748b]">
-                      No patients have completed consultations with you yet.
-                    </td>
-                  </tr>
-                ) : patients.map((patient) => (
-                  <tr key={getPatientId(patient)} className="border-b border-[#e2e8f0] last:border-b-0">
-                    <td className="px-3 py-3 font-semibold text-[#001b5e]">{getPatientName(patient)}</td>
-                    <td className="px-3 py-3 text-[#475569]">{getPatientId(patient)}</td>
-                    <td className="px-3 py-3 text-[#475569]">{getConsultationCount(patient)}</td>
-                    <td className="px-3 py-3">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[#16b36c]/15 px-2 py-1 text-[10px] font-semibold text-[#16b36c]">
-                        <span className="material-symbols-outlined text-[14px]">star</span>
-                        {getPatientRating(patient).toFixed(1)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+          {isLoadingPatients ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-44 animate-pulse rounded-2xl border border-[#e0e7ef] bg-white" />)}</div>
+          ) : patients.length === 0 && !patientsError ? (
+            <div className="grid min-h-64 place-items-center rounded-[1.5rem] border border-dashed border-[#cfd9e6] bg-white p-8 text-center"><div><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#eafbf2] text-[#0b9459]"><span className="material-symbols-outlined">person_search</span></span><h2 className="mt-4 text-base font-bold text-[#001b5e]">No patient history yet</h2><p className="mt-2 text-xs text-[#718096]">Patients appear here after their first completed consultation.</p></div></div>
+          ) : (
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Patient directory">
+              {patients.map((patient) => {
+                const name = getPatientName(patient);
+                const rating = getPatientRating(patient);
+                return (
+                  <article key={getPatientId(patient)} className="group rounded-2xl border border-[#e0e7ef] bg-white p-5 shadow-[0_8px_26px_rgba(30,52,83,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(30,52,83,0.09)]">
+                    <div className="flex items-start justify-between gap-3"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#e7f4ff] text-sm font-extrabold text-[#155e9b]">{name.charAt(0).toUpperCase()}</span><span className="inline-flex items-center gap-1 rounded-full bg-[#fff6df] px-2.5 py-1 text-[10px] font-bold text-[#a45f08]"><span className="material-symbols-outlined text-[14px]">star</span>{rating.toFixed(1)}</span></div>
+                    <h2 className="mt-4 truncate text-base font-bold text-[#001b5e]">{name}</h2>
+                    <p className="mt-1 truncate text-[11px] text-[#8a96a8]">ID: {getPatientId(patient)}</p>
+                    <div className="mt-4 flex items-center gap-2 rounded-xl bg-[#f7f9fc] px-3 py-2.5"><span className="material-symbols-outlined text-[18px] text-[#0b9459]">medical_services</span><p className="text-xs text-[#526175]"><span className="font-bold text-[#001b5e]">{getConsultationCount(patient)}</span> completed consultation{getConsultationCount(patient) === 1 ? "" : "s"}</p></div>
+                  </article>
+                );
+              })}
+            </section>
+          )}
+        </div>
       </main>
     </div>
   );

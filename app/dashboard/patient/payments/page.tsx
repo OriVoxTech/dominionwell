@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import PatientMobileNav from "@/components/patient-mobile-nav";
+import PatientPageHeader from "@/components/patient-page-header";
+import PatientSidebar from "@/components/patient-sidebar";
 import { getApiErrorMessage, patientApiService, type SubscriptionPayment } from "@/lib/api";
 
 const amountFormatter = new Intl.NumberFormat("en-NG");
@@ -92,34 +94,12 @@ export default function PatientPaymentsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
+    <div className="min-h-screen bg-[#f4f7fb] text-[#17223b]">
       <PatientMobileNav active="payments" />
+      <PatientSidebar active="payments" />
 
-      <main className="mx-auto min-h-screen w-full max-w-6xl px-6 py-8 md:px-10">
-        <header className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-          <div>
-            <div className="mb-2 flex items-center gap-2 sm:gap-3">
-              <Link
-                href="/dashboard/patient"
-                aria-label="Back to dashboard"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-white"
-              >
-                <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-              </Link>
-              <h1 className="text-2xl font-semibold text-[#001b5e]">Payment History</h1>
-            </div>
-            <p className="text-sm text-[#64748b]">
-              View subscription checkout attempts, pending payments, and completed transactions.
-            </p>
-          </div>
-
-          <Link
-            href="/dashboard/patient/subscription?mode=buy"
-            className="inline-flex items-center justify-center rounded-lg bg-[#001b5e] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b2b75]"
-          >
-            Buy Subscription
-          </Link>
-        </header>
+      <main className="dw-modern-dashboard min-h-screen lg:ml-[264px]"><div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
+        <PatientPageHeader title="Payment history" description="Review subscription checkouts, pending payments, and completed transactions." icon="receipt_long" action={<Link href="/dashboard/patient/subscription?mode=buy" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#16b36c] px-4 text-xs font-bold text-white shadow-sm hover:bg-[#118d57]"><span className="material-symbols-outlined text-[17px]">add_card</span>Buy subscription</Link>} />
 
         {error ? (
           <section role="alert" className="mb-6 rounded-xl border border-[#fecaca] bg-[#fef2f2] p-4">
@@ -127,7 +107,7 @@ export default function PatientPaymentsPage() {
           </section>
         ) : null}
 
-        <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm">
+        <section className="rounded-[1.5rem] border border-[#e0e7ef] bg-white p-4 shadow-[0_8px_28px_rgba(30,52,83,0.05)] sm:p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-[#001b5e]">Transactions</h2>
             <p className="text-xs text-[#64748b]">
@@ -142,9 +122,7 @@ export default function PatientPaymentsPage() {
               ))}
             </div>
           ) : payments.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-[#c6c6cf] bg-[#f8fafc] p-4 text-sm text-[#64748b]">
-              No payments yet. Completed subscription payments will appear here.
-            </div>
+            <div className="grid min-h-56 place-items-center rounded-2xl border border-dashed border-[#cfd9e6] bg-[#fafcff] p-6 text-center"><div><span className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-[#eafbf2] text-[#0b9459]"><span className="material-symbols-outlined">receipt_long</span></span><p className="mt-4 text-sm font-bold text-[#001b5e]">No payments yet</p><p className="mt-1 text-xs text-[#718096]">Completed subscription payments will appear here.</p></div></div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
@@ -183,7 +161,7 @@ export default function PatientPaymentsPage() {
             </div>
           )}
         </section>
-      </main>
+      </div></main>
     </div>
   );
 }

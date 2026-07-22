@@ -1,63 +1,49 @@
-import Image from "next/image";
-import Link from "next/link";
+import PublicFooter from "@/components/public-footer";
+import PublicHeader from "@/components/public-header";
+
+const supportOptions = [
+  { icon: "mail", title: "Email support", value: "support@dominionwell.com", note: "For account and care questions" },
+  { icon: "call", title: "Phone support", value: "+1 (202) 555-0117", note: "Monday to Friday, 8 AM–6 PM" },
+  { icon: "help", title: "Help center", value: "Patient support", note: "Guides for bookings and accounts" },
+];
 
 export default function ContactPage() {
   return (
-    <div className="min-h-screen bg-[#f7f9fc] text-[#191c1e]">
-      <header className="sticky top-0 z-50 flex h-16 w-full items-center justify-between border-b border-[#c6c6cf] bg-[#f7f9fc]/95 px-4 backdrop-blur md:px-10">
-        <Link href="/" className="flex items-center gap-2">
-          <Image alt="DominionWell Logo" className="h-8 w-auto" src="/logo.png" width={128} height={32} />
-          <span className="text-1xl font-bold text-[#001b5e]">DominionWell+</span>
-        </Link>
-        <nav className="flex items-center gap-6">
-          <Link className="text-sm text-[#45464e] hover:text-[#16b46f]" href="/services">Services</Link>
-          <Link className="text-sm text-[#45464e] hover:text-[#16b46f]" href="/about">About</Link>
-          <Link className="rounded-lg bg-[#16b46f] px-4 py-2 text-sm font-semibold text-white" href="/register">Register</Link>
-        </nav>
-      </header>
+    <div className="min-h-screen bg-[#f7f9fc] text-[#17223b]">
+      <PublicHeader />
+      <main className="mx-auto max-w-[1280px] px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-[#ccebd9] bg-white px-3 py-1.5 text-[11px] font-bold text-[#087b48]"><span className="material-symbols-outlined text-[16px]">support_agent</span>We are here to help</span>
+          <h1 className="mt-5 text-3xl font-extrabold tracking-[-0.04em] text-[#001b5e] sm:text-[2.5rem]">How can we help?</h1>
+          <p className="mt-3 text-sm leading-7 text-[#607087] sm:text-base">Questions about your account, a consultation, or partnering with DominionWell+? Reach out and our team will guide you.</p>
+        </div>
 
-      <main className="mx-auto w-full max-w-[1440px] px-4 py-12 md:px-10">
-        <section className="mb-10">
-          <h1 className="mb-3 text-4xl font-bold text-[#001b5e]">Contact Us</h1>
-          <p className="max-w-2xl text-base text-[#45464e]">
-            Need support, have questions, or want to partner with DominionWell+? We are here to help.
-          </p>
+        <section className="mt-10 grid gap-4 sm:grid-cols-3">
+          {supportOptions.map((option) => (
+            <article key={option.title} className="rounded-[1.4rem] border border-[#e0e7ef] bg-white p-5 text-center shadow-[0_8px_26px_rgba(30,52,83,0.05)]">
+              <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-[#eafbf2] text-[#0b9459]"><span className="material-symbols-outlined text-[21px]">{option.icon}</span></span>
+              <h2 className="mt-4 text-sm font-bold text-[#001b5e]">{option.title}</h2><p className="mt-2 text-sm font-semibold text-[#44536a]">{option.value}</p><p className="mt-1 text-[11px] text-[#8a96a8]">{option.note}</p>
+            </article>
+          ))}
         </section>
 
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <article className="rounded-2xl border border-[#c6c6cf] bg-white p-6 shadow-sm lg:col-span-1">
-            <h2 className="mb-4 text-lg font-semibold text-[#001b5e]">Support Channels</h2>
-            <div className="space-y-3 text-sm text-[#45464e]">
-              <p><span className="font-semibold text-[#001b5e]">Email:</span> support@dominionwell.com</p>
-              <p><span className="font-semibold text-[#001b5e]">Phone:</span> +1 (202) 555-0117</p>
-              <p><span className="font-semibold text-[#001b5e]">Hours:</span> Mon - Fri, 8:00 AM - 6:00 PM</p>
-            </div>
-          </article>
+        <section className="mt-6 grid overflow-hidden rounded-[1.75rem] border border-[#e0e7ef] bg-white shadow-[0_12px_38px_rgba(30,52,83,0.06)] lg:grid-cols-[.72fr_1.28fr]">
+          <div className="bg-[#001b5e] p-6 text-white sm:p-8">
+            <span className="grid h-11 w-11 place-items-center rounded-xl bg-white/10 text-[#8df0bb]"><span className="material-symbols-outlined">forum</span></span>
+            <h2 className="mt-6 text-xl font-bold">Send us a message</h2>
+            <p className="mt-3 text-sm leading-6 text-[#cbd8f4]">Share a few details and the appropriate support team can follow up with you.</p>
+            <div className="mt-8 rounded-2xl border border-white/10 bg-white/10 p-4 text-xs leading-5 text-[#dce5f8]">Please do not include urgent or sensitive medical information in this form. Contact local emergency services for emergencies.</div>
+          </div>
 
-          <article className="rounded-2xl border border-[#c6c6cf] bg-white p-6 shadow-sm lg:col-span-2">
-            <h2 className="mb-4 text-lg font-semibold text-[#001b5e]">Send a Message</h2>
-            <form className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <label className="block text-sm">
-                <span className="mb-1 block font-medium text-[#334155]">Full Name</span>
-                <input className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]" type="text" />
-              </label>
-              <label className="block text-sm">
-                <span className="mb-1 block font-medium text-[#334155]">Email Address</span>
-                <input className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]" type="email" />
-              </label>
-              <label className="block text-sm md:col-span-2">
-                <span className="mb-1 block font-medium text-[#334155]">Message</span>
-                <textarea className="h-32 w-full resize-none rounded-lg border border-[#c6c6cf] px-3 py-2 outline-none focus:border-[#0aa4b4]" />
-              </label>
-              <div className="md:col-span-2">
-                <button className="rounded-lg bg-[#001b5e] px-5 py-2 text-sm font-semibold text-white hover:bg-[#0b2b75]" type="button">
-                  Submit
-                </button>
-              </div>
-            </form>
-          </article>
+          <form className="grid gap-4 p-5 sm:grid-cols-2 sm:p-8">
+            <label className="grid gap-1.5 text-xs font-bold text-[#33415c]">Full name<input className="h-11 rounded-xl border border-[#d6dee8] bg-[#fbfcfe] px-3 text-sm font-medium outline-none focus:border-[#16a968]" type="text" placeholder="Your full name" /></label>
+            <label className="grid gap-1.5 text-xs font-bold text-[#33415c]">Email address<input className="h-11 rounded-xl border border-[#d6dee8] bg-[#fbfcfe] px-3 text-sm font-medium outline-none focus:border-[#16a968]" type="email" placeholder="you@example.com" /></label>
+            <label className="grid gap-1.5 text-xs font-bold text-[#33415c] sm:col-span-2">How can we help?<textarea className="min-h-32 resize-y rounded-xl border border-[#d6dee8] bg-[#fbfcfe] px-3 py-3 text-sm font-medium outline-none focus:border-[#16a968]" placeholder="Tell us what you need help with" /></label>
+            <div className="sm:col-span-2"><button className="w-full rounded-xl bg-[#16a968] px-5 py-3 text-sm font-bold text-white hover:bg-[#118d57] sm:w-auto" type="button">Send message</button></div>
+          </form>
         </section>
       </main>
+      <PublicFooter />
     </div>
   );
 }

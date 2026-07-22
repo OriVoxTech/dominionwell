@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import PatientMobileNav from "@/components/patient-mobile-nav";
+import PatientSidebar from "@/components/patient-sidebar";
 import {
   patientApiService,
   getApiErrorMessage,
@@ -156,17 +157,17 @@ export default function DoctorProfilePage() {
   const reviewCount = reviews?.satisfaction.reviewCount ?? 0;
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
+    <div className="min-h-screen bg-[#f4f7fb] text-[#17223b]">
       <PatientMobileNav active="doctors" />
+      <PatientSidebar active="doctors" />
 
-      <main className="min-h-screen p-4 sm:p-6 md:p-8">
-        <div className="mx-auto max-w-4xl">
+      <main className="dw-modern-dashboard min-h-screen lg:ml-[264px]"><div className="mx-auto max-w-5xl px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
           <header className="mb-6">
             <div className="mb-3 flex items-center gap-2 sm:gap-3">
               <Link href="/dashboard/patient/doctors" aria-label="Back to doctors" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-white">
                 <span className="material-symbols-outlined text-[18px]">arrow_back</span>
               </Link>
-              <h1 className="text-xl font-semibold text-[#001b5e] sm:text-2xl">Doctor Profile</h1>
+              <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#0b9459]">Consultation profile</p><h1 className="mt-1 text-xl font-bold text-[#001b5e] sm:text-2xl">Doctor profile</h1></div>
             </div>
             <p className="text-xs text-[#475569] sm:text-[13px]">Review this verified doctor’s professional profile.</p>
           </header>
@@ -193,10 +194,10 @@ export default function DoctorProfilePage() {
           ) : null}
 
           {!isLoading && !errorMessage && doctor ? (
-            <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm sm:p-6">
+            <section className="rounded-[1.75rem] border border-[#e0e7ef] bg-white p-5 shadow-[0_12px_36px_rgba(30,52,83,0.07)] sm:p-7">
               <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-[#e0f2fe] text-xl font-bold text-[#0369a1]">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-[#e7f4ff] text-xl font-bold text-[#155e9b] shadow-sm">
                     {getDoctorInitials(doctor)}
                   </div>
                   <div className="min-w-0">
@@ -219,7 +220,7 @@ export default function DoctorProfilePage() {
               </div>
 
               <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
+                <div className="rounded-2xl border border-[#e7ecf2] bg-[#fafcff] p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">Specializations</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {doctor.specializations.map((item) => (
@@ -227,7 +228,7 @@ export default function DoctorProfilePage() {
                     ))}
                   </div>
                 </div>
-                <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
+                <div className="rounded-2xl border border-[#e7ecf2] bg-[#fafcff] p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">Patient Rating</p>
                   <div className="mt-3 flex items-center gap-2">
                     <StarRating rating={averageRating ?? 0} />
@@ -239,7 +240,7 @@ export default function DoctorProfilePage() {
                 </div>
               </div>
 
-              <div className="mb-6 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
+              <div className="mb-5 rounded-2xl border border-[#e7ecf2] bg-[#fafcff] p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">Verification</p>
                 <p className="mt-3 text-sm font-semibold text-[#001b5e]">
                   {doctor.verifiedAt ? `Verified ${new Date(doctor.verifiedAt).toLocaleDateString()}` : "Verification pending"}
@@ -247,12 +248,12 @@ export default function DoctorProfilePage() {
                 <p className="mt-1 text-xs text-[#64748b]">Member since {new Date(doctor.user.createdAt).toLocaleDateString()}</p>
               </div>
 
-              <div className="mb-6 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
+              <div className="mb-5 rounded-2xl border border-[#d7efe2] bg-[#f4fbf7] p-4">
                 <h3 className="text-sm font-semibold text-[#001b5e]">About</h3>
                 <p className="mt-2 text-sm leading-6 text-[#475569]">{doctor.bio || "This doctor has not added a biography yet."}</p>
               </div>
 
-              <div className="mb-6 rounded-xl border border-[#e2e8f0] bg-white p-4">
+              <div className="mb-5 rounded-2xl border border-[#e7ecf2] bg-white p-4 sm:p-5">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-semibold text-[#001b5e]">Patient Reviews</h3>
@@ -302,8 +303,7 @@ export default function DoctorProfilePage() {
               </div>
             </section>
           ) : null}
-        </div>
-      </main>
+      </div></main>
     </div>
   );
 }

@@ -332,7 +332,7 @@ export default function JoinDoctorPage() {
       <section className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-4 py-10 md:grid-cols-[0.85fr_1.15fr] md:px-10 md:py-16">
         <div className="rounded-[2rem] bg-[#001b5e] p-7 text-white md:p-10">
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-[#74fcad]">Join our care network</p>
-          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Apply to become a DominionWell+ doctor.</h1>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Apply to become a DominionWell+ doctor.</h1>
           <p className="mt-5 text-sm leading-7 text-[#d8e2ff]">
             Submit your provider details, specialty, licenses, and supporting documents. Our verification team will review your application before granting access.
           </p>
@@ -353,7 +353,7 @@ export default function JoinDoctorPage() {
 
         <form onSubmit={handleSubmit} className="rounded-[2rem] border border-[#dbe4f0] bg-white p-5 shadow-sm sm:p-7">
           <div className="mb-6">
-            <h2 className="text-2xl font-semibold text-[#001b5e]">Doctor application</h2>
+            <h2 className="text-xl font-semibold text-[#001b5e]">Doctor application</h2>
             <p className="mt-2 text-sm text-[#64748b]">Fields marked with * are required.</p>
           </div>
 

@@ -1,18 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import PatientAvatar from "@/components/patient-avatar";
 import PatientMobileNav from "@/components/patient-mobile-nav";
-import PatientLogoutButton from "@/components/patient-logout-button";
-import PatientProfileSummary from "@/components/patient-profile-summary";
+import PatientPageHeader from "@/components/patient-page-header";
+import PatientSidebar from "@/components/patient-sidebar";
 import {
   getApiErrorMessage,
   patientApiService,
   type PatientNotification,
   type PatientNotificationsResponse,
 } from "@/lib/api";
-import { usePatientProfile } from "@/lib/use-patient-profile";
 
 type NotificationItem = {
   id: string;
@@ -105,7 +102,6 @@ function mapNotification(notification: PatientNotification): NotificationItem {
 }
 
 export default function PatientNotificationsPage() {
-  const profile = usePatientProfile();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -179,79 +175,13 @@ export default function PatientNotificationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
+    <div className="min-h-screen bg-[#f4f7fb] text-[#17223b]">
       <PatientMobileNav active="notifications" />
+      <PatientSidebar active="notifications" />
 
-      <aside className="fixed left-0 top-0 z-40 hidden h-full w-[250px] flex-col bg-[#001b5e] px-3 py-6 text-white shadow-md lg:flex">
-        <div className="mb-8 px-2">
-          <h1 className="text-1xl font-extrabold tracking-tight">DominionWell+</h1>
-        </div>
-
-        <div className="mb-6 flex items-center gap-3 px-2">
-          <PatientAvatar profile={profile} />
-          <PatientProfileSummary />
-        </div>
-
-        <nav className="flex-1 space-y-1 text-sm">
-          <Link href="/dashboard/patient" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-            <span className="material-symbols-outlined text-[20px]">dashboard</span>
-            <span>Dashboard</span>
-          </Link>
-          <Link href="/dashboard/patient/appointments" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-            <span className="material-symbols-outlined text-[20px]">calendar_month</span>
-            <span>Appointments</span>
-          </Link>
-          <div className="flex items-center gap-3 rounded-lg border-l-4 border-[#16b46f] bg-[#16b46f]/20 px-3 py-2 text-[#d7ffe9]">
-            <span className="material-symbols-outlined text-[20px]">notifications</span>
-            <span>Notifications</span>
-          </div>
-          <Link href="/dashboard/patient/doctors" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-            <span className="material-symbols-outlined text-[20px]">medical_services</span>
-            <span>Browse Doctors</span>
-          </Link>
-          <Link href="/dashboard/patient/subscription" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-            <span className="material-symbols-outlined text-[20px]">card_membership</span>
-            <span>Subscription</span>
-          </Link>
-          <Link href="/dashboard/patient/payments" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-            <span className="material-symbols-outlined text-[20px]">receipt_long</span>
-            <span>Payments</span>
-          </Link>
-          <Link href="/dashboard/patient/settings" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-            <span className="material-symbols-outlined text-[20px]">settings</span>
-            <span>Settings</span>
-          </Link>
-        </nav>
-
-        <Link href="/dashboard/patient/doctors" className="mb-6 mt-4 rounded-xl bg-[#16b46f] py-2.5 text-center text-sm font-semibold text-white">
-          Book New Consult
-        </Link>
-
-        <div className="space-y-1 border-t border-white/10 pt-4 text-sm text-[#d8e2ff]">
-          <Link href="/dashboard/patient/help-center" className="flex items-center gap-3 px-3 py-2 hover:bg-white/10">
-            <span className="material-symbols-outlined text-[20px]">help</span>
-            <span>Help Center</span>
-          </Link>
-          <PatientLogoutButton className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60" />
-        </div>
-      </aside>
-
-      <main className="min-h-screen p-4 sm:p-6 md:p-8 lg:ml-[250px]">
-        <header className="mb-5 sm:mb-6">
-          <div className="mb-3 flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/dashboard/patient"
-              aria-label="Back"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            </Link>
-            <h2 className="text-xl font-semibold text-[#001b5e] sm:text-2xl">Notifications</h2>
-          </div>
-          <p className="text-xs text-[#475569] sm:text-[13px]">Stay updated with your appointments and account activity.</p>
-        </header>
-
-        <section className="mb-5 rounded-2xl border border-[#c6c6cf] bg-white p-4 shadow-sm sm:mb-6 sm:p-5">
+      <main className="dw-modern-dashboard min-h-screen lg:ml-[264px]"><div className="mx-auto max-w-5xl px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
+        <PatientPageHeader title="Notifications" description="Stay updated with appointment reminders, care messages, and account activity." icon="notifications" />
+        <section className="mb-5 rounded-[1.5rem] border border-[#e0e7ef] bg-white p-4 shadow-[0_8px_28px_rgba(30,52,83,0.05)] sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-[#001b5e] sm:text-[15px]">Recent Alerts</h3>
             <div className="flex items-center gap-2">
@@ -290,7 +220,7 @@ export default function PatientNotificationsPage() {
           ) : null}
 
           {!isLoading ? notifications.map((item) => (
-            <article key={item.id} className="rounded-2xl border border-[#c6c6cf] bg-white p-4 shadow-sm sm:p-5">
+            <article key={item.id} className={`rounded-[1.5rem] border bg-white p-4 shadow-[0_8px_26px_rgba(30,52,83,0.04)] sm:p-5 ${item.unread ? "border-[#b9e8cd] ring-1 ring-[#e3f7eb]" : "border-[#e0e7ef]"}`}>
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
                   <h4 className="text-sm font-semibold text-[#001b5e] sm:text-[15px]">{item.title}</h4>
@@ -299,7 +229,7 @@ export default function PatientNotificationsPage() {
                 {item.unread ? <span className="mt-1 h-2.5 w-2.5 rounded-full bg-[#16b46f]" aria-label="Unread notification" /> : null}
               </div>
 
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-col gap-3 border-t border-[#edf1f5] pt-3 sm:flex-row sm:items-center sm:justify-between">
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${item.typeClass}`}>{item.tag}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] text-[#64748b] sm:text-xs">{item.time}</span>
@@ -316,7 +246,7 @@ export default function PatientNotificationsPage() {
             </article>
           )) : null}
         </section>
-      </main>
+      </div></main>
     </div>
   );
 }

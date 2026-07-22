@@ -6,6 +6,7 @@
 
 body {
   font-family: var(--font-body), sans-serif;
+  font-size: 15px;
   font-weight: 500;
   letter-spacing: -0.01em;
   text-rendering: optimizeLegibility;
@@ -34,10 +35,43 @@ textarea {
   letter-spacing: -0.005em;
 }
 
+button,
+a,
+input,
+select,
+textarea {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: 180ms;
+  transition-timing-function: ease;
+}
+
+input,
+select,
+textarea {
+  min-width: 0;
+}
+
+:focus-visible {
+  outline: 3px solid rgba(22, 169, 104, 0.22);
+  outline-offset: 2px;
+}
+
 @media (max-width: 640px) {
   body {
-    font-size: 14px;
+    font-size: 13.5px;
     line-height: 1.5;
+  }
+
+  h1 {
+    font-size: 1.875rem !important;
+  }
+
+  h2 {
+    font-size: 1.4rem !important;
+  }
+
+  h3 {
+    font-size: 1.1rem !important;
   }
 
   h1,
@@ -48,6 +82,23 @@ textarea {
   h6 {
     line-height: 1.2;
     letter-spacing: -0.015em;
+  }
+
+  main,
+  section,
+  article,
+  form {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 380px) {
+  h1 {
+    font-size: 1.7rem !important;
+  }
+
+  h2 {
+    font-size: 1.3rem !important;
   }
 }
 
@@ -85,4 +136,127 @@ textarea {
 
 .hero-gradient {
   background: linear-gradient(135deg, rgba(247, 249, 252, 1) 0%, rgba(10, 164, 180, 0.12) 100%);
+}
+
+.dw-patient-workspace,
+.dw-doctor-workspace {
+  min-height: 100vh;
+  background: #f4f7fb;
+}
+
+.dw-patient-workspace main,
+.dw-doctor-workspace main {
+  min-width: 0;
+}
+
+.dw-patient-workspace main > header h1,
+.dw-patient-workspace main > header h2,
+.dw-doctor-workspace main > header h1,
+.dw-doctor-workspace main > header h2 {
+  font-size: 1.35rem;
+  letter-spacing: -0.025em;
+  color: #001b5e;
+}
+
+.dw-admin-content h1,
+.dw-admin-content h2 {
+  letter-spacing: -0.025em;
+}
+
+.dw-admin-content > div > h2,
+.dw-admin-content > div > div:first-child h2 {
+  font-size: 1.35rem;
+}
+
+.dw-admin-content h3 {
+  font-size: 1rem;
+}
+
+.dw-admin-content table {
+  font-size: 0.8rem;
+}
+
+.dw-admin-content th {
+  font-size: 0.65rem;
+}
+
+.dw-patient-workspace :not(h1):not(h2).text-2xl,
+.dw-doctor-workspace :not(h1):not(h2).text-2xl,
+.dw-admin-content :not(h1):not(h2).text-2xl {
+  font-size: 1.25rem !important;
+}
+
+.dw-patient-workspace :not(h1):not(h2).text-3xl,
+.dw-doctor-workspace :not(h1):not(h2).text-3xl,
+.dw-admin-content :not(h1):not(h2).text-3xl {
+  font-size: 1.5rem !important;
+}
+
+.dw-patient-workspace main section,
+.dw-doctor-workspace main section {
+  border-color: #e0e7ef;
+}
+
+.dw-patient-workspace table,
+.dw-doctor-workspace table {
+  font-size: 0.8rem;
+}
+
+.dw-patient-workspace th,
+.dw-doctor-workspace th {
+  font-size: 0.65rem;
+}
+
+@media (min-width: 1024px) {
+  .dw-patient-workspace aside.fixed,
+  .dw-doctor-workspace aside.fixed {
+    width: 264px !important;
+    background-color: #001b5e !important;
+    box-shadow: none !important;
+  }
+
+  .dw-patient-workspace main[class*="lg:ml-"],
+  .dw-doctor-workspace main[class*="lg:ml-"] {
+    margin-left: 264px !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .dw-patient-workspace main,
+  .dw-doctor-workspace main {
+    padding: 1rem;
+  }
+
+  .dw-patient-workspace main.dw-modern-dashboard,
+  .dw-doctor-workspace main.dw-modern-dashboard {
+    padding: 0;
+  }
+
+  .dw-patient-workspace main > header,
+  .dw-doctor-workspace main > header {
+    margin-bottom: 1.25rem;
+  }
+
+  .dw-patient-workspace main section,
+  .dw-doctor-workspace main section {
+    border-radius: 1rem;
+  }
+
+  .dw-patient-workspace .overflow-x-auto,
+  .dw-doctor-workspace .overflow-x-auto {
+    width: 100%;
+    overscroll-behavior-inline: contain;
+  }
+
+  .dw-patient-workspace table,
+  .dw-doctor-workspace table,
+  .dw-admin-content table {
+    min-width: 640px;
+  }
+}
+
+@media (max-width: 420px) {
+  .dw-admin-content .grid-cols-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

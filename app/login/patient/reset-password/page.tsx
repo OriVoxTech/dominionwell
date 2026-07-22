@@ -64,7 +64,7 @@ function PatientResetPasswordContent() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f7f9fc] px-4 py-7 sm:py-10 md:px-8">
+    <main className="min-h-screen bg-[linear-gradient(135deg,#f7fbff,#ffffff_55%,#effcf6)] px-4 py-7 sm:py-10 md:px-8">
       <div className="mx-auto w-full max-w-[1120px] overflow-hidden rounded-3xl border border-[#c6c6cf] bg-white shadow-xl md:grid md:grid-cols-[1.1fr_0.9fr]">
         <section className="p-5 sm:p-6 md:p-10">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -75,7 +75,7 @@ function PatientResetPasswordContent() {
             >
               <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             </Link>
-            <h1 className="text-2xl font-bold text-[#001b5e] sm:text-3xl">Reset Password</h1>
+            <h1 className="text-xl font-bold text-[#001b5e] sm:text-2xl">Reset Password</h1>
           </div>
           <p className="mt-1.5 text-xs text-[#475569] sm:mt-2 sm:text-sm">
             Enter the verification code and choose a new password for <span className="font-semibold">{email || "your patient account"}</span>.
@@ -184,7 +184,7 @@ function PatientResetPasswordContent() {
         </section>
 
         <aside className="hidden bg-[#001b5e] p-10 text-white lg:block">
-          <h2 className="text-2xl font-bold">Restore access with confidence</h2>
+          <h2 className="text-xl font-bold">Restore access with confidence</h2>
           <p className="mt-3 text-sm leading-7 text-[#dbeafe]">
             Reset your DominionWell+ password to get back to appointments, doctors, prescriptions, and secure care updates.
           </p>

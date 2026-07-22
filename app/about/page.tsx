@@ -1,38 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
-import SignInModal from "../../components/sign-in-modal";
+import PublicHeader from "@/components/public-header";
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f7f9fc] text-[#191c1e]">
-      <nav className="sticky top-0 z-50 flex h-16 w-full items-center justify-between border-b border-[#c6c6cf] bg-[#f7f9fc] px-4 md:px-10">
-        <div className="flex items-center gap-4">
-          <Image alt="DominionWell Logo" className="h-8 w-auto" src="/logo.png" width={128} height={32} />
-          <span className="text-1xl font-bold text-[#001b5e]">DominionWell+</span>
-        </div>
-
-        <div className="hidden items-center gap-6 md:flex">
-          <Link className="text-sm text-[#45464e] transition-colors hover:text-[#16b46f]" href="/">
-            Find Doctors
-          </Link>
-          <a className="text-sm text-[#45464e] transition-colors hover:text-[#16b46f]" href="#">
-            Services
-          </a>
-          <Link className="border-b-2 border-[#16b46f] pb-1 text-sm font-bold text-[#16b46f]" href="/about">
-            About
-          </Link>
-          <a className="text-sm text-[#45464e] transition-colors hover:text-[#16b46f]" href="#">
-            Contact
-          </a>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <SignInModal className="px-4 py-2 text-sm text-[#16b46f]" />
-          <button className="rounded-lg bg-[#16b46f] px-4 py-2 text-sm font-medium text-white" type="button">
-            Register
-          </button>
-        </div>
-      </nav>
+      <PublicHeader />
 
       <main className="w-full">
         <section className="hero-gradient relative overflow-hidden px-4 pb-8 pt-8 md:pb-10 md:pl-10 md:pr-0 md:pt-10">
@@ -41,7 +14,7 @@ export default function AboutPage() {
               <div className="inline-flex items-center rounded-full border border-[#16b46f]/30 bg-[#16b46f]/10 px-4 py-1 text-[#16b46f]">
                 <span className="text-xs font-semibold uppercase tracking-wider">Our Vision</span>
               </div>
-              <h1 className="max-w-xl text-3xl font-bold text-[#001b5e] md:text-4xl">Healthcare Without Boundaries.</h1>
+              <h1 className="max-w-xl text-3xl font-bold tracking-[-0.035em] text-[#001b5e] md:text-[2.5rem]">Healthcare Without Boundaries.</h1>
               <p className="max-w-lg text-sm leading-6 text-[#45464e]">
                 DominionWell+ is redefining the medical landscape through VitalCare, bridging the gap between world-class expertise and
                 global accessibility.
@@ -76,7 +49,7 @@ export default function AboutPage() {
         <section className="bg-white px-4 py-14 md:px-10 md:py-16">
           <div className="mx-auto w-full max-w-[1440px]">
             <div className="mb-10 text-center">
-              <h2 className="text-3xl font-semibold text-[#001b5e]">Driven by Purpose</h2>
+              <h2 className="text-2xl font-semibold text-[#001b5e]">Driven by Purpose</h2>
               <p className="mx-auto mt-2 max-w-2xl text-base text-[#45464e]">
                 We believe healthcare is a fundamental right. Our platform leverages technology to provide clinical precision with
                 human empathy.
@@ -89,7 +62,7 @@ export default function AboutPage() {
                   <span className="material-symbols-outlined text-4xl text-[#16b46f]" style={{ fontVariationSettings: "'FILL' 1" }}>
                     medical_services
                   </span>
-                  <h3 className="text-2xl font-semibold text-[#001b5e]">Clinical Precision</h3>
+                  <h3 className="text-xl font-semibold text-[#001b5e]">Clinical Precision</h3>
                   <p className="text-base text-[#45464e]">
                     Our diagnostic tools are powered by advanced AI and vetted by world-renowned specialists to ensure every patient
                     receives the most accurate care path possible.
@@ -111,7 +84,7 @@ export default function AboutPage() {
               <div className="col-span-12 flex flex-col justify-between rounded-2xl bg-[#001b5e] p-6 text-white md:col-span-4">
                 <div className="space-y-2">
                   <span className="material-symbols-outlined text-4xl text-[#16b46f]">language</span>
-                  <h3 className="text-2xl font-semibold">Global Scale</h3>
+                  <h3 className="text-xl font-semibold">Global Scale</h3>
                   <p className="text-base text-[#d3defa]">
                     Connecting patients in remote regions to top-tier specialists across the globe via encrypted, low-latency
                     telemedicine.
@@ -124,7 +97,7 @@ export default function AboutPage() {
 
               <div className="col-span-12 rounded-2xl border border-[#c6c6cf] bg-[#f7f9fc] p-6 md:col-span-4">
                 <span className="material-symbols-outlined text-4xl text-[#16b46f]">diversity_3</span>
-                <h3 className="mt-2 text-2xl font-semibold text-[#001b5e]">Patient-Centric</h3>
+                <h3 className="mt-2 text-xl font-semibold text-[#001b5e]">Patient-Centric</h3>
                 <p className="mt-2 text-base text-[#45464e]">
                   We focus on the human behind the data. Compassion is integrated into every interaction, from intake to recovery.
                 </p>
@@ -139,7 +112,7 @@ export default function AboutPage() {
                   }}
                 />
                 <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-[#001b5e]/80 to-transparent p-6 text-white">
-                  <h3 className="text-2xl font-semibold">Integrated Recovery Centers</h3>
+                  <h3 className="text-xl font-semibold">Integrated Recovery Centers</h3>
                   <p className="max-w-lg text-base text-[#d9e4ff]">Physical and digital touchpoints working in unison for seamless health management.</p>
                 </div>
               </div>
@@ -151,7 +124,7 @@ export default function AboutPage() {
           <div className="mx-auto w-full max-w-[1440px]">
             <div className="mb-10 flex flex-col items-end justify-between gap-4 md:flex-row">
               <div className="max-w-xl">
-                <h2 className="text-3xl font-semibold text-[#001b5e]">Leadership Excellence</h2>
+                <h2 className="text-2xl font-semibold text-[#001b5e]">Leadership Excellence</h2>
                 <p className="mt-2 text-base text-[#45464e]">
                   A multidisciplinary team of medical experts, technology visionaries, and advocates dedicated to universal health
                   standards.
@@ -215,7 +188,7 @@ export default function AboutPage() {
                 ["85M", "Grants Issued", "Subsidizing care for underserved global communities."],
               ].map(([metric, title, text]) => (
                 <div className="space-y-2" key={title}>
-                  <h5 className="text-5xl font-bold leading-none text-[#16b46f]">{metric}</h5>
+                  <h5 className="text-3xl font-bold leading-none text-[#16b46f]">{metric}</h5>
                   <p className="text-xl font-semibold">{title}</p>
                   <p className="text-base text-[#bfd2ff]">{text}</p>
                 </div>

@@ -8,10 +8,8 @@ import {
   useEffect,
   useState,
 } from "react";
-import PatientAvatar from "@/components/patient-avatar";
 import PatientMobileNav from "@/components/patient-mobile-nav";
-import PatientLogoutButton from "@/components/patient-logout-button";
-import PatientProfileSummary from "@/components/patient-profile-summary";
+import PatientSidebar from "@/components/patient-sidebar";
 import {
   doctorApplicationsApiService,
   getApiErrorMessage,
@@ -22,7 +20,6 @@ import {
   type PublicDoctor,
   type PublicDoctorsResponse,
 } from "@/lib/api";
-import { usePatientProfile } from "@/lib/use-patient-profile";
 
 const EMPTY_RESPONSE: PublicDoctorsResponse = {
   data: [],
@@ -103,7 +100,6 @@ function getDateKey(value: string) {
 
 function BrowseDoctorsContent() {
   const router = useRouter();
-  const profile = usePatientProfile();
   const searchParams = useSearchParams();
   const initialDoctorId = searchParams.get("doctorId") ?? "";
   const [query, setQuery] = useState(searchParams.get("query") ?? "");
@@ -304,73 +300,56 @@ function BrowseDoctorsContent() {
   );
   const availableDates = Object.keys(availabilityByDate);
   const selectedDateSlots = selectedDate ? availabilityByDate[selectedDate] ?? [] : [];
+  const hasActiveFilters = Boolean(query || specialization || selectedDoctorId);
+
+  const clearFilters = () => {
+    setQuery("");
+    setDebouncedQuery("");
+    setSpecialization("");
+    setSelectedDoctorId("");
+    setPage(1);
+    router.replace("/dashboard/patient/doctors");
+  };
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
+    <div className="min-h-screen bg-[#f4f7fb] text-[#17223b]">
       <PatientMobileNav active="doctors" />
+      <PatientSidebar active="doctors" />
 
-      <aside className="fixed left-0 top-0 z-40 hidden h-full w-[250px] flex-col bg-[#001b5e] px-3 py-6 text-white shadow-md lg:flex">
-        <div className="mb-8 px-2">
-          <h1 className="text-1xl font-extrabold tracking-tight">DominionWell+</h1>
-        </div>
-
-        <div className="mb-6 flex items-center gap-3 px-2">
-          <PatientAvatar profile={profile} />
-          <PatientProfileSummary />
-        </div>
-
-        <nav className="flex-1 space-y-1 text-sm">
-          <Link href="/dashboard/patient" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-            <span className="material-symbols-outlined text-[20px]">dashboard</span>
-            <span>Dashboard</span>
-          </Link>
-          <Link href="/dashboard/patient/appointments" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-            <span className="material-symbols-outlined text-[20px]">calendar_month</span>
-            <span>Appointments</span>
-          </Link>
-          <div className="flex items-center gap-3 rounded-lg border-l-4 border-[#16b46f] bg-[#16b46f]/20 px-3 py-2 text-[#d7ffe9]">
-            <span className="material-symbols-outlined text-[20px]">medical_services</span>
-            <span>Browse Doctors</span>
+      <main className="dw-modern-dashboard min-h-screen lg:ml-[264px]"><div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
+        <section className="relative mb-6 overflow-hidden rounded-[1.75rem] bg-[linear-gradient(118deg,#001b5e_0%,#073978_58%,#08758a_100%)] px-5 pb-24 pt-6 text-white shadow-[0_18px_50px_rgba(0,27,94,0.18)] sm:px-7 sm:pb-24 sm:pt-8 lg:px-9">
+          <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-[#54e6ad]/15 blur-2xl" />
+          <div className="pointer-events-none absolute bottom-0 right-[22%] h-32 w-32 rounded-full border border-white/10" />
+          <div className="relative max-w-2xl">
+            <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.13em] text-[#9ff4ce]">
+              <span className="material-symbols-outlined text-[15px]">verified</span>
+              Verified care network
+            </span>
+            <h1 className="max-w-xl text-2xl font-bold leading-tight tracking-[-0.025em] sm:text-[30px]">
+              Find a doctor who fits your care needs
+            </h1>
+            <p className="mt-2 max-w-xl text-[13px] leading-6 text-white/75 sm:text-sm">
+              Explore trusted specialists, review their experience, and book a convenient consultation from one place.
+            </p>
           </div>
-          <Link href="/dashboard/patient/subscription" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-            <span className="material-symbols-outlined text-[20px]">card_membership</span>
-            <span>Subscription</span>
-          </Link>
-          <Link href="/dashboard/patient/payments" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-            <span className="material-symbols-outlined text-[20px]">receipt_long</span>
-            <span>Payments</span>
-          </Link>
-          <Link href="/dashboard/patient/settings" className="flex items-center gap-3 px-3 py-2 text-[#d8e2ff] hover:bg-white/10">
-            <span className="material-symbols-outlined text-[20px]">settings</span>
-            <span>Settings</span>
-          </Link>
-        </nav>
 
-        <div className="space-y-1 border-t border-white/10 pt-4 text-sm text-[#d8e2ff]">
-          <Link href="/dashboard/patient/help-center" className="flex items-center gap-3 px-3 py-2 hover:bg-white/10">
-            <span className="material-symbols-outlined text-[20px]">help</span>
-            <span>Help Center</span>
-          </Link>
-          <PatientLogoutButton className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60" />
-        </div>
-      </aside>
-
-      <main className="min-h-screen p-4 sm:p-6 md:p-8 lg:ml-[250px]">
-        <header className="mb-5 sm:mb-6">
-          <div className="mb-2 flex items-center gap-2 sm:gap-3">
-            <Link href="/dashboard/patient" aria-label="Back" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]">
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            </Link>
-            <h2 className="text-2xl font-semibold text-[#001b5e] sm:text-1xl">Browse Doctors</h2>
+          <div className="absolute bottom-5 right-6 hidden items-center gap-6 text-white/85 lg:flex">
+            <div className="flex items-center gap-2">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/10"><span className="material-symbols-outlined text-[19px] text-[#6ee7b7]">shield_with_heart</span></span>
+              <div><p className="text-xs font-semibold text-white">Verified specialists</p><p className="text-[10px] text-white/55">Care you can trust</p></div>
+            </div>
+            <div className="h-8 w-px bg-white/15" />
+            <div className="flex items-center gap-2">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/10"><span className="material-symbols-outlined text-[19px] text-[#6ee7b7]">calendar_month</span></span>
+              <div><p className="text-xs font-semibold text-white">Simple booking</p><p className="text-[10px] text-white/55">Choose an open time</p></div>
+            </div>
           </div>
-          <p className="text-xs text-[#475569] sm:text-[13px]">Browse active, verified doctors and find the right specialist.</p>
-        </header>
+        </section>
 
-        <section className="mb-5 rounded-2xl border border-[#c6c6cf] bg-white p-4 shadow-sm sm:mb-6 sm:p-5">
-          <h3 className="mb-3 text-sm font-semibold text-[#001b5e] sm:mb-4 sm:text-[15px]">Search doctors</h3>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_240px]">
+        <section className="relative z-10 -mt-[4.6rem] mb-7 rounded-[1.35rem] border border-white/80 bg-white/95 p-3 shadow-[0_14px_38px_rgba(15,35,70,0.13)] backdrop-blur sm:p-4">
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-[1fr_260px_auto]">
             <label className="relative block">
-              <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]">search</span>
+              <span className="material-symbols-outlined pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[20px] text-[#64748b]">search</span>
               <input
                 type="search"
                 value={query}
@@ -379,29 +358,40 @@ function BrowseDoctorsContent() {
                   setSelectedDoctorId("");
                 }}
                 placeholder="Search by name, username, or specialization"
-                className="h-11 w-full rounded-xl border border-[#c6c6cf] bg-white pl-10 pr-4 text-[13px] outline-none focus:border-[#0aa4b4]"
+                className="h-12 w-full rounded-xl border border-[#d8e1eb] bg-[#f8fafc] pl-11 pr-4 text-[13px] text-[#17223b] outline-none transition placeholder:text-[#94a3b8] focus:border-[#0aa4b4] focus:bg-white focus:ring-4 focus:ring-[#0aa4b4]/10"
               />
             </label>
 
-            <select
-              className="h-11 w-full rounded-xl border border-[#c6c6cf] bg-white px-3 text-[13px] outline-none focus:border-[#0aa4b4]"
-              value={specialization}
-              onChange={(event) => {
-                setSpecialization(event.target.value);
-                setSelectedDoctorId("");
-                setPage(1);
-              }}
-              aria-label="Filter by specialization"
-              disabled={isLoadingSpecialties}
+            <label className="relative block">
+              <span className="material-symbols-outlined pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[19px] text-[#64748b]">stethoscope</span>
+              <select
+                className="h-12 w-full appearance-none rounded-xl border border-[#d8e1eb] bg-[#f8fafc] pl-11 pr-9 text-[13px] text-[#334155] outline-none transition focus:border-[#0aa4b4] focus:bg-white focus:ring-4 focus:ring-[#0aa4b4]/10"
+                value={specialization}
+                onChange={(event) => {
+                  setSpecialization(event.target.value);
+                  setSelectedDoctorId("");
+                  setPage(1);
+                }}
+                aria-label="Filter by specialization"
+                disabled={isLoadingSpecialties}
+              >
+                <option value="">All specializations</option>
+                {isLoadingSpecialties ? <option value="">Loading specialties...</option> : null}
+                {specialties.map((option) => (
+                  <option key={option.id} value={option.name}>{option.name}</option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[18px] text-[#64748b]">expand_more</span>
+            </label>
+
+            <button
+              type="button"
+              onClick={clearFilters}
+              disabled={!hasActiveFilters}
+              className="h-12 rounded-xl border border-[#d8e1eb] px-4 text-xs font-semibold text-[#475569] transition hover:border-[#b8c6d6] hover:bg-[#f8fafc] disabled:cursor-default disabled:opacity-40 md:min-w-[88px]"
             >
-              <option value="">All specializations</option>
-              {isLoadingSpecialties ? (
-                <option value="">Loading specialties...</option>
-              ) : null}
-              {specialties.map((option) => (
-                <option key={option.id} value={option.name}>{option.name}</option>
-              ))}
-            </select>
+              Clear
+            </button>
           </div>
           {specialtiesError ? (
             <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs text-[#b91c1c]">
@@ -417,9 +407,14 @@ function BrowseDoctorsContent() {
           ) : null}
         </section>
 
-        <section className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
-          <h3 className="text-sm font-semibold text-[#001b5e] sm:text-[15px]">View all doctors</h3>
-          <p className="text-xs text-[#475569] sm:text-[13px]">{directory.meta.total} result{directory.meta.total === 1 ? "" : "s"}</p>
+        <section className="mb-4 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0a8f66]">Doctor directory</p>
+            <h2 className="mt-1 text-lg font-bold tracking-[-0.015em] text-[#001b5e]">Meet your care team</h2>
+          </div>
+          <span className="rounded-full border border-[#dbe5ef] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#475569] shadow-sm">
+            {directory.meta.total} doctor{directory.meta.total === 1 ? "" : "s"}
+          </span>
         </section>
 
         {errorMessage ? (
@@ -430,11 +425,11 @@ function BrowseDoctorsContent() {
         ) : null}
 
         {isLoading ? (
-          <section className="grid grid-cols-1 gap-4 lg:grid-cols-2" aria-label="Loading doctors">
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-2" aria-label="Loading doctors">
             {[0, 1, 2, 3].map((item) => (
-              <div key={item} className="h-52 animate-pulse rounded-2xl border border-[#e2e8f0] bg-white p-5">
-                <div className="mb-5 h-14 w-14 rounded-full bg-[#e2e8f0]" />
-                <div className="mb-3 h-4 w-1/2 rounded bg-[#e2e8f0]" />
+              <div key={item} className="h-64 animate-pulse rounded-[1.5rem] border border-[#e2e8f0] bg-white p-5">
+                <div className="mb-5 flex gap-4"><div className="h-20 w-20 rounded-2xl bg-[#e2e8f0]" /><div className="flex-1 pt-2"><div className="mb-3 h-4 w-1/2 rounded bg-[#e2e8f0]" /><div className="h-3 w-1/3 rounded bg-[#f1f5f9]" /></div></div>
+                <div className="mb-2 h-3 w-full rounded bg-[#f1f5f9]" />
                 <div className="h-3 w-3/4 rounded bg-[#f1f5f9]" />
               </div>
             ))}
@@ -442,59 +437,71 @@ function BrowseDoctorsContent() {
         ) : null}
 
         {!isLoading && !errorMessage ? (
-          <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {directory.data.map((doctor) => {
               const doctorName = getDoctorName(doctor);
               const presenceStatus = getPresenceStatusMeta(doctor.presenceStatus);
               const isOffline = isDoctorOffline(doctor);
 
               return (
-                <article key={doctor.id} className="flex flex-col rounded-2xl border border-[#c6c6cf] bg-white p-4 shadow-sm sm:p-5">
-                  <div className="mb-4 flex items-start gap-3">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#e0f2fe] text-sm font-bold text-[#0369a1]">
-                      {getDoctorInitials(doctor)}
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="truncate text-sm font-semibold text-[#001b5e] sm:text-[15px]">{doctorName}</h4>
-                      <p className="mt-1 text-xs text-[#64748b]">@{doctor.user.username}</p>
-                    </div>
-                    <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
-                      <span className="rounded-full bg-[#dcfce7] px-2 py-1 text-[10px] font-semibold uppercase text-[#15803d]">Verified</span>
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${presenceStatus.className}`}>
+                <article key={doctor.id} className="group overflow-hidden rounded-[1.6rem] border border-[#dfe7f0] bg-white shadow-[0_10px_32px_rgba(20,43,77,0.06)] transition duration-300 hover:-translate-y-1 hover:border-[#bfd3e5] hover:shadow-[0_20px_42px_rgba(20,43,77,0.11)]">
+                  <div className="relative border-b border-[#e8eef5] bg-[linear-gradient(135deg,#f6fbff_0%,#effaf6_100%)] p-4 sm:p-5">
+                    <div className="absolute right-4 top-4 flex flex-col items-end gap-1.5">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full border border-white/80 px-2.5 py-1 text-[10px] font-bold shadow-sm ${presenceStatus.className}`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${presenceStatus.dotClassName}`} />
                         {presenceStatus.label}
                       </span>
                     </div>
+
+                    <div className="flex items-center gap-3.5 pr-20 sm:gap-4">
+                      <div className="relative grid h-[74px] w-[74px] shrink-0 place-items-center rounded-[1.35rem] border-4 border-white bg-[linear-gradient(145deg,#dff8ef,#dceaff)] text-lg font-extrabold text-[#005b73] shadow-[0_8px_20px_rgba(0,79,105,0.12)] sm:h-20 sm:w-20">
+                        {getDoctorInitials(doctor)}
+                        <span className="absolute -bottom-1.5 -right-1.5 grid h-6 w-6 place-items-center rounded-full border-2 border-white bg-[#16b36c] text-white shadow-sm" title="Verified doctor">
+                          <span className="material-symbols-outlined text-[14px]">check</span>
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#0a8f66]">Verified specialist</p>
+                        <h3 className="truncate text-[17px] font-bold tracking-[-0.015em] text-[#001b5e] sm:text-lg">{doctorName}</h3>
+                        <p className="mt-1 truncate text-[11px] text-[#64748b]">@{doctor.user.username}</p>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="mb-4 flex flex-wrap gap-2">
-                    {doctor.specializations.map((item) => (
-                      <span key={item} className="rounded-md bg-[#eef2ff] px-2 py-1 text-[11px] font-medium text-[#3730a3]">{formatSpecialization(item)}</span>
-                    ))}
-                  </div>
+                  <div className="flex min-h-[174px] flex-col p-4 sm:p-5">
+                    <div className="mb-4 flex flex-wrap items-center gap-2">
+                      {doctor.specializations.map((item) => (
+                        <span key={item} className="inline-flex items-center gap-1 rounded-full bg-[#eef4ff] px-2.5 py-1.5 text-[10px] font-bold text-[#244b91]">
+                          <span className="material-symbols-outlined text-[14px]">medical_services</span>
+                          {formatSpecialization(item)}
+                        </span>
+                      ))}
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#f7f8fa] px-2.5 py-1.5 text-[10px] font-semibold text-[#64748b]">
+                        <span className="material-symbols-outlined text-[14px]">workspace_premium</span>
+                        {(doctor.yearsOfExperience ?? 0) > 0
+                          ? `${doctor.yearsOfExperience} ${doctor.yearsOfExperience === 1 ? "year" : "years"} experience`
+                          : "Verified provider"}
+                      </span>
+                    </div>
 
-                  <p className="mb-5 line-clamp-3 text-xs leading-5 text-[#475569] sm:text-[13px]">
-                    {doctor.bio || "This doctor has not added a biography yet."}
-                  </p>
+                    <p className="line-clamp-2 text-[12px] leading-5 text-[#52627a] sm:text-[13px]">
+                      {doctor.bio || "Committed to providing attentive, patient-focused care and helpful medical guidance."}
+                    </p>
 
-                  <div className="mt-auto flex items-center justify-between gap-3 border-t border-[#e2e8f0] pt-4">
-                    <span className="text-[11px] text-[#64748b]">Verified {new Date(doctor.verifiedAt).toLocaleDateString()}</span>
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <Link href={`/dashboard/patient/doctors/${doctor.id}`} className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#001b5e] hover:bg-[#f8fafc]" aria-label={`View profile for ${doctorName}`}>
-                        View Profile
+                    <div className="mt-auto grid grid-cols-1 gap-2 pt-5 sm:grid-cols-2">
+                      <Link href={`/dashboard/patient/doctors/${doctor.id}`} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[#cdd9e6] bg-white px-3 text-xs font-bold text-[#001b5e] transition hover:border-[#8da9c4] hover:bg-[#f8fbff]" aria-label={`View profile for ${doctorName}`}>
+                        View profile
+                        <span className="material-symbols-outlined text-[16px]">arrow_outward</span>
                       </Link>
                       <button
                         type="button"
                         onClick={() => void openBookingFlow(doctor)}
                         disabled={isOffline}
-                        className="rounded-lg bg-[#001b5e] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
-                        title={
-                          isOffline
-                            ? "This doctor is currently offline"
-                            : "Book an appointment"
-                        }
+                        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#16b36c] px-3 text-xs font-bold text-white shadow-[0_7px_16px_rgba(22,179,108,0.2)] transition hover:bg-[#118d57] disabled:cursor-not-allowed disabled:bg-[#d9e0e8] disabled:text-[#718096] disabled:shadow-none"
+                        title={isOffline ? "This doctor is currently offline" : "Book an appointment"}
                       >
-                        {isOffline ? "Doctor Offline" : "Book Appointment"}
+                        <span className="material-symbols-outlined text-[16px]">calendar_add_on</span>
+                        {isOffline ? "Currently offline" : "Book appointment"}
                       </button>
                     </div>
                   </div>
@@ -505,9 +512,11 @@ function BrowseDoctorsContent() {
         ) : null}
 
         {!isLoading && !errorMessage && directory.data.length === 0 ? (
-          <section className="mt-6 rounded-2xl border border-dashed border-[#c6c6cf] bg-white p-6 text-center">
-            <h4 className="text-base font-semibold text-[#001b5e]">No doctors match your search</h4>
-            <p className="mt-1 text-sm text-[#64748b]">Try another name, username, or specialization.</p>
+          <section className="mt-6 rounded-[1.5rem] border border-dashed border-[#b9cadb] bg-white px-5 py-10 text-center shadow-sm">
+            <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#eef6fb] text-[#08758a]"><span className="material-symbols-outlined">person_search</span></span>
+            <h4 className="mt-4 text-base font-bold text-[#001b5e]">No doctors match your search</h4>
+            <p className="mx-auto mt-1 max-w-sm text-[13px] text-[#64748b]">Try a different name or choose another medical specialty.</p>
+            <button type="button" onClick={clearFilters} className="mt-4 rounded-xl bg-[#001b5e] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#082d70]">Clear filters</button>
           </section>
         ) : null}
 
@@ -518,7 +527,7 @@ function BrowseDoctorsContent() {
             <button type="button" disabled={page >= directory.meta.totalPages} onClick={() => setPage((current) => current + 1)} className="rounded-lg border border-[#c6c6cf] px-3 py-2 text-xs font-semibold text-[#001b5e] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">Next</button>
           </nav>
         ) : null}
-      </main>
+      </div></main>
 
       {bookingDoctor ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-6">
@@ -694,7 +703,7 @@ function BrowseDoctorsContent() {
 
 export default function BrowseDoctorsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#f9fafb]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[#f4f7fb]" />}>
       <BrowseDoctorsContent />
     </Suspense>
   );

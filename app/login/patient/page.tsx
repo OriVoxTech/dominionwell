@@ -93,8 +93,8 @@ function PatientLoginContent() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f9fc] px-4 py-7 sm:py-10 md:px-8">
-      <div className="mx-auto w-full max-w-[1120px] overflow-hidden rounded-3xl border border-[#c6c6cf] bg-white shadow-xl md:grid md:grid-cols-[1.1fr_0.9fr]">
+    <main className="min-h-screen bg-[linear-gradient(135deg,#f7fbff,#ffffff_55%,#effcf6)] px-4 py-7 sm:py-10 md:px-8">
+      <div className="mx-auto w-full max-w-[1040px] overflow-hidden rounded-[1.75rem] border border-[#dbe4ee] bg-white shadow-[0_24px_65px_rgba(0,27,94,0.12)] md:grid md:grid-cols-[1.1fr_0.9fr]">
         <section className="p-5 sm:p-6 md:p-10">
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
@@ -104,7 +104,7 @@ function PatientLoginContent() {
             >
               <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             </Link>
-            <h1 className="text-2xl font-bold text-[#001b5e] sm:text-3xl">
+            <h1 className="text-xl font-bold text-[#001b5e] sm:text-2xl">
               Patient Login
             </h1>
           </div>
@@ -232,7 +232,7 @@ function PatientLoginContent() {
         </section>
 
         <aside className="hidden bg-[#001b5e] p-10 text-white lg:block">
-          <h2 className="text-2xl font-bold">Your health data, protected.</h2>
+          <h2 className="text-xl font-bold">Your health data, protected.</h2>
           <p className="mt-3 text-sm leading-7 text-[#dbeafe]">
             Login to access appointments, medical records, secure chats, and prescription updates in one place.
           </p>

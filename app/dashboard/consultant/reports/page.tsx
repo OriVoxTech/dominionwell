@@ -1,11 +1,9 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
-import DoctorProfileSummary from "@/components/doctor-profile-summary";
-import DoctorLogoutButton from "@/components/doctor-logout-button";
+import DoctorPageHeader from "@/components/doctor-page-header";
+import DoctorSidebar from "@/components/doctor-sidebar";
 
 type DoctorReport = {
   id: string;
@@ -50,135 +48,39 @@ export default function ConsultantReportsPage() {
   const [selectedReport, setSelectedReport] = useState<DoctorReport | null>(doctorReports[0] ?? null);
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
+    <div className="min-h-screen bg-[#f4f7fb] text-[#17223b]">
       <DoctorMobileNav />
+      <DoctorSidebar active="reports" />
 
-      <aside className="fixed left-0 top-0 z-40 hidden h-full w-[280px] flex-col bg-[#0d1b3d] px-4 py-8 text-white shadow-md lg:flex">
-        <div className="mb-8 px-2">
-          <span className="text-1xl font-extrabold text-[#7784ac]">DominionWell+</span>
-        </div>
+      <main className="dw-modern-dashboard min-h-screen lg:ml-[264px]">
+        <div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
+          <DoctorPageHeader title="Reports" description="Review clinical notes created after completed consultations and open the full report in context." icon="clinical_notes" />
 
-        <div className="mb-8 flex items-center gap-4 px-2">
-          <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#16b36c] bg-[#e0e3e6]">
-            <Image
-              className="object-cover"
-              alt="Doctor profile"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBveWw5sJYO4vcFdjWVdbuGQDlC0JKaMeg6jsjDDSJkIwdRjG_4H_Ao7x2stxD6kTx4oY4DP80Tf-kMczLWJQqZw7ajzN4HpSFJ0W7qcoFs9bxbSpMN7PrAqivavfdvvECjYhZNcT_25wMoRamMlavt1GZ5bU5v1LXmZRreRkSDQzcoG5jXyD19NtcvpsAZFGHlPJkNdm6Vme6nV5SmbMT-CGGHwt91t_aHyC2bbT4qoU6rYhO4t232jYBYnX0OKrxpnI_i4VeK-yJ_"
-              fill
-              sizes="48px"
-              unoptimized
-            />
-          </div>
-          <DoctorProfileSummary />
-        </div>
-
-        <div className="flex-grow space-y-2 text-sm">
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor">
-            <span className="material-symbols-outlined">dashboard</span>
-            <span>Dashboard</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/consultations">
-            <span className="material-symbols-outlined">medical_services</span>
-            <span>Consultations</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/patients">
-            <span className="material-symbols-outlined">group</span>
-            <span>Patients</span>
-          </Link>
-          <div className="flex items-center gap-3 rounded-lg border-l-4 border-[#16b36c] bg-[#74fcad] p-3 text-[#007443]">
-            <span className="material-symbols-outlined">analytics</span>
-            <span>Reports</span>
-          </div>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/wallet">
-            <span className="material-symbols-outlined">wallet</span>
-            <span>Wallet</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/settings">
-            <span className="material-symbols-outlined">settings</span>
-            <span>Settings</span>
-          </Link>
-        </div>
-
-        <div className="mt-auto space-y-2 border-t border-[#7784ac]/10 pt-6 text-sm">
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/notifications">
-            <span className="material-symbols-outlined">notifications</span>
-            <span>Notifications</span>
-          </Link>
-          <DoctorLogoutButton className="flex w-full items-center gap-3 p-3 text-left text-[#7784ac]/85 hover:bg-[#00020d]/10" />
-        </div>
-      </aside>
-
-      <main className="min-h-screen p-4 sm:p-6 md:p-10 lg:ml-[280px]">
-        <header className="mb-6 sm:mb-8">
-          <div className="mb-2 flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/dashboard/doctor"
-              aria-label="Back"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            </Link>
-            <h1 className="text-xl font-semibold text-[#00020d] sm:text-2xl">Reports</h1>
-          </div>
-          <p className="text-xs text-[#45464e] sm:text-sm">
-            View all reports created for consultations, including patient and consultation references.
-          </p>
-        </header>
-
-        <section className="rounded-xl border border-[#eaecf0] bg-white/80 p-5 shadow-sm backdrop-blur-sm">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-1xl font-semibold text-[#00020d]">Doctor Reports</h2>
-            <p className="text-xs text-[#64748b]">Total: {doctorReports.length}</p>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="bg-[#f2f4f7] text-[11px] uppercase tracking-wide text-[#64748b]">
-                  <th className="rounded-l-lg px-3 py-3">Report ID</th>
-                  <th className="px-3 py-3">Consultation ID</th>
-                  <th className="px-3 py-3">Patient ID</th>
-                  <th className="px-3 py-3">Summary</th>
-                  <th className="rounded-r-lg px-3 py-3">Created</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="grid gap-5 xl:grid-cols-[.8fr_1.2fr]">
+            <section className="rounded-[1.5rem] border border-[#e0e7ef] bg-white p-4 shadow-[0_8px_28px_rgba(30,52,83,0.05)] sm:p-5">
+              <div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#0b9459]">Report library</p><h2 className="mt-1 text-base font-bold text-[#001b5e]">Consultation reports</h2></div><span className="rounded-full bg-[#eafbf2] px-2.5 py-1 text-[10px] font-bold text-[#0b9459]">{doctorReports.length} total</span></div>
+              <div className="grid gap-3">
                 {doctorReports.map((report) => (
-                  <tr
-                    key={report.id}
-                    className={`cursor-pointer border-b border-[#e2e8f0] transition last:border-b-0 hover:bg-[#f8fafc] ${
-                      selectedReport?.id === report.id ? "bg-[#eff6ff]" : ""
-                    }`}
-                    onClick={() => setSelectedReport(report)}
-                  >
-                    <td className="px-3 py-3 font-semibold text-[#001b5e]">{report.id}</td>
-                    <td className="px-3 py-3 text-[#475569]">{report.consultationId}</td>
-                    <td className="px-3 py-3 text-[#475569]">{report.patientId}</td>
-                    <td className="px-3 py-3 text-[#475569]">{report.summary}</td>
-                    <td className="px-3 py-3 text-[#475569]">{report.createdAt}</td>
-                  </tr>
+                  <button key={report.id} type="button" onClick={() => setSelectedReport(report)} className={`w-full rounded-2xl border p-4 text-left transition ${selectedReport?.id === report.id ? "border-[#315ead] bg-[#eef4ff] shadow-sm" : "border-[#e5eaf0] bg-[#fafcff] hover:border-[#bdcbe0] hover:bg-white"}`}>
+                    <div className="flex items-start justify-between gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-[#315ead] shadow-sm"><span className="material-symbols-outlined text-[18px]">description</span></span><span className="text-[10px] font-semibold text-[#8a96a8]">{report.createdAt}</span></div>
+                    <h3 className="mt-3 text-sm font-bold text-[#001b5e]">{report.id}</h3><p className="mt-1 line-clamp-2 text-xs leading-5 text-[#64748b]">{report.summary}</p>
+                    <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold text-[#526175]"><span className="rounded-full bg-white px-2 py-1">{report.consultationId}</span><span className="rounded-full bg-white px-2 py-1">{report.patientId}</span></div>
+                  </button>
                 ))}
-              </tbody>
-            </table>
-          </div>
-
-          {selectedReport ? (
-            <div className="mt-5 rounded-xl border border-[#dbeafe] bg-[#f8fbff] p-4">
-              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-[#001b5e]">Full Report</h3>
-                  <p className="text-xs text-[#64748b]">
-                    {selectedReport.id} • {selectedReport.consultationId} • {selectedReport.patientId}
-                  </p>
-                </div>
-                <span className="inline-flex w-fit rounded-full bg-[#dbeafe] px-3 py-1 text-[11px] font-semibold text-[#1d4ed8]">
-                  {selectedReport.createdAt}
-                </span>
               </div>
-              <p className="text-sm leading-6 text-[#334155]">{selectedReport.fullReport}</p>
-            </div>
-          ) : null}
-        </section>
+            </section>
+
+            <section className="min-h-[420px] rounded-[1.5rem] border border-[#e0e7ef] bg-white p-5 shadow-[0_8px_28px_rgba(30,52,83,0.05)] sm:p-7">
+              {selectedReport ? (
+                <div><div className="flex flex-col gap-4 border-b border-[#edf1f5] pb-5 sm:flex-row sm:items-start sm:justify-between"><div className="flex items-start gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#eafbf2] text-[#0b9459]"><span className="material-symbols-outlined">clinical_notes</span></span><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#0b9459]">Clinical report</p><h2 className="mt-1 text-lg font-bold text-[#001b5e]">{selectedReport.id}</h2></div></div><span className="w-fit rounded-full bg-[#eef4ff] px-3 py-1.5 text-[10px] font-bold text-[#315ead]">{selectedReport.createdAt}</span></div>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-[#f7f9fc] p-3"><p className="text-[10px] font-bold uppercase text-[#8a96a8]">Consultation</p><p className="mt-1 text-xs font-bold text-[#001b5e]">{selectedReport.consultationId}</p></div><div className="rounded-xl bg-[#f7f9fc] p-3"><p className="text-[10px] font-bold uppercase text-[#8a96a8]">Patient</p><p className="mt-1 text-xs font-bold text-[#001b5e]">{selectedReport.patientId}</p></div></div>
+                  <div className="mt-6"><h3 className="text-sm font-bold text-[#001b5e]">Consultation summary</h3><p className="mt-3 text-sm leading-7 text-[#526175]">{selectedReport.fullReport}</p></div>
+                  <div className="mt-7 rounded-2xl border border-[#d7efe2] bg-[#f4fbf7] p-4"><div className="flex gap-3"><span className="material-symbols-outlined text-[20px] text-[#0b9459]">verified_user</span><div><p className="text-xs font-bold text-[#075d3a]">Private clinical record</p><p className="mt-1 text-[11px] leading-5 text-[#4c7661]">This report is part of the patient&apos;s protected consultation history.</p></div></div></div>
+                </div>
+              ) : <div className="grid h-full min-h-80 place-items-center text-center"><div><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#eef4ff] text-[#315ead]"><span className="material-symbols-outlined">description</span></span><p className="mt-4 text-sm font-bold text-[#001b5e]">Select a report</p></div></div>}
+            </section>
+          </div>
+        </div>
       </main>
     </div>
   );

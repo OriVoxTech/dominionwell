@@ -58,7 +58,7 @@ export default function AdminLoginPage() {
       <div className="mx-auto grid w-full max-w-[1040px] overflow-hidden rounded-3xl border border-[#dbe4f0] bg-white shadow-xl lg:grid-cols-[1.1fr_0.9fr]">
         <section className="p-6 sm:p-8 md:p-10">
           <div className="mb-4">
-            <h1 className="text-2xl font-bold text-[#001b5e] sm:text-3xl">Admin Login</h1>
+            <h1 className="text-xl font-bold text-[#001b5e] sm:text-2xl">Admin Login</h1>
             <p className="mt-2 text-sm text-[#475569]">Sign in to manage doctors, patients, payments, subscriptions, and analytics.</p>
           </div>
 
@@ -121,7 +121,7 @@ export default function AdminLoginPage() {
         </section>
 
         <aside className="hidden bg-[#001b5e] p-10 text-white lg:block">
-          <h2 className="text-2xl font-bold">DominionWell+ Control Center</h2>
+          <h2 className="text-xl font-bold">DominionWell+ Control Center</h2>
           <p className="mt-3 text-sm leading-7 text-[#dbeafe]">
             Monitor platform health, govern account access, review consultations, and manage all operational workflows from one secure console.
           </p>

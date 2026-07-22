@@ -1,11 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import DoctorMobileNav from "@/components/doctor-mobile-nav";
-import DoctorProfileSummary from "@/components/doctor-profile-summary";
-import DoctorLogoutButton from "@/components/doctor-logout-button";
+import DoctorPageHeader from "@/components/doctor-page-header";
+import DoctorSidebar from "@/components/doctor-sidebar";
 import {
   doctorApiService,
   getApiErrorMessage,
@@ -232,80 +231,14 @@ export default function ConsultantWalletPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] text-[#191c1e]">
+    <div className="min-h-screen bg-[#f4f7fb] text-[#17223b]">
       <DoctorMobileNav />
 
-      <aside className="fixed left-0 top-0 z-40 hidden h-full w-[280px] flex-col bg-[#0d1b3d] px-4 py-8 text-white shadow-md lg:flex">
-        <div className="mb-8 px-2">
-          <span className="text-1xl font-extrabold text-[#7784ac]">DominionWell+</span>
-        </div>
+      <DoctorSidebar active="wallet" />
 
-        <div className="mb-8 flex items-center gap-4 px-2">
-          <div className="relative h-12 w-12 overflow-hidden rounded-full border-2 border-[#16b36c] bg-[#e0e3e6]">
-            <Image
-              className="object-cover"
-              alt="Doctor profile"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBveWw5sJYO4vcFdjWVdbuGQDlC0JKaMeg6jsjDDSJkIwdRjG_4H_Ao7x2stxD6kTx4oY4DP80Tf-kMczLWJQqZw7ajzN4HpSFJ0W7qcoFs9bxbSpMN7PrAqivavfdvvECjYhZNcT_25wMoRamMlavt1GZ5bU5v1LXmZRreRkSDQzcoG5jXyD19NtcvpsAZFGHlPJkNdm6Vme6nV5SmbMT-CGGHwt91t_aHyC2bbT4qoU6rYhO4t232jYBYnX0OKrxpnI_i4VeK-yJ_"
-              fill
-              sizes="48px"
-              unoptimized
-            />
-          </div>
-          <DoctorProfileSummary />
-        </div>
-
-        <div className="flex-grow space-y-2 text-sm">
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor">
-            <span className="material-symbols-outlined">dashboard</span>
-            <span>Dashboard</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/consultations">
-            <span className="material-symbols-outlined">medical_services</span>
-            <span>Consultations</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/patients">
-            <span className="material-symbols-outlined">group</span>
-            <span>Patients</span>
-          </Link>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/reports">
-            <span className="material-symbols-outlined">analytics</span>
-            <span>Reports</span>
-          </Link>
-          <div className="flex items-center gap-3 rounded-lg border-l-4 border-[#16b36c] bg-[#74fcad] p-3 text-[#007443]">
-            <span className="material-symbols-outlined">wallet</span>
-            <span>Wallet</span>
-          </div>
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/settings">
-            <span className="material-symbols-outlined">settings</span>
-            <span>Settings</span>
-          </Link>
-        </div>
-
-        <div className="mt-auto space-y-2 border-t border-[#7784ac]/10 pt-6 text-sm">
-          <Link className="flex items-center gap-3 p-3 text-[#7784ac]/85 hover:bg-[#00020d]/10" href="/dashboard/doctor/notifications">
-            <span className="material-symbols-outlined">notifications</span>
-            <span>Notifications</span>
-          </Link>
-          <DoctorLogoutButton className="flex w-full items-center gap-3 p-3 text-left text-[#7784ac]/85 hover:bg-[#00020d]/10" />
-        </div>
-      </aside>
-
-      <main className="min-h-screen p-4 sm:p-6 md:p-10 lg:ml-[280px]">
-        <header className="mb-6 sm:mb-8">
-          <div className="mb-2 flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/dashboard/doctor"
-              aria-label="Back"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#c6c6cf] text-[#0aa4b4] hover:bg-[#f8fafc]"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            </Link>
-            <h1 className="text-xl font-semibold text-[#00020d] sm:text-2xl">Wallet</h1>
-          </div>
-          <p className="text-xs text-[#45464e] sm:text-sm">
-            Each completed consultation adds 1 point and NGN {displayedWallet.pointValue.toLocaleString()} to your wallet balance. Points stay cumulative even after withdrawals.
-          </p>
-        </header>
+      <main className="dw-modern-dashboard min-h-screen lg:ml-[264px]">
+        <div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 sm:py-7 xl:px-9">
+        <DoctorPageHeader title="Wallet" description={`Track professional earnings, manage payout details, and request withdrawals. Each completed consultation is worth NGN ${displayedWallet.pointValue.toLocaleString()}.`} icon="account_balance_wallet" />
 
         {walletError ? (
           <section role="alert" className="mb-5 rounded-xl border border-[#fecaca] bg-[#fef2f2] p-4 text-sm text-[#b91c1c]">
@@ -313,22 +246,22 @@ export default function ConsultantWalletPage() {
           </section>
         ) : null}
 
-        <section className="mb-5 grid grid-cols-1 gap-3 sm:mb-6 sm:grid-cols-3">
-          <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Total Points</p>
-            <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{displayedWallet.points}</p>
+        <section className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <article className="rounded-2xl bg-[#001b5e] p-5 text-white shadow-[0_16px_35px_rgba(0,27,94,0.15)]">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-[#8df0bb]"><span className="material-symbols-outlined text-[20px]">stars</span></span><p className="mt-5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#aebee0]">Lifetime points</p>
+            <p className="mt-1 text-xl font-bold">{displayedWallet.points}</p>
           </article>
-          <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Available Balance</p>
-            <p className="mt-2 text-2xl font-semibold text-[#001b5e]">NGN {displayedWallet.balance.toLocaleString()}</p>
+          <article className="rounded-2xl border border-[#e0e7ef] bg-white p-5 shadow-[0_8px_26px_rgba(30,52,83,0.05)]">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#eafbf2] text-[#0b9459]"><span className="material-symbols-outlined text-[20px]">payments</span></span><p className="mt-5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#8a96a8]">Available balance</p>
+            <p className="mt-1 text-xl font-bold text-[#001b5e]">NGN {displayedWallet.balance.toLocaleString()}</p>
           </article>
-          <article className="rounded-xl border border-[#dbe4f0] bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Completed Consultations</p>
-            <p className="mt-2 text-2xl font-semibold text-[#001b5e]">{completedConsultationCount}</p>
+          <article className="rounded-2xl border border-[#e0e7ef] bg-white p-5 shadow-[0_8px_26px_rgba(30,52,83,0.05)]">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#eef4ff] text-[#315ead]"><span className="material-symbols-outlined text-[20px]">task_alt</span></span><p className="mt-5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#8a96a8]">Completed consultations</p>
+            <p className="mt-1 text-xl font-bold text-[#001b5e]">{completedConsultationCount}</p>
           </article>
         </section>
 
-        <section className="mb-5 rounded-2xl border border-[#dbe4f0] bg-white p-4 shadow-sm sm:mb-6 sm:p-5">
+        <section className="mb-5 rounded-[1.5rem] border border-[#e0e7ef] bg-white p-4 shadow-[0_8px_28px_rgba(30,52,83,0.05)] sm:p-6">
           <h2 className="text-base font-semibold text-[#001b5e]">Bank Details</h2>
           <div className="mt-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
             <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
@@ -356,23 +289,23 @@ export default function ConsultantWalletPage() {
           ) : null}
         </section>
 
-        <section className="mb-5 rounded-2xl border border-[#dbe4f0] bg-white p-4 shadow-sm sm:mb-6 sm:p-5">
+        <section className="mb-5 rounded-[1.5rem] border border-[#e0e7ef] bg-white p-4 shadow-[0_8px_28px_rgba(30,52,83,0.05)] sm:p-6">
           <h2 className="text-base font-semibold text-[#001b5e]">Request Withdrawal</h2>
           <p className="mt-1 text-xs text-[#475569]">Withdrawals are requested in multiples of NGN {displayedWallet.pointValue.toLocaleString()}.</p>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
             <input
               type="number"
               min={displayedWallet.pointValue}
               step={displayedWallet.pointValue}
               value={withdrawAmount}
               onChange={(event) => setWithdrawAmount(event.target.value)}
-              className="h-10 w-44 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm"
+              className="h-11 w-full rounded-xl border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#16b36c] sm:w-52"
               aria-label="Withdrawal amount"
             />
             <button
               type="button"
-              className="h-10 rounded-lg bg-[#001b5e] px-4 text-sm font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+              className="h-11 rounded-xl bg-[#16b36c] px-5 text-sm font-bold text-white hover:bg-[#118d57] disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
               disabled={
                 isRequestingWithdrawal ||
                 !doctorProfile?.id ||
@@ -400,7 +333,7 @@ export default function ConsultantWalletPage() {
         </section>
 
         <section>
-          <article className="rounded-2xl border border-[#dbe4f0] bg-white p-4 shadow-sm sm:p-5">
+          <article className="rounded-[1.5rem] border border-[#e0e7ef] bg-white p-4 shadow-[0_8px_28px_rgba(30,52,83,0.05)] sm:p-6">
             <h3 className="mb-3 text-base font-semibold text-[#001b5e]">Withdrawal History</h3>
             {withdrawalsError ? (
               <div role="alert" className="mb-4 flex flex-col gap-3 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c] sm:flex-row sm:items-center sm:justify-between">
@@ -459,6 +392,7 @@ export default function ConsultantWalletPage() {
             )}
           </article>
         </section>
+        </div>
       </main>
     </div>
   );

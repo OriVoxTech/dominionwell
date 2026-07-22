@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import PublicHeader from "@/components/public-header";
 import { getApiErrorMessage, getApiResponseMessage, patientAuthApi } from "@/lib/api";
 
 type RegistrationField =
@@ -158,24 +158,11 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f9fc] text-[#191c1e]">
-      <header className="sticky top-0 z-50 flex h-16 w-full items-center justify-between border-b border-[#c6c6cf] bg-[#f7f9fc]/95 px-3 backdrop-blur sm:px-4 md:px-10">
-        <Link href="/" className="flex items-center gap-2">
-          <Image alt="DominionWell Logo" className="h-7 w-auto sm:h-8" src="/logo.png" width={128} height={32} />
-          <span className="text-lg font-bold text-[#001b5e] sm:text-1xl">DominionWell+</span>
-        </Link>
-        <nav className="hidden items-center gap-6 md:flex">
-          <Link className="text-sm text-[#45464e] hover:text-[#16b46f]" href="/services">Services</Link>
-          <Link className="text-sm text-[#45464e] hover:text-[#16b46f]" href="/contact">Contact</Link>
-          <Link className="text-sm text-[#45464e] hover:text-[#16b46f]" href="/about">About</Link>
-        </nav>
-        <Link href="/" className="text-xs font-semibold text-[#0aa4b4] md:hidden">
-          Home
-        </Link>
-      </header>
+    <div className="min-h-screen bg-[linear-gradient(135deg,#f7fbff,#ffffff_55%,#effcf6)] text-[#191c1e]">
+      <PublicHeader />
 
       <main className="mx-auto w-full max-w-[720px] px-4 py-8 md:px-10 md:py-12">
-        <section className="rounded-2xl border border-[#c6c6cf] bg-white p-5 shadow-sm sm:p-8">
+        <section className="rounded-[1.5rem] border border-[#dbe4ee] bg-white p-5 shadow-[0_16px_45px_rgba(0,27,94,0.07)] sm:p-8">
           <div className="mb-5 sm:mb-6">
             <div className="mb-1.5 flex items-center gap-2 sm:gap-3 sm:mb-2">
               <Link
@@ -185,7 +172,7 @@ export default function RegisterPage() {
               >
                 <span className="material-symbols-outlined text-[18px]">arrow_back</span>
               </Link>
-              <h1 className="text-2xl font-bold text-[#001b5e] sm:text-3xl">
+              <h1 className="text-xl font-bold text-[#001b5e] sm:text-2xl">
                 {step === "create" ? "Create Patient Account" : "Verify OTP"}
               </h1>
             </div>

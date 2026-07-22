@@ -119,7 +119,7 @@ export default function Home() {
                 Healthcare designed around your life
               </div>
 
-              <h1 className="max-w-2xl text-[2.25rem] font-extrabold leading-[1.08] tracking-[-0.05em] text-[#001b5e] sm:text-[3rem] lg:text-[3.45rem]">
+              <h1 className="max-w-2xl text-[2rem] font-extrabold leading-[1.1] tracking-[-0.045em] text-[#001b5e] sm:text-[2.65rem] lg:text-[3.1rem]">
                 Better care begins with the right connection.
               </h1>
               <p className="mt-5 max-w-lg text-[15px] leading-7 text-[#536178] sm:text-base">
@@ -235,7 +235,7 @@ export default function Home() {
           <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center">
               <p className="text-xs font-extrabold uppercase tracking-[0.22em] text-[#0c945a]">Simple from the start</p>
-              <h2 className="mt-3 text-2xl font-extrabold tracking-[-0.035em] text-[#001b5e] sm:text-3xl">Care in three straightforward steps</h2>
+              <h2 className="mt-3 text-xl font-extrabold tracking-[-0.035em] text-[#001b5e] sm:text-2xl">Care in three straightforward steps</h2>
               <p className="mt-4 text-base leading-7 text-[#607087]">
                 Spend less time navigating healthcare and more time getting the support you need.
               </p>
@@ -264,7 +264,7 @@ export default function Home() {
           <div className="mx-auto grid max-w-[1280px] gap-12 px-4 sm:px-6 lg:grid-cols-[.88fr_1.12fr] lg:items-center lg:gap-20 lg:px-8">
             <div>
               <p className="text-xs font-extrabold uppercase tracking-[0.22em] text-[#0c945a]">Built for better care</p>
-              <h2 className="mt-3 text-2xl font-extrabold tracking-[-0.035em] text-[#001b5e] sm:text-3xl">
+              <h2 className="mt-3 text-xl font-extrabold tracking-[-0.035em] text-[#001b5e] sm:text-2xl">
                 Everything you need to feel confident about your next consultation.
               </h2>
               <p className="mt-5 max-w-xl text-base leading-7 text-[#607087]">
@@ -305,7 +305,7 @@ export default function Home() {
               <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white/10 text-[#74ecad]">
                 <span className="material-symbols-outlined">favorite</span>
               </span>
-              <h2 className="mt-6 text-2xl font-extrabold tracking-[-0.035em] text-white sm:text-3xl">Ready for a simpler care experience?</h2>
+              <h2 className="mt-6 text-xl font-extrabold tracking-[-0.035em] text-white sm:text-2xl">Ready for a simpler care experience?</h2>
               <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#c7d4f2] sm:text-base">
                 Create your patient account today, or sign in to browse verified doctors and book your next consultation.
               </p>
