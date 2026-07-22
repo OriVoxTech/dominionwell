@@ -3,74 +3,65 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import SignInModal from "../components/sign-in-modal";
-import {
-  getApiErrorMessage,
-  patientDoctorsApiService,
-  type PublicDoctor,
-} from "@/lib/api";
-import { isPatientSessionActive } from "@/lib/patient-session";
+import { useEffect } from "react";
+import SignInModal from "@/components/sign-in-modal";
 import { usePatientSessionActive } from "@/components/use-patient-session-active";
 
-const FEATURED_DOCTOR_COUNT = 4;
+const careBenefits = [
+  {
+    icon: "verified_user",
+    title: "Verified specialists",
+    description:
+      "Choose from qualified doctors across the specialties that matter to you.",
+  },
+  {
+    icon: "calendar_month",
+    title: "Appointments that fit",
+    description:
+      "See real availability and book a consultation without phone calls or queues.",
+  },
+  {
+    icon: "medical_information",
+    title: "Care that stays connected",
+    description:
+      "Keep appointments, consultation reports, and care activity in one secure place.",
+  },
+];
 
-function getDoctorName(doctor: PublicDoctor) {
-  const name = [doctor.user.firstName, doctor.user.lastName]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(" ");
+const steps = [
+  {
+    number: "01",
+    title: "Create your account",
+    description: "Set up your patient profile and choose the right care plan.",
+  },
+  {
+    number: "02",
+    title: "Find your doctor",
+    description: "Browse verified doctors by specialty, profile, and live availability.",
+  },
+  {
+    number: "03",
+    title: "Book and receive care",
+    description: "Choose a convenient time and manage your consultation from one dashboard.",
+  },
+];
 
-  return name ? `Dr. ${name}` : `Dr. ${doctor.user.username}`;
-}
-
-function getDoctorSearchQuery(doctor: PublicDoctor) {
-  const name = [doctor.user.firstName, doctor.user.lastName]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(" ");
-
-  return name || doctor.user.username;
-}
-
-function getDoctorInitials(doctor: PublicDoctor) {
+function Brand() {
   return (
-    [doctor.user.firstName, doctor.user.lastName]
-      .map((part) => part.trim().charAt(0).toUpperCase())
-      .filter(Boolean)
-      .join("") || "DR"
+    <Link href="/" className="flex items-center gap-2.5" aria-label="DominionWell home">
+      <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#e8fff2]">
+        <Image src="/logo.png" alt="" width={26} height={26} className="h-6 w-auto" priority />
+      </span>
+      <span className="hidden text-lg font-extrabold tracking-[-0.04em] text-[#001b5e] min-[420px]:inline sm:text-xl">
+        DominionWell<span className="text-[#16a968]">+</span>
+      </span>
+    </Link>
   );
-}
-
-function formatSpecialization(value: string) {
-  return value
-    .toLowerCase()
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function pickRandomDoctors(doctors: PublicDoctor[]) {
-  const shuffledDoctors = [...doctors];
-
-  for (let index = shuffledDoctors.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1));
-    [shuffledDoctors[index], shuffledDoctors[randomIndex]] = [
-      shuffledDoctors[randomIndex],
-      shuffledDoctors[index],
-    ];
-  }
-
-  return shuffledDoctors.slice(0, FEATURED_DOCTOR_COUNT);
 }
 
 export default function Home() {
   const router = useRouter();
   const hasPatientSession = usePatientSessionActive();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [featuredDoctors, setFeaturedDoctors] = useState<PublicDoctor[]>([]);
-  const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
-  const [doctorsError, setDoctorsError] = useState("");
 
   useEffect(() => {
     if (hasPatientSession) {
@@ -78,409 +69,308 @@ export default function Home() {
     }
   }, [hasPatientSession, router]);
 
-  useEffect(() => {
-    if (hasPatientSession) {
-      return;
-    }
-
-    let shouldUpdate = true;
-
-    const loadFeaturedDoctors = async () => {
-      try {
-        const response = await patientDoctorsApiService.list({
-          page: 1,
-          limit: 100,
-        });
-
-        if (shouldUpdate) {
-          setFeaturedDoctors(pickRandomDoctors(response.data.data));
-        }
-      } catch (error) {
-        if (shouldUpdate) {
-          setDoctorsError(getApiErrorMessage(error));
-        }
-      } finally {
-        if (shouldUpdate) {
-          setIsLoadingDoctors(false);
-        }
-      }
-    };
-
-    void loadFeaturedDoctors();
-
-    return () => {
-      shouldUpdate = false;
-    };
-  }, [hasPatientSession]);
-
-  const isPatientLoggedIn = () => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return isPatientSessionActive();
-  };
-
-  const requirePatientLogin = (nextAction: () => void) => {
-    if (isPatientLoggedIn()) {
-      nextAction();
-      return;
-    }
-
-    setShowLoginModal(true);
-  };
-
-  const handleSearch = () => {
-    requirePatientLogin(() => {
-      const query = searchQuery.trim();
-      const route = query
-        ? `/dashboard/patient/doctors?query=${encodeURIComponent(query)}`
-        : "/dashboard/patient/doctors";
-      router.push(route);
-    });
-  };
-
-  const getFilteredDoctorRoute = (doctor: PublicDoctor) => {
-    const params = new URLSearchParams({
-      doctorId: doctor.id,
-      query: getDoctorSearchQuery(doctor),
-    });
-
-    return `/dashboard/patient/doctors?${params.toString()}`;
-  };
-
-  const handleBookConsultation = (doctor: PublicDoctor) => {
-    const doctorPath = getFilteredDoctorRoute(doctor);
-
-    if (!isPatientLoggedIn()) {
-      router.push(`/login/patient?next=${encodeURIComponent(doctorPath)}`);
-      return;
-    }
-
-    router.push(doctorPath);
-  };
-
   if (hasPatientSession) {
-    return <div className="min-h-screen bg-[#f7f9fc]" />;
+    return <div className="min-h-screen bg-[#f8fafc]" />;
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f9fc] text-[#191c1e]">
-      <header className="sticky top-0 z-50 flex h-16 w-full items-center justify-between border-b border-[#c6c6cf] bg-[#f7f9fc]/95 px-3 backdrop-blur sm:px-4 md:px-10">
-        <div className="flex items-center gap-2">
-          <Image alt="DominionWell Logo" className="h-7 w-auto sm:h-8" src="/logo.png" width={128} height={32} />
-          <span className="text-lg font-bold text-[#001b5e] sm:text-1xl">DominionWell+</span>
-        </div>
+    <div className="min-h-screen overflow-hidden bg-[#fbfcfe] text-[#17223b]">
+      <header className="sticky top-0 z-50 border-b border-[#dbe3ee]/80 bg-white/90 backdrop-blur-xl">
+        <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Brand />
 
-        <nav className="hidden items-center gap-6 md:flex">
-          <a className="border-b-2 border-[#16b46f] pb-1 text-sm font-bold text-[#16b46f]" href="#">
-            Find Doctors
-          </a>
-          <Link className="text-sm text-[#45464e] hover:text-[#16b46f]" href="/services">
-            Services
-          </Link>
-          <Link className="text-sm text-[#45464e] hover:text-[#16b46f]" href="/about">
-            About
-          </Link>
-          <Link className="text-sm text-[#45464e] hover:text-[#16b46f]" href="/contact">
-            Contact
-          </Link>
-        </nav>
+          <nav className="hidden items-center gap-7 lg:flex" aria-label="Primary navigation">
+            <a className="text-sm font-semibold text-[#526078] transition hover:text-[#001b5e]" href="#how-it-works">
+              How it works
+            </a>
+            <Link className="text-sm font-semibold text-[#526078] transition hover:text-[#001b5e]" href="/services">
+              Services
+            </Link>
+            <Link className="text-sm font-semibold text-[#526078] transition hover:text-[#001b5e]" href="/about">
+              About us
+            </Link>
+            <Link className="text-sm font-semibold text-[#526078] transition hover:text-[#001b5e]" href="/contact">
+              Contact
+            </Link>
+          </nav>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          <SignInModal className="text-xs text-[#45464e] hover:text-[#16b46f] sm:text-sm" />
-          <SignInModal
-            open={showLoginModal}
-            onOpenChange={setShowLoginModal}
-            hideTrigger
-          />
-          <Link href="/register" className="rounded-lg bg-[#16b46f] px-3 py-2 text-xs font-semibold text-white sm:px-4 sm:text-sm">
-            Register
-          </Link>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <SignInModal className="rounded-xl px-3 py-2 text-sm font-bold text-[#001b5e] transition hover:bg-[#f0f4f8] sm:px-4" />
+            <Link
+              href="/register"
+              className="rounded-xl bg-[#001b5e] px-3.5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#092b76] sm:px-5"
+            >
+              Register
+            </Link>
+          </div>
         </div>
       </header>
 
       <main>
-        <section className="hero-pattern relative flex min-h-[64vh] items-center overflow-hidden sm:min-h-[70vh]">
-          <div className="mx-auto w-full max-w-[1440px] px-4 md:px-10">
-            <div className="max-w-3xl">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[#16b46f] px-3 py-1 text-white">
-                <span className="material-symbols-outlined text-[10px]">verified</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider">Trusted by 500+ Clinics</span>
+        <section className="relative isolate overflow-hidden pb-14 pt-10 sm:pb-18 sm:pt-14 lg:pb-20 lg:pt-16">
+          <div className="absolute inset-0 -z-20 bg-[linear-gradient(135deg,#f7fbff_0%,#ffffff_47%,#effcf6_100%)]" />
+          <div className="absolute -right-32 -top-32 -z-10 h-[32rem] w-[32rem] rounded-full bg-[#77e8af]/20 blur-3xl" />
+          <div className="absolute -bottom-48 -left-36 -z-10 h-[30rem] w-[30rem] rounded-full bg-[#4b76d1]/10 blur-3xl" />
+
+          <div className="mx-auto grid max-w-[1200px] items-center gap-10 px-4 sm:px-6 lg:grid-cols-[1.03fr_.97fr] lg:gap-14 lg:px-8">
+            <div className="max-w-2xl">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#bfead2] bg-white/90 px-3.5 py-2 text-[11px] font-bold text-[#087b48] shadow-sm sm:text-xs">
+                <span className="material-symbols-outlined text-[17px]">health_and_safety</span>
+                Healthcare designed around your life
               </div>
 
-              <h1 className="mb-3 text-2xl font-bold tracking-tight text-[#001b5e] sm:mb-4 sm:text-4xl md:text-5xl">
-                Healthcare Without Boundaries
+              <h1 className="max-w-2xl text-[2.25rem] font-extrabold leading-[1.08] tracking-[-0.05em] text-[#001b5e] sm:text-[3rem] lg:text-[3.45rem]">
+                Better care begins with the right connection.
               </h1>
-              <p className="mb-6 max-w-xl text-base leading-7 text-[#45464e] sm:mb-8 sm:text-lg sm:leading-8">
-                Experience a new era of medical care. DominionWell+ connects you with world-class specialists through our secure,
-                HIPAA-compliant SaaS platform designed for modern life.
+              <p className="mt-5 max-w-lg text-[15px] leading-7 text-[#536178] sm:text-base">
+                Meet trusted doctors, book a time that works, and manage your care from one simple, secure platform.
               </p>
 
-              <div className="glass-card flex max-w-2xl flex-col gap-2 rounded-xl p-2 shadow-lg md:flex-row">
-                <div className="flex flex-1 items-center gap-3 px-2 py-2">
-                  <span className="material-symbols-outlined text-[#76767f]">search</span>
-                  <input
-                    className="w-full border-none bg-transparent text-[#191c1e] placeholder:text-[#c6c6cf] focus:outline-none"
-                    placeholder="Specialty or Doctor Name"
-                    type="text"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                  />
-                </div>
-                <button
-                  className="flex items-center justify-center gap-2 rounded-lg bg-[#16b46f] px-6 py-3 text-sm font-semibold text-white sm:px-8"
-                  type="button"
-                  onClick={handleSearch}
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/register"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#16a968] px-6 py-3 text-sm font-bold text-white shadow-[0_12px_30px_rgba(22,169,104,0.24)] transition hover:-translate-y-0.5 hover:bg-[#118d57]"
                 >
-                  Search
-                </button>
+                  Create patient account
+                  <span className="material-symbols-outlined text-[19px]">arrow_forward</span>
+                </Link>
+                <Link
+                  href="/login/patient?next=%2Fdashboard%2Fpatient%2Fdoctors"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#c9d4e3] bg-white px-6 py-3 text-sm font-bold text-[#001b5e] shadow-sm transition hover:border-[#9babbe] hover:bg-[#f7f9fc]"
+                >
+                  <span className="material-symbols-outlined text-[19px]">stethoscope</span>
+                  Sign in to find a doctor
+                </Link>
               </div>
 
-              <div className="mt-6 flex flex-wrap items-center gap-2.5 sm:mt-8 sm:gap-3">
-                <span className="text-xs text-[#45464e] sm:text-sm">Popular:</span>
-                <span className="cursor-pointer rounded-full border border-[#c6c6cf] bg-[#eceef1] px-4 py-1.5 text-xs font-semibold text-[#191c1e]">Gynecologist</span>
-                <span className="cursor-pointer rounded-full border border-[#c6c6cf] bg-[#eceef1] px-4 py-1.5 text-xs font-semibold text-[#191c1e]">Pediatrician</span>
-                <span className="cursor-pointer rounded-full border border-[#c6c6cf] bg-[#eceef1] px-4 py-1.5 text-xs font-semibold text-[#191c1e]">General Practitioner</span>
+              <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2.5 text-xs font-semibold text-[#526078] sm:text-sm">
+                <span className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[19px] text-[#16a968]">check_circle</span>
+                  Verified providers
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[19px] text-[#16a968]">check_circle</span>
+                  Simple online booking
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[19px] text-[#16a968]">check_circle</span>
+                  Private patient dashboard
+                </span>
               </div>
             </div>
-          </div>
 
-          <div className="absolute bottom-10 right-10 hidden lg:block">
-            <div className="glass-card max-w-xs rounded-xl p-4 shadow-md">
-              <div className="mb-2 flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#16b46f]">
-                  <span className="material-symbols-outlined text-[#001b5e]">video_call</span>
+            <div className="relative mx-auto w-full max-w-[500px] lg:mx-0 lg:ml-auto">
+              <div className="absolute -left-5 top-14 h-24 w-24 rounded-[2rem] bg-[#16a968]/15 blur-sm" />
+              <div className="absolute -right-5 bottom-12 h-32 w-32 rounded-full bg-[#164b9d]/15 blur-sm" />
+
+              <div className="relative rounded-[1.75rem] border border-white/80 bg-white/90 p-3.5 shadow-[0_30px_70px_rgba(0,27,94,0.14)] backdrop-blur-xl sm:p-5">
+                <div className="rounded-[1.35rem] bg-[#001b5e] p-5 text-white sm:p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#74ecad]">Your care dashboard</p>
+                      <h2 className="mt-2 text-xl font-bold sm:text-2xl">Healthcare, made clearer.</h2>
+                    </div>
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10">
+                      <span className="material-symbols-outlined text-[#74ecad]">favorite</span>
+                    </span>
+                  </div>
+
+                  <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+                      <span className="material-symbols-outlined text-[22px] text-[#74ecad]">calendar_today</span>
+                      <p className="mt-4 text-xs text-[#c6d2f1]">Appointments</p>
+                      <p className="mt-1 text-base font-bold">Easy to manage</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+                      <span className="material-symbols-outlined text-[22px] text-[#74ecad]">clinical_notes</span>
+                      <p className="mt-4 text-xs text-[#c6d2f1]">Care history</p>
+                      <p className="mt-1 text-base font-bold">Always together</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-[#001b5e]">Schedule Appointment</p>
-                  <p className="text-xs text-[#45464e]">Instantly</p>
+
+                <div className="mt-3 rounded-2xl border border-[#dce5ef] bg-[#f8fbff] p-4 sm:p-5">
+                  <div className="flex items-center gap-4">
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#e8fff2] text-[#0b8d55]">
+                      <span className="material-symbols-outlined">video_camera_front</span>
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-[#7a879b]">Next step</p>
+                      <p className="text-sm font-bold leading-5 text-[#001b5e]">Choose a doctor and a convenient time</p>
+                    </div>
+                    <span className="material-symbols-outlined text-[#16a968]">arrow_forward</span>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-3 rounded-2xl border border-[#cfeedd] bg-[#effcf5] p-4">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-[#0b8d55] shadow-sm">
+                    <span className="material-symbols-outlined text-[21px]">verified</span>
+                  </span>
+                  <div>
+                    <p className="text-xs text-[#5e7a6d]">Quality care</p>
+                    <p className="text-sm font-bold text-[#001b5e]">Connect with verified specialists</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="bg-[#f2f4f7] py-10 sm:py-12">
-          <div className="mx-auto w-full max-w-[1440px] px-4 md:px-10">
-            <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-16">
-              <h2 className="mb-3 text-2xl font-semibold text-[#001b5e] sm:mb-4 sm:text-3xl">How DominionWell+ Works</h2>
-              <p className="text-sm text-[#45464e] sm:text-base">
-                We&apos;ve simplified the journey from feeling unwell to receiving expert care. Your health, managed in three simple steps.
+        <section className="border-y border-[#e2e8f0] bg-white">
+          <div className="mx-auto grid max-w-[1280px] grid-cols-2 gap-px bg-[#e2e8f0] px-0 sm:grid-cols-4">
+            {[
+              ["person_search", "Find the right doctor"],
+              ["schedule", "Choose a suitable time"],
+              ["videocam", "Consult from anywhere"],
+              ["shield_lock", "Manage care securely"],
+            ].map(([icon, label]) => (
+              <div key={label} className="flex min-h-24 items-center justify-center gap-3 bg-white px-4 py-5 text-center sm:text-left">
+                <span className="material-symbols-outlined text-[23px] text-[#16a968]">{icon}</span>
+                <span className="max-w-36 text-sm font-bold leading-5 text-[#33415c]">{label}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="how-it-works" className="bg-[#f7f9fc] py-14 sm:py-20">
+          <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="text-xs font-extrabold uppercase tracking-[0.22em] text-[#0c945a]">Simple from the start</p>
+              <h2 className="mt-3 text-2xl font-extrabold tracking-[-0.035em] text-[#001b5e] sm:text-3xl">Care in three straightforward steps</h2>
+              <p className="mt-4 text-base leading-7 text-[#607087]">
+                Spend less time navigating healthcare and more time getting the support you need.
               </p>
             </div>
 
-            <div className="bento-grid">
-              <div className="glass-card col-span-12 flex flex-col items-start gap-3 rounded-2xl border border-[#c6c6cf] p-6 sm:gap-4 sm:p-8 md:col-span-4">
-                <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-[#001b5e]">
-                  <span className="material-symbols-outlined text-[#16b46f]">search_check</span>
-                </div>
-                <h3 className="text-xl font-semibold text-[#001b5e] sm:text-2xl">Find a Provider</h3>
-                <p className="text-sm text-[#45464e] sm:text-base">
-                  Browse our curated network of board-certified specialists. Filter by rating, language, or availability.
-                </p>
-                <Link href="/login/patient" className="mt-auto flex items-center gap-1 pt-4 text-sm font-medium text-[#16b46f]">
-                  Browse Network <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </Link>
-              </div>
-
-              <div className="col-span-12 flex flex-col items-start gap-3 rounded-2xl bg-[#001b5e] p-6 shadow-xl sm:gap-4 sm:p-8 md:col-span-4">
-                <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-[#16b46f]">
-                  <span className="material-symbols-outlined text-white">calendar_month</span>
-                </div>
-                <h3 className="text-xl font-semibold text-white sm:text-2xl">Instant Booking</h3>
-                <p className="text-sm text-[#b9c5f1] sm:text-base">
-                  Secure your slot in seconds. No more waiting on hold, choose a time that works for your schedule.
-                </p>
-                <Link href="/login/patient" className="mt-auto flex items-center gap-1 pt-4 text-sm font-medium text-[#16b46f]">
-                  View Availability <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </Link>
-              </div>
-
-              <div className="glass-card col-span-12 flex flex-col items-start gap-3 rounded-2xl border border-[#c6c6cf] p-6 sm:gap-4 sm:p-8 md:col-span-4">
-                <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-[#002126]">
-                  <span className="material-symbols-outlined text-[#0aa4b4]">medical_information</span>
-                </div>
-                <h3 className="text-xl font-semibold text-[#001b5e] sm:text-2xl">Receive Care</h3>
-                <p className="text-sm text-[#45464e] sm:text-base">
-                  Consult via HD video or in-person. Access your digital records and prescriptions immediately after.
-                </p>
-                <Link href="/login/patient" className="mt-auto flex items-center gap-1 pt-4 text-sm font-medium text-[#16b46f]">
-                  Learn More <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </Link>
-              </div>
+            <div className="mt-10 grid gap-5 md:grid-cols-3">
+              {steps.map((step, index) => (
+                <article key={step.number} className="relative rounded-[1.5rem] border border-[#dfe7f0] bg-white p-6 shadow-[0_12px_35px_rgba(0,27,94,0.05)] sm:p-7">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-extrabold text-[#16a968]">STEP {step.number}</span>
+                    {index < steps.length - 1 ? (
+                      <span className="material-symbols-outlined hidden text-[#b5c0cf] md:block">arrow_forward</span>
+                    ) : (
+                      <span className="material-symbols-outlined text-[#16a968]">check_circle</span>
+                    )}
+                  </div>
+                  <h3 className="mt-8 text-xl font-bold text-[#001b5e]">{step.title}</h3>
+                  <p className="mt-3 text-sm leading-6 text-[#607087]">{step.description}</p>
+                </article>
+              ))}
             </div>
           </div>
         </section>
 
-        <section className="py-14 sm:py-24">
-          <div className="mx-auto w-full max-w-[1440px] px-4 md:px-10">
-            <div className="mb-8 flex items-end justify-between gap-8 sm:mb-12">
-              <div className="max-w-xl">
-                <h2 className="mb-2 text-xl font-semibold text-[#001b5e] sm:text-2xl">Featured Specialists</h2>
-                <p className="text-sm text-[#45464e] sm:text-base">
-                  Meet our top-rated medical professionals who are setting new standards in clinical excellence and patient care.
-                </p>
-              </div>
-              <Link href="/login/patient" className="hidden items-center gap-2 rounded-lg border-2 border-[#16b46f] px-6 py-2 text-sm font-medium text-[#16b46f] md:flex">
-                View All Doctors
+        <section className="bg-white py-14 sm:py-20">
+          <div className="mx-auto grid max-w-[1280px] gap-12 px-4 sm:px-6 lg:grid-cols-[.88fr_1.12fr] lg:items-center lg:gap-20 lg:px-8">
+            <div>
+              <p className="text-xs font-extrabold uppercase tracking-[0.22em] text-[#0c945a]">Built for better care</p>
+              <h2 className="mt-3 text-2xl font-extrabold tracking-[-0.035em] text-[#001b5e] sm:text-3xl">
+                Everything you need to feel confident about your next consultation.
+              </h2>
+              <p className="mt-5 max-w-xl text-base leading-7 text-[#607087]">
+                DominionWell+ brings discovery, scheduling, and ongoing care into a calm, easy-to-use experience.
+              </p>
+              <Link href="/services" className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-[#087b48] hover:text-[#065f38]">
+                Explore our services
+                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-8 lg:grid-cols-4">
-              {isLoadingDoctors
-                ? Array.from({ length: FEATURED_DOCTOR_COUNT }, (_, index) => (
-                    <div key={index} className="h-[390px] animate-pulse rounded-2xl border border-[#e2e8f0] bg-white">
-                      <div className="h-64 bg-[#e2e8f0]" />
-                      <div className="space-y-3 p-6">
-                        <div className="h-5 w-2/3 rounded bg-[#e2e8f0]" />
-                        <div className="h-4 w-1/2 rounded bg-[#f1f5f9]" />
-                        <div className="h-11 rounded-lg bg-[#f1f5f9]" />
-                      </div>
-                    </div>
-                  ))
-                : featuredDoctors.map((doctor) => {
-                    const doctorName = getDoctorName(doctor);
-                    const specialization = doctor.specializations[0]
-                      ? formatSpecialization(doctor.specializations[0])
-                      : "Medical Specialist";
-
-                    return (
-                      <article key={doctor.id} className="group overflow-hidden rounded-2xl border border-[#c6c6cf] bg-white transition-all duration-300 hover:shadow-xl">
-                        <div className="relative flex h-64 items-center justify-center overflow-hidden bg-gradient-to-br from-[#001b5e] via-[#07327d] to-[#0aa4b4]">
-                          <span className="text-6xl font-bold tracking-wide text-white/95 transition-transform duration-500 group-hover:scale-105">
-                            {getDoctorInitials(doctor)}
-                          </span>
-                          <div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-[#16b46f] px-3 py-1 text-xs font-semibold text-white">
-                            <span className="material-symbols-outlined text-[14px]">verified</span>
-                            Verified
-                          </div>
-                        </div>
-                        <div className="p-5 sm:p-6">
-                          <h4 className="mb-1 truncate text-1xl font-semibold text-[#001b5e]">{doctorName}</h4>
-                          <p className="mb-4 truncate text-sm text-[#45464e]">{specialization}</p>
-                          <button
-                            className="w-full rounded-lg bg-[#eceef1] py-3 text-sm font-medium text-[#001b5e]"
-                            type="button"
-                            onClick={() => handleBookConsultation(doctor)}
-                          >
-                            Book Consultation
-                          </button>
-                        </div>
-                      </article>
-                    );
-                  })}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {careBenefits.map((benefit, index) => (
+                <article
+                  key={benefit.title}
+                  className={`rounded-[1.5rem] border p-6 ${
+                    index === 0
+                      ? "border-[#cceedd] bg-[#effcf5] sm:col-span-2"
+                      : "border-[#dfe7f0] bg-[#f9fbfd]"
+                  }`}
+                >
+                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-white text-[#0c945a] shadow-sm">
+                    <span className="material-symbols-outlined text-[23px]">{benefit.icon}</span>
+                  </span>
+                  <h3 className="mt-6 text-lg font-bold text-[#001b5e]">{benefit.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-[#607087]">{benefit.description}</p>
+                </article>
+              ))}
             </div>
-
-            {!isLoadingDoctors && doctorsError ? (
-              <p role="alert" className="mt-6 text-center text-sm text-[#b91c1c]">
-                {doctorsError}
-              </p>
-            ) : null}
-
-            {!isLoadingDoctors && !doctorsError && featuredDoctors.length === 0 ? (
-              <p className="mt-6 text-center text-sm text-[#45464e]">No doctors are available right now.</p>
-            ) : null}
           </div>
         </section>
 
-        <section className="px-4 py-14 md:px-10 md:py-20">
-          <div className="mx-auto max-w-[1440px]">
-            <div className="relative overflow-hidden rounded-[2rem] bg-[#001b5e] p-7 text-center sm:p-12 md:p-20">
-              <div className="relative z-10 mx-auto max-w-2xl">
-                <h2 className="mb-4 text-2xl font-bold tracking-tight text-white sm:mb-6 sm:text-4xl md:text-4xl">Ready to prioritize your health?</h2>
-                <p className="mb-8 text-sm text-[#7784ac] sm:mb-10 sm:text-lg">
-                  Join thousands of patients who have already transformed their healthcare experience with DominionWell+.
-                </p>
-                <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                  <Link href="/register" className="w-full rounded-xl bg-[#16b46f] px-10 py-4 text-center text-lg font-semibold text-white sm:w-auto">
-                    Get Started for Free
-                  </Link>
-                </div>
+        <section className="bg-[#f7f9fc] px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
+          <div className="relative mx-auto max-w-[1280px] overflow-hidden rounded-[2rem] bg-[#001b5e] px-6 py-12 text-center shadow-[0_30px_70px_rgba(0,27,94,0.18)] sm:px-12 sm:py-16">
+            <div className="absolute -left-20 -top-24 h-64 w-64 rounded-full border-[42px] border-white/[0.04]" />
+            <div className="absolute -bottom-32 -right-20 h-72 w-72 rounded-full bg-[#16a968]/20 blur-2xl" />
+            <div className="relative mx-auto max-w-2xl">
+              <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white/10 text-[#74ecad]">
+                <span className="material-symbols-outlined">favorite</span>
+              </span>
+              <h2 className="mt-6 text-2xl font-extrabold tracking-[-0.035em] text-white sm:text-3xl">Ready for a simpler care experience?</h2>
+              <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#c7d4f2] sm:text-base">
+                Create your patient account today, or sign in to browse verified doctors and book your next consultation.
+              </p>
+              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+                <Link href="/register" className="rounded-xl bg-[#16a968] px-7 py-3.5 text-sm font-bold text-white transition hover:bg-[#118d57]">
+                  Create an account
+                </Link>
+                <Link href="/login/patient?next=%2Fdashboard%2Fpatient%2Fdoctors" className="rounded-xl border border-white/25 bg-white/10 px-7 py-3.5 text-sm font-bold text-white transition hover:bg-white/15">
+                  Sign in to browse doctors
+                </Link>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border-t border-[#e2e8f0] bg-white py-12">
+          <div className="mx-auto flex max-w-[1280px] flex-col items-start justify-between gap-6 px-4 sm:px-6 md:flex-row md:items-center lg:px-8">
+            <div>
+              <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-[#0c945a]">For healthcare professionals</p>
+              <h2 className="mt-2 text-2xl font-bold text-[#001b5e]">Bring your expertise to DominionWell+</h2>
+              <p className="mt-2 text-sm text-[#607087]">Apply to join our network or sign in to your doctor workspace.</p>
+            </div>
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+              <Link href="/join-doctor" className="rounded-xl border border-[#c9d4e3] px-5 py-3 text-center text-sm font-bold text-[#001b5e] hover:bg-[#f7f9fc]">
+                Apply as a doctor
+              </Link>
+              <Link href="/login/doctor" className="rounded-xl bg-[#001b5e] px-5 py-3 text-center text-sm font-bold text-white hover:bg-[#092b76]">
+                Doctor sign in
+              </Link>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-[#c6c6cf] bg-[#001b5e] py-14 text-white sm:py-16">
-        <div className="mx-auto max-w-[1440px] px-4 md:px-10">
-          <div className="mb-10 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-xl sm:p-7 md:flex md:items-center md:justify-between md:gap-8">
-            <div className="max-w-2xl">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-[#74fcad]">Care network</p>
-              <h3 className="text-2xl font-bold tracking-tight sm:text-3xl">Patients need excellent doctors. Excellent doctors need better tools.</h3>
-              <p className="mt-3 text-sm leading-6 text-[#d8e2ff]">
-                Join DominionWell+ as a verified provider and offer secure virtual care to patients who need timely access.
+      <footer className="bg-[#00143f] py-12 text-white">
+        <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-10 border-b border-white/10 pb-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr]">
+            <div className="max-w-sm">
+              <div className="inline-flex rounded-xl bg-white p-2">
+                <Brand />
+              </div>
+              <p className="mt-5 text-sm leading-6 text-[#b8c7e8]">
+                Connecting patients and doctors through thoughtful, accessible digital healthcare.
               </p>
             </div>
-            <Link
-              href="/join-doctor"
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#16b46f] px-5 py-3 text-sm font-semibold text-white hover:bg-[#149660] md:mt-0 md:w-auto"
-            >
-              Join as a Doctor
-              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-            </Link>
-          </div>
-
-          <div className="mb-10 grid grid-cols-1 gap-10 md:grid-cols-4">
-            <div className="md:col-span-1">
-              <div className="mb-6 flex items-center gap-2">
-                <Image alt="DominionWell Logo" className="h-6 w-auto" src="/logo.png" width={96} height={24} />
-                <span className="text-m font-bold text-white">DominionWell+</span>
-              </div>
-              <p className="text-sm leading-6 text-[#d8e2ff]">
-                Redefining clinical precision and patient-centered healthcare for patients, doctors, and care teams.
-              </p>
-              <div className="mt-5 flex gap-3">
-                <a className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-[#d8e2ff] hover:bg-[#16b46f] hover:text-white" href="#" aria-label="DominionWell web">
-                  <span className="material-symbols-outlined text-[18px]">public</span>
-                </a>
-                <a className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-[#d8e2ff] hover:bg-[#16b46f] hover:text-white" href="#" aria-label="DominionWell community">
-                  <span className="material-symbols-outlined text-[18px]">group</span>
-                </a>
-                <a className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-[#d8e2ff] hover:bg-[#16b46f] hover:text-white" href="#" aria-label="DominionWell updates">
-                  <span className="material-symbols-outlined text-[18px]">campaign</span>
-                </a>
+            <div>
+              <h3 className="text-sm font-bold text-white">For patients</h3>
+              <div className="mt-4 grid gap-3 text-sm text-[#b8c7e8]">
+                <Link className="hover:text-white" href="/register">Create an account</Link>
+                <Link className="hover:text-white" href="/login/patient">Patient sign in</Link>
+                <Link className="hover:text-white" href="/services">Our services</Link>
               </div>
             </div>
             <div>
-              <h5 className="mb-4 text-sm font-bold text-white">Platform</h5>
-              <ul className="space-y-3 text-sm text-[#d8e2ff]">
-                <li><a className="hover:text-[#74fcad]" href="#">Find Doctors</a></li>
-                <li><Link className="hover:text-[#74fcad]" href="/services">Services</Link></li>
-                <li><Link className="hover:text-[#74fcad]" href="/register">Patient Registration</Link></li>
-                <li><Link className="hover:text-[#74fcad]" href="/login/patient">Patient Login</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h5 className="mb-4 text-sm font-bold text-white">Company</h5>
-              <ul className="space-y-3 text-sm text-[#d8e2ff]">
-                <li><Link className="hover:text-[#74fcad]" href="/about">About Us</Link></li>
-                <li><Link className="hover:text-[#74fcad]" href="/contact">Contact</Link></li>
-                <li><Link className="hover:text-[#74fcad]" href="/join-doctor">Join as a Doctor</Link></li>
-                <li><Link className="hover:text-[#74fcad]" href="/login/doctor">Doctor Login</Link></li>
-                <li><Link className="hover:text-[#74fcad]" href="/admin/login">Admin Portal</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h5 className="mb-4 text-sm font-bold text-white">Stay in the loop</h5>
-              <p className="mb-4 text-sm leading-6 text-[#d8e2ff]">Get health tips, care updates, and product announcements.</p>
-              <div className="flex gap-2 rounded-xl bg-white/10 p-1">
-                <input className="min-w-0 flex-1 rounded-lg border border-transparent bg-white px-3 py-2 text-sm text-[#001b5e] outline-none placeholder:text-[#64748b]" placeholder="Your email" type="email" />
-                <button className="rounded-lg bg-[#16b46f] px-4 py-2 text-xs font-semibold text-white hover:bg-[#149660]" type="button">
-                  Join
-                </button>
+              <h3 className="text-sm font-bold text-white">DominionWell+</h3>
+              <div className="mt-4 grid gap-3 text-sm text-[#b8c7e8]">
+                <Link className="hover:text-white" href="/about">About us</Link>
+                <Link className="hover:text-white" href="/contact">Contact</Link>
+                <Link className="hover:text-white" href="/join-doctor">Join as a doctor</Link>
               </div>
             </div>
           </div>
-
-          <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 md:flex-row">
-            <p className="text-xs text-[#b8c7ee]">© 2026 DominionWell+. All rights reserved.</p>
-            <div className="flex flex-wrap justify-center gap-4 text-xs text-[#b8c7ee]">
-              <a className="hover:text-[#74fcad]" href="#">Privacy Policy</a>
-              <a className="hover:text-[#74fcad]" href="#">Terms of Use</a>
-              <a className="hover:text-[#74fcad]" href="#">Security</a>
-            </div>
+          <div className="flex flex-col gap-3 pt-6 text-xs text-[#91a4cf] sm:flex-row sm:items-center sm:justify-between">
+            <p>© 2026 DominionWell+. All rights reserved.</p>
+            <Link className="hover:text-white" href="/admin/login">Admin portal</Link>
           </div>
         </div>
       </footer>
