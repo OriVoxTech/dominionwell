@@ -17,7 +17,14 @@ import {
   type AdminDoctorApplication,
   type AdminDoctorApplicationStatus,
   type AdminDoctorUser,
+  type AdminSpecialty,
 } from "@/lib/api";
+import {
+  formatNigerianPhone,
+  isValidEmail,
+  isValidNigerianPhoneLocalNumber,
+  normalizeNigerianPhoneLocalNumber,
+} from "@/lib/form-validation";
 
 type AddDoctorTab = "request" | "manual";
 
@@ -39,30 +46,11 @@ type NewDoctorForm = {
 const defaultForm: NewDoctorForm = {
   firstName: "",
   lastName: "",
-  specialization: "GENERAL_PRACTICE",
+  specialization: "",
   email: "",
   phone: "",
   username: "",
 };
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_PATTERN = /^\+?[0-9\s()-]{7,20}$/;
-const SPECIALIZATION_PATTERN = /^[A-Z][A-Z_]*$/;
-const SPECIALIZATION_OPTIONS = [
-  "GENERAL_PRACTICE",
-  "CARDIOLOGY",
-  "DERMATOLOGY",
-  "ENDOCRINOLOGY",
-  "GASTROENTEROLOGY",
-  "GYNECOLOGY",
-  "NEUROLOGY",
-  "ONCOLOGY",
-  "OPHTHALMOLOGY",
-  "ORTHOPEDICS",
-  "PEDIATRICS",
-  "PSYCHIATRY",
-  "UROLOGY",
-] as const;
 
 const APPLICATION_STATUS_OPTIONS: Array<AdminDoctorApplicationStatus | ""> = [
   "",
@@ -118,6 +106,9 @@ export default function AdminDoctorsPage() {
   const [createMessage, setCreateMessage] = useState("");
   const [isCreatingDoctor, setIsCreatingDoctor] = useState(false);
   const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
+  const [specialties, setSpecialties] = useState<AdminSpecialty[]>([]);
+  const [isLoadingSpecialties, setIsLoadingSpecialties] = useState(true);
+  const [specialtiesError, setSpecialtiesError] = useState("");
   const [directoryError, setDirectoryError] = useState("");
   const [doctorTotal, setDoctorTotal] = useState(0);
   const [statusUpdatingUserId, setStatusUpdatingUserId] = useState("");
@@ -126,15 +117,24 @@ export default function AdminDoctorsPage() {
   const [documentPreview, setDocumentPreview] = useState<DocumentPreview>(null);
   const [documentPreviewError, setDocumentPreviewError] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
+  const [rejectingApplicationId, setRejectingApplicationId] = useState("");
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionReasonError, setRejectionReasonError] = useState("");
   const [isLoadingApplications, setIsLoadingApplications] = useState(true);
   const [applicationsError, setApplicationsError] = useState("");
   const [applicationsTotal, setApplicationsTotal] = useState(0);
+  const activeSpecialties = useMemo(
+    () => specialties.filter((specialty) => specialty.isActive !== false),
+    [specialties],
+  );
   const isCreateDoctorValid =
     Boolean(form.firstName.trim()) &&
     Boolean(form.lastName.trim()) &&
-    EMAIL_PATTERN.test(form.email.trim()) &&
-    PHONE_PATTERN.test(form.phone.trim()) &&
-    SPECIALIZATION_PATTERN.test(form.specialization.trim()) &&
+    isValidEmail(form.email) &&
+    isValidNigerianPhoneLocalNumber(form.phone) &&
+    activeSpecialties.some(
+      (specialty) => specialty.name === form.specialization.trim(),
+    ) &&
     Boolean(form.username.trim());
 
   const loadDoctors = useCallback(async () => {
@@ -151,6 +151,35 @@ export default function AdminDoctorsPage() {
       setDirectoryError(getApiErrorMessage(error));
     } finally {
       setIsLoadingDoctors(false);
+    }
+  }, []);
+
+  const loadSpecialties = useCallback(async () => {
+    setSpecialtiesError("");
+    setIsLoadingSpecialties(true);
+
+    try {
+      const response = await adminApiService.listSpecialties();
+      const nextSpecialties = response.data;
+      setSpecialties(nextSpecialties);
+      setForm((current) => {
+        if (
+          nextSpecialties.some(
+            (specialty) =>
+              specialty.isActive !== false &&
+              specialty.name === current.specialization,
+          )
+        ) {
+          return current;
+        }
+
+        return { ...current, specialization: "" };
+      });
+    } catch (error) {
+      setSpecialties([]);
+      setSpecialtiesError(getApiErrorMessage(error));
+    } finally {
+      setIsLoadingSpecialties(false);
     }
   }, []);
 
@@ -194,10 +223,11 @@ export default function AdminDoctorsPage() {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void loadDoctors();
+      void loadSpecialties();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [loadDoctors]);
+  }, [loadDoctors, loadSpecialties]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -355,15 +385,39 @@ export default function AdminDoctorsPage() {
     }
   };
 
+  const startRejectJoinRequest = (request: AdminDoctorApplication) => {
+    if (requestActionId) return;
+
+    setRejectingApplicationId(request.id);
+    setRejectionReason("");
+    setRejectionReasonError("");
+    setRequestMessage("");
+  };
+
+  const cancelRejectJoinRequest = () => {
+    setRejectingApplicationId("");
+    setRejectionReason("");
+    setRejectionReasonError("");
+  };
+
   const handleRejectJoinRequest = async (request: AdminDoctorApplication) => {
     if (requestActionId) return;
 
+    const reason = rejectionReason.trim();
+
+    if (!reason) {
+      setRejectionReasonError("Enter a reason before rejecting this application.");
+      return;
+    }
+
     setRequestMessage("");
+    setRejectionReasonError("");
     setRequestActionId(request.id);
 
     try {
-      await adminApiService.rejectDoctorApplication(request.id);
+      await adminApiService.rejectDoctorApplication(request.id, { reason });
       setRequestMessage(`${request.fullName} has been rejected.`);
+      cancelRejectJoinRequest();
       await loadDoctorApplications();
     } catch (error) {
       setRequestMessage(getApiErrorMessage(error));
@@ -407,7 +461,11 @@ export default function AdminDoctorsPage() {
 
   const handleAddDoctor = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!isCreateDoctorValid) return;
+    if (!isCreateDoctorValid) {
+      setCreateError("Complete all required fields and select an active specialty.");
+      setCreateMessage("");
+      return;
+    }
 
     setCreateError("");
     setCreateMessage("");
@@ -418,8 +476,8 @@ export default function AdminDoctorsPage() {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: form.email.trim().toLowerCase(),
-        phone: form.phone.trim(),
-        specialization: form.specialization.trim().toUpperCase(),
+        phone: formatNigerianPhone(form.phone),
+        specialization: form.specialization.trim(),
         username: form.username.trim(),
       };
       const response = await adminApiService.createDoctor(payload);
@@ -734,12 +792,56 @@ export default function AdminDoctorsPage() {
                   <button
                     type="button"
                     disabled={Boolean(requestActionId)}
-                    onClick={() => void handleRejectJoinRequest(request)}
+                    onClick={() => startRejectJoinRequest(request)}
                     className="rounded-lg border border-[#ef4444]/40 px-3 py-2 text-xs font-semibold text-[#b91c1c] hover:bg-[#fef2f2] disabled:cursor-wait disabled:opacity-60"
                   >
-                    {requestActionId === request.id ? "Rejecting..." : "Reject"}
+                    Reject
                   </button>
                 </div>
+
+                {rejectingApplicationId === request.id ? (
+                  <div className="mt-3 rounded-lg border border-[#fecaca] bg-[#fff7f7] p-3">
+                    <label className="block text-xs font-semibold text-[#7f1d1d]">
+                      Rejection reason
+                      <textarea
+                        value={rejectionReason}
+                        onChange={(event) => {
+                          setRejectionReason(event.target.value);
+                          setRejectionReasonError("");
+                        }}
+                        rows={3}
+                        className="mt-2 w-full resize-y rounded-lg border border-[#fca5a5] bg-white px-3 py-2 text-sm font-normal text-[#334155] outline-none focus:border-[#ef4444]"
+                        placeholder="Tell the applicant why this application was rejected."
+                        disabled={requestActionId === request.id}
+                      />
+                    </label>
+                    {rejectionReasonError ? (
+                      <p className="mt-2 text-xs font-semibold text-[#b91c1c]">
+                        {rejectionReasonError}
+                      </p>
+                    ) : null}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleRejectJoinRequest(request)}
+                        disabled={requestActionId === request.id}
+                        className="rounded-lg bg-[#b91c1c] px-3 py-2 text-xs font-semibold text-white hover:bg-[#991b1b] disabled:cursor-wait disabled:bg-[#94a3b8]"
+                      >
+                        {requestActionId === request.id
+                          ? "Rejecting..."
+                          : "Submit Rejection"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelRejectJoinRequest}
+                        disabled={requestActionId === request.id}
+                        className="rounded-lg border border-[#cbd5e1] px-3 py-2 text-xs font-semibold text-[#475569] hover:bg-white disabled:cursor-wait disabled:opacity-60"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </article>
             ))}
           </div>
@@ -789,23 +891,51 @@ export default function AdminDoctorsPage() {
               <select
                 value={form.specialization}
                 onChange={(event) => setForm((current) => ({ ...current, specialization: event.target.value }))}
-                className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]"
+                disabled={isLoadingSpecialties || activeSpecialties.length === 0}
+                className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4] disabled:cursor-not-allowed disabled:bg-[#f1f5f9] disabled:text-[#94a3b8]"
                 required
               >
-                {SPECIALIZATION_OPTIONS.map((specialization) => (
-                  <option key={specialization} value={specialization}>
-                    {specialization.replaceAll("_", " ")}
+                <option value="" disabled>
+                  {isLoadingSpecialties
+                    ? "Loading specialties..."
+                    : activeSpecialties.length === 0
+                      ? "No active specialties"
+                      : "Select specialty"}
+                </option>
+                {activeSpecialties.map((specialty) => (
+                  <option key={specialty.id} value={specialty.name}>
+                    {specialty.name}
                   </option>
                 ))}
               </select>
-              <input value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Email" type="email" autoComplete="email" required />
-              <input value={form.phone} onChange={(e) => setForm((current) => ({ ...current, phone: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Phone" type="tel" autoComplete="tel" required />
+              <div>
+                <input value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Email" type="email" autoComplete="email" required aria-invalid={Boolean(form.email.trim()) && !isValidEmail(form.email)} aria-describedby={form.email.trim() && !isValidEmail(form.email) ? "admin-doctor-email-error" : undefined} />
+                {form.email.trim() && !isValidEmail(form.email) ? <span id="admin-doctor-email-error" className="mt-1 block text-xs text-[#b91c1c]">Enter a valid email address.</span> : null}
+              </div>
+              <div>
+                <div className="flex h-10 overflow-hidden rounded-lg border border-[#cbd5e1] bg-white focus-within:border-[#0aa4b4]">
+                  <span className="flex items-center border-r border-[#cbd5e1] bg-[#f8fafc] px-3 text-sm font-semibold text-[#001b5e]">+234</span>
+                  <input value={form.phone} onChange={(e) => setForm((current) => ({ ...current, phone: normalizeNigerianPhoneLocalNumber(e.target.value) }))} className="h-full min-w-0 flex-1 px-3 text-sm outline-none" placeholder="8012345678" type="tel" inputMode="numeric" autoComplete="tel" required />
+                </div>
+              </div>
               <input value={form.username} onChange={(e) => setForm((current) => ({ ...current, username: e.target.value }))} className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#0aa4b4]" placeholder="Login username" autoComplete="username" required />
 
               {createError ? <p role="alert" className="rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-sm text-[#b91c1c] md:col-span-2 xl:col-span-3">{createError}</p> : null}
+              {specialtiesError ? (
+                <div role="alert" className="flex flex-col gap-2 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-sm text-[#b91c1c] md:col-span-2 xl:col-span-3 sm:flex-row sm:items-center sm:justify-between">
+                  <span>{specialtiesError}</span>
+                  <button
+                    type="button"
+                    onClick={() => void loadSpecialties()}
+                    className="w-fit rounded-md border border-[#fca5a5] px-2 py-1 text-xs font-semibold hover:bg-white"
+                  >
+                    Retry specialties
+                  </button>
+                </div>
+              ) : null}
               {createMessage ? <p role="status" className="rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm text-[#15803d] md:col-span-2 xl:col-span-3">{createMessage}</p> : null}
 
-              <button type="submit" disabled={!isCreateDoctorValid || isCreatingDoctor} className="h-10 rounded-lg bg-[#001b5e] px-4 text-sm font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8] md:col-span-2 xl:col-span-3">
+              <button type="submit" disabled={!isCreateDoctorValid || isCreatingDoctor || isLoadingSpecialties} className="h-10 rounded-lg bg-[#001b5e] px-4 text-sm font-semibold text-white hover:bg-[#0b2b75] disabled:cursor-not-allowed disabled:bg-[#94a3b8] md:col-span-2 xl:col-span-3">
                 {isCreatingDoctor ? "Creating doctor..." : "Add Doctor"}
               </button>
             </form>

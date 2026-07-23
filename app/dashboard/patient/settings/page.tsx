@@ -20,6 +20,12 @@ import {
     setCachedPatientProfile,
     usePatientProfile,
 } from "@/lib/use-patient-profile";
+import {
+    formatNigerianPhone,
+    getNigerianPhoneLocalNumber,
+    isValidNigerianPhoneLocalNumber,
+    normalizeNigerianPhoneLocalNumber,
+} from "@/lib/form-validation";
 
 type CurrentSubscription = {
     planName: string;
@@ -170,7 +176,7 @@ export default function PatientSettingsPage() {
             ? profilePreferences.emailNotifications
             : true;
     const fullNameValue = fullName ?? (profile ? getPatientDisplayName(profile) : "");
-    const phoneValue = phone ?? profile?.user.phone ?? "";
+    const phoneValue = phone ?? getNigerianPhoneLocalNumber(profile?.user.phone);
     const emailValue = profile?.user.email ?? "";
     const emailNotificationsValue = emailNotifications ?? savedEmailNotifications;
     const displayName = fullNameValue.trim() || getPatientDisplayName(profile);
@@ -208,6 +214,12 @@ export default function PatientSettingsPage() {
             return;
         }
 
+        if (!isValidNigerianPhoneLocalNumber(phoneValue)) {
+            setSaveError("Enter a 10-digit Nigerian phone number.");
+            setSaveMessage("");
+            return;
+        }
+
         setIsSavingProfile(true);
         setSaveMessage("");
         setSaveError("");
@@ -216,7 +228,7 @@ export default function PatientSettingsPage() {
             const response = await patientApiService.updateProfile({
                 firstName,
                 lastName,
-                phone: phoneValue,
+                phone: formatNigerianPhone(phoneValue),
                 preferences: {
                     ...(profile?.preferences ?? {}),
                     emailNotifications: emailNotificationsValue,
@@ -361,12 +373,17 @@ export default function PatientSettingsPage() {
 
                             <label className="block text-sm md:col-span-2">
                                 <span className="mb-1 block font-medium text-[#334155]">Phone Number</span>
-                                <input
-                                    type="text"
-                                    value={phoneValue}
-                                    onChange={(event) => setPhone(event.target.value)}
-                                    className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
-                                />
+                                <div className="flex h-10 w-full overflow-hidden rounded-lg border border-[#c6c6cf] focus-within:border-[#0aa4b4]">
+                                    <span className="flex items-center border-r border-[#c6c6cf] bg-[#f8fafc] px-3 text-sm font-semibold text-[#001b5e]">+234</span>
+                                    <input
+                                        type="tel"
+                                        inputMode="numeric"
+                                        value={phoneValue}
+                                        onChange={(event) => setPhone(normalizeNigerianPhoneLocalNumber(event.target.value))}
+                                        className="h-full min-w-0 flex-1 px-3 outline-none"
+                                        placeholder="8012345678"
+                                    />
+                                </div>
                             </label>
                         </div>
                     </section>

@@ -1,10 +1,4 @@
-const DEFAULT_API_BASE_URL =
-  "https://dominionwell-backend-1ksa.onrender.com/api";
-
-const API_BASE_URL =
-  process.env.API_BASE_URL ??
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  DEFAULT_API_BASE_URL;
+import { API_BASE_URL } from "@/lib/api-base-url";
 
 const ALLOWED_ACTIONS = new Set(["approve", "reject"]);
 
@@ -31,6 +25,7 @@ export async function PATCH(
   }
 
   const { id, action } = await params;
+  let requestBody: unknown;
 
   if (!ALLOWED_ACTIONS.has(action)) {
     return Response.json(
@@ -46,6 +41,24 @@ export async function PATCH(
     );
   }
 
+  if (action === "reject") {
+    try {
+      requestBody = await request.json();
+    } catch {
+      return Response.json(
+        {
+          statusCode: 400,
+          error: {
+            message: "A rejection reason is required.",
+            error: "Bad Request",
+            statusCode: 400,
+          },
+        },
+        { status: 400 },
+      );
+    }
+  }
+
   try {
     const upstreamResponse = await fetch(
       `${API_BASE_URL}/admin/doctor-applications/${encodeURIComponent(id)}/${action}`,
@@ -54,8 +67,10 @@ export async function PATCH(
         headers: {
           Accept: "*/*",
           Authorization: authorization,
+          ...(action === "reject" ? { "Content-Type": "application/json" } : {}),
           "ngrok-skip-browser-warning": "true",
         },
+        ...(action === "reject" ? { body: JSON.stringify(requestBody) } : {}),
         cache: "no-store",
       },
     );

@@ -285,12 +285,12 @@ export default function AboutPage() {
           <div className="col-span-12 space-y-4 md:col-span-4">
             <h6 className="text-sm uppercase tracking-widest">Newsletter</h6>
             <p className="text-base text-[#bfd2ff]">Get the latest in healthcare innovation and impact reports.</p>
-            <div className="flex">
-              <input className="w-full rounded-l-lg border border-white/30 bg-[#0b2a7f] px-4 py-3 text-white outline-none" placeholder="Email address" type="email" />
-              <button className="rounded-r-lg bg-[#16b46f] px-4 text-sm font-medium text-white" type="button">
+            <form className="flex">
+              <input className="w-full rounded-l-lg border border-white/30 bg-[#0b2a7f] px-4 py-3 text-white outline-none" placeholder="Email address" type="email" required />
+              <button className="rounded-r-lg bg-[#16b46f] px-4 text-sm font-medium text-white" type="submit">
                 Subscribe
               </button>
-            </div>
+            </form>
           </div>
         </div>
 

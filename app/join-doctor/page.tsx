@@ -16,8 +16,35 @@ import {
   type AdminSpecialty,
   type PublicDoctorsResponse,
 } from "@/lib/api";
+import {
+  formatNigerianPhone,
+  isValidEmail,
+  isValidNigerianPhoneLocalNumber,
+  normalizeNigerianPhoneLocalNumber,
+} from "@/lib/form-validation";
 
 const MAX_DOCUMENT_FILES = 5;
+const MAX_DOCUMENT_FILE_SIZE = 10 * 1024 * 1024;
+const ACCEPTED_DOCUMENT_EXTENSIONS = new Set([
+  "pdf",
+  "png",
+  "jpg",
+  "jpeg",
+  "doc",
+  "docx",
+]);
+
+type DoctorApplicationErrors = Partial<
+  Record<
+    | "fullName"
+    | "email"
+    | "phoneLocalNumber"
+    | "username"
+    | "specialtyId"
+    | "documents",
+    string
+  >
+>;
 
 function getDoctorUsernameBase(fullName: string) {
   const nameParts = fullName
@@ -62,16 +89,30 @@ function selectAvailableDoctorUsername(
   return "";
 }
 
-function normalizeNigerianPhoneInput(value: string) {
-  let digits = value.replace(/\D/g, "");
+function getDocumentExtension(fileName: string) {
+  return fileName.split(".").pop()?.toLowerCase() ?? "";
+}
 
-  if (digits.startsWith("234")) {
-    digits = digits.slice(3);
+function validateSelectedDocuments(files: File[]) {
+  if (files.length === 0) {
+    return "Please attach at least one supporting document or license.";
   }
 
-  digits = digits.replace(/^0+/, "");
+  const invalidFile = files.find(
+    (file) => !ACCEPTED_DOCUMENT_EXTENSIONS.has(getDocumentExtension(file.name)),
+  );
 
-  return digits.slice(0, 10);
+  if (invalidFile) {
+    return "Documents must be PDF, image, or Word files.";
+  }
+
+  const oversizedFile = files.find((file) => file.size > MAX_DOCUMENT_FILE_SIZE);
+
+  if (oversizedFile) {
+    return "Each document must be 10 MB or smaller.";
+  }
+
+  return "";
 }
 
 function extractSpecialties(responseData: unknown) {
@@ -115,7 +156,9 @@ function extractDoctorsResponse(responseData: unknown): PublicDoctorsResponse {
 export default function JoinDoctorPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
   const [phoneLocalNumber, setPhoneLocalNumber] = useState("");
+  const [specialtyId, setSpecialtyId] = useState("");
   const [specialties, setSpecialties] = useState<AdminSpecialty[]>([]);
   const [existingDoctorUsernames, setExistingDoctorUsernames] = useState<
     Set<string>
@@ -126,6 +169,7 @@ export default function JoinDoctorPage() {
     useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [errors, setErrors] = useState<DoctorApplicationErrors>({});
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<"info" | "success" | "error">(
     "info",
@@ -134,6 +178,17 @@ export default function JoinDoctorPage() {
     fullName,
     existingDoctorUsernames,
   );
+  const emailError =
+    email.trim() && !isValidEmail(email) ? "Enter a valid email address." : "";
+
+  const clearFieldError = (field: keyof DoctorApplicationErrors) => {
+    setErrors((currentErrors) => {
+      if (!currentErrors[field]) return currentErrors;
+      const nextErrors = { ...currentErrors };
+      delete nextErrors[field];
+      return nextErrors;
+    });
+  };
 
   const loadSpecialties = useCallback(async (showLoading = true) => {
     if (showLoading) {
@@ -210,24 +265,47 @@ export default function JoinDoctorPage() {
 
   const handleFilesSelected = (event: ChangeEvent<HTMLInputElement>) => {
     const incomingFiles = Array.from(event.target.files ?? []);
+    const rejectedFiles = incomingFiles.filter(
+      (file) =>
+        !ACCEPTED_DOCUMENT_EXTENSIONS.has(getDocumentExtension(file.name)) ||
+        file.size > MAX_DOCUMENT_FILE_SIZE,
+    );
+    const nextFiles = [...selectedFiles];
 
-    setSelectedFiles((currentFiles) => {
-      const nextFiles = [...currentFiles];
+    incomingFiles.forEach((file) => {
+      const isUnsupported =
+        !ACCEPTED_DOCUMENT_EXTENSIONS.has(getDocumentExtension(file.name)) ||
+        file.size > MAX_DOCUMENT_FILE_SIZE;
+      const alreadySelected = nextFiles.some(
+        (currentFile) =>
+          currentFile.name === file.name &&
+          currentFile.size === file.size &&
+          currentFile.lastModified === file.lastModified,
+      );
 
-      incomingFiles.forEach((file) => {
-        const alreadySelected = nextFiles.some(
-          (currentFile) =>
-            currentFile.name === file.name &&
-            currentFile.size === file.size &&
-            currentFile.lastModified === file.lastModified,
-        );
+      if (
+        !isUnsupported &&
+        !alreadySelected &&
+        nextFiles.length < MAX_DOCUMENT_FILES
+      ) {
+        nextFiles.push(file);
+      }
+    });
 
-        if (!alreadySelected && nextFiles.length < MAX_DOCUMENT_FILES) {
-          nextFiles.push(file);
-        }
-      });
+    const documentError =
+      rejectedFiles.length > 0
+        ? "Some files were skipped. Use PDF, image, or Word files up to 10 MB each."
+        : validateSelectedDocuments(nextFiles);
 
-      return nextFiles;
+    setSelectedFiles(nextFiles);
+    setErrors((currentErrors) => {
+      const nextErrors = { ...currentErrors };
+      if (documentError) {
+        nextErrors.documents = documentError;
+      } else {
+        delete nextErrors.documents;
+      }
+      return nextErrors;
     });
 
     event.target.value = "";
@@ -242,21 +320,61 @@ export default function JoinDoctorPage() {
           file.lastModified !== fileToRemove.lastModified,
       ),
     );
+    clearFieldError("documents");
+  };
+
+  const validateForm = () => {
+    const nextErrors: DoctorApplicationErrors = {};
+    const trimmedFullName = fullName.trim();
+    const trimmedEmail = email.trim();
+
+    if (!trimmedFullName) {
+      nextErrors.fullName = "Full name is required.";
+    } else if (trimmedFullName.length < 3) {
+      nextErrors.fullName = "Enter the doctor's full name.";
+    }
+
+    if (!trimmedEmail) {
+      nextErrors.email = "Email address is required.";
+    } else if (!isValidEmail(trimmedEmail)) {
+      nextErrors.email = "Enter a valid email address.";
+    }
+
+    if (!phoneLocalNumber) {
+      nextErrors.phoneLocalNumber = "Phone number is required.";
+    } else if (!isValidNigerianPhoneLocalNumber(phoneLocalNumber)) {
+      nextErrors.phoneLocalNumber = "Enter a 10-digit Nigerian phone number.";
+    }
+
+    if (!generatedUsername) {
+      nextErrors.username = "Enter a full name so we can generate a username.";
+    }
+
+    if (!specialtyId) {
+      nextErrors.specialtyId = "Select a medical specialty.";
+    }
+
+    const documentsError = validateSelectedDocuments(selectedFiles);
+    if (documentsError) {
+      nextErrors.documents = documentsError;
+    }
+
+    setErrors(nextErrors);
+    return nextErrors;
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formElement = event.currentTarget;
-    const formData = new FormData(formElement);
     const trimmedFullName = fullName.trim();
-    const email = String(formData.get("email") ?? "").trim();
-    const phone = phoneLocalNumber ? `+234${phoneLocalNumber}` : "";
+    const trimmedEmail = email.trim();
+    const phone = formatNigerianPhone(phoneLocalNumber);
     const username = generatedUsername;
-    const specialtyId = String(formData.get("specialtyId") ?? "").trim();
+    const validationErrors = validateForm();
 
-    if (!trimmedFullName || !email || !phone || !username || !specialtyId) {
+    if (Object.keys(validationErrors).length > 0) {
       setMessageTone("error");
-      setMessage("Please complete all required fields before sending your request.");
+      setMessage("Please fix the highlighted fields before sending your request.");
       return;
     }
 
@@ -268,19 +386,13 @@ export default function JoinDoctorPage() {
       return;
     }
 
-    if (selectedFiles.length === 0) {
-      setMessageTone("error");
-      setMessage("Please attach at least one supporting document or license.");
-      return;
-    }
-
     setIsSubmitting(true);
     setMessage("");
 
     try {
       await doctorApplicationsApiService.submit({
         fullName: trimmedFullName,
-        email,
+        email: trimmedEmail,
         phone,
         username,
         specialtyId,
@@ -290,8 +402,11 @@ export default function JoinDoctorPage() {
       formElement.reset();
       if (fileInputRef.current) fileInputRef.current.value = "";
       setFullName("");
+      setEmail("");
       setPhoneLocalNumber("");
+      setSpecialtyId("");
       setSelectedFiles([]);
+      setErrors({});
       setMessageTone("success");
       setMessage(
         "Your doctor application request has been sent. Our verification team will review it soon.",
@@ -351,7 +466,11 @@ export default function JoinDoctorPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="rounded-[2rem] border border-[#dbe4f0] bg-white p-5 shadow-sm sm:p-7">
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="rounded-[2rem] border border-[#dbe4f0] bg-white p-5 shadow-sm sm:p-7"
+        >
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-[#001b5e]">Doctor application</h2>
             <p className="mt-2 text-sm text-[#64748b]">Fields marked with * are required.</p>
@@ -364,20 +483,63 @@ export default function JoinDoctorPage() {
                 name="fullName"
                 required
                 value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
-                className="mt-2 h-11 w-full rounded-xl border border-[#cbd5e1] px-3 text-sm outline-none focus:border-[#16b46f]"
+                onChange={(event) => {
+                  setFullName(event.target.value);
+                  clearFieldError("fullName");
+                  clearFieldError("username");
+                }}
+                aria-invalid={Boolean(errors.fullName)}
+                aria-describedby={
+                  errors.fullName ? "doctor-full-name-error" : undefined
+                }
+                className={`mt-2 h-11 w-full rounded-xl border px-3 text-sm outline-none focus:border-[#16b46f] ${
+                  errors.fullName ? "border-[#ef4444]" : "border-[#cbd5e1]"
+                }`}
                 placeholder="Dr. Ada Lovelace"
               />
+              {errors.fullName ? (
+                <span id="doctor-full-name-error" className="mt-1 block text-xs text-[#b91c1c]">
+                  {errors.fullName}
+                </span>
+              ) : null}
             </label>
 
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Email *</span>
-              <input name="email" required type="email" className="mt-2 h-11 w-full rounded-xl border border-[#cbd5e1] px-3 text-sm outline-none focus:border-[#16b46f]" placeholder="doctor@example.com" />
+              <input
+                name="email"
+                required
+                type="email"
+                value={email}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  clearFieldError("email");
+                }}
+                aria-invalid={Boolean(errors.email || emailError)}
+                aria-describedby={
+                  errors.email || emailError ? "doctor-email-error" : undefined
+                }
+                className={`mt-2 h-11 w-full rounded-xl border px-3 text-sm outline-none focus:border-[#16b46f] ${
+                  errors.email || emailError ? "border-[#ef4444]" : "border-[#cbd5e1]"
+                }`}
+                placeholder="doctor@example.com"
+              />
+              {errors.email || emailError ? (
+                <span id="doctor-email-error" className="mt-1 block text-xs text-[#b91c1c]">
+                  {errors.email || emailError}
+                </span>
+              ) : null}
             </label>
 
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-[#64748b]">Phone *</span>
-              <div className="mt-2 flex h-11 w-full overflow-hidden rounded-xl border border-[#cbd5e1] focus-within:border-[#16b46f]">
+              <div
+                className={`mt-2 flex h-11 w-full overflow-hidden rounded-xl border focus-within:border-[#16b46f] ${
+                  errors.phoneLocalNumber
+                    ? "border-[#ef4444]"
+                    : "border-[#cbd5e1]"
+                }`}
+              >
                 <span className="flex items-center border-r border-[#cbd5e1] bg-[#f8fafc] px-3 text-sm font-semibold text-[#001b5e]">
                   +234
                 </span>
@@ -387,15 +549,25 @@ export default function JoinDoctorPage() {
                   type="tel"
                   inputMode="numeric"
                   value={phoneLocalNumber}
-                  onChange={(event) =>
+                  onChange={(event) => {
                     setPhoneLocalNumber(
-                      normalizeNigerianPhoneInput(event.target.value),
-                    )
+                      normalizeNigerianPhoneLocalNumber(event.target.value),
+                    );
+                    clearFieldError("phoneLocalNumber");
+                  }}
+                  aria-invalid={Boolean(errors.phoneLocalNumber)}
+                  aria-describedby={
+                    errors.phoneLocalNumber ? "doctor-phone-error" : undefined
                   }
                   className="h-full min-w-0 flex-1 px-3 text-sm outline-none"
                   placeholder="8012345678"
                 />
               </div>
+              {errors.phoneLocalNumber ? (
+                <span id="doctor-phone-error" className="mt-1 block text-xs text-[#b91c1c]">
+                  {errors.phoneLocalNumber}
+                </span>
+              ) : null}
             </label>
 
             <label className="block">
@@ -405,13 +577,24 @@ export default function JoinDoctorPage() {
                 required
                 readOnly
                 value={generatedUsername}
-                className="mt-2 h-11 w-full rounded-xl border border-[#cbd5e1] bg-[#f8fafc] px-3 text-sm text-[#475569] outline-none"
+                aria-invalid={Boolean(errors.username)}
+                aria-describedby={
+                  errors.username ? "doctor-username-error" : undefined
+                }
+                className={`mt-2 h-11 w-full rounded-xl border bg-[#f8fafc] px-3 text-sm text-[#475569] outline-none ${
+                  errors.username ? "border-[#ef4444]" : "border-[#cbd5e1]"
+                }`}
                 placeholder={
                   isLoadingDoctorUsernames
                     ? "Checking existing usernames..."
                     : "Generated from full name"
                 }
               />
+              {errors.username ? (
+                <span id="doctor-username-error" className="mt-1 block text-xs text-[#b91c1c]">
+                  {errors.username}
+                </span>
+              ) : null}
             </label>
 
             <label className="block">
@@ -419,9 +602,19 @@ export default function JoinDoctorPage() {
               <select
                 name="specialtyId"
                 required
-                defaultValue=""
+                value={specialtyId}
+                onChange={(event) => {
+                  setSpecialtyId(event.target.value);
+                  clearFieldError("specialtyId");
+                }}
+                aria-invalid={Boolean(errors.specialtyId)}
+                aria-describedby={
+                  errors.specialtyId ? "doctor-specialty-error" : undefined
+                }
                 disabled={isLoadingSpecialties || specialties.length === 0}
-                className="mt-2 h-11 w-full rounded-xl border border-[#cbd5e1] bg-white px-3 text-sm outline-none focus:border-[#16b46f] disabled:cursor-not-allowed disabled:bg-[#f1f5f9] disabled:text-[#94a3b8]"
+                className={`mt-2 h-11 w-full rounded-xl border bg-white px-3 text-sm outline-none focus:border-[#16b46f] disabled:cursor-not-allowed disabled:bg-[#f1f5f9] disabled:text-[#94a3b8] ${
+                  errors.specialtyId ? "border-[#ef4444]" : "border-[#cbd5e1]"
+                }`}
               >
                 <option value="" disabled>
                   {isLoadingSpecialties
@@ -436,6 +629,11 @@ export default function JoinDoctorPage() {
                   </option>
                 ))}
               </select>
+              {errors.specialtyId ? (
+                <span id="doctor-specialty-error" className="mt-1 block text-xs text-[#b91c1c]">
+                  {errors.specialtyId}
+                </span>
+              ) : null}
             </label>
           </div>
 
@@ -487,6 +685,10 @@ export default function JoinDoctorPage() {
               type="file"
               multiple
               onChange={handleFilesSelected}
+              aria-invalid={Boolean(errors.documents)}
+              aria-describedby={
+                errors.documents ? "doctor-documents-error" : undefined
+              }
               className="hidden"
               accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
             />
@@ -494,12 +696,19 @@ export default function JoinDoctorPage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="mt-3 flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-[#94a3b8] bg-[#f8fafc] p-6 text-center text-sm text-[#475569] hover:border-[#16b46f] hover:bg-[#f0fdf4]"
+                className={`mt-3 flex w-full flex-col items-center justify-center rounded-xl border border-dashed bg-[#f8fafc] p-6 text-center text-sm text-[#475569] hover:border-[#16b46f] hover:bg-[#f0fdf4] ${
+                  errors.documents ? "border-[#ef4444]" : "border-[#94a3b8]"
+                }`}
               >
                 <span className="material-symbols-outlined mb-2 text-[#001b5e]">upload_file</span>
                 <span className="font-semibold text-[#001b5e]">Select files</span>
                 <span className="mt-1 text-xs text-[#64748b]">You can add multiple files now or add more later.</span>
               </button>
+            ) : null}
+            {errors.documents ? (
+              <span id="doctor-documents-error" className="mt-2 block text-xs text-[#b91c1c]">
+                {errors.documents}
+              </span>
             ) : null}
           </div>
 

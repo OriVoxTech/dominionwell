@@ -24,6 +24,12 @@ import {
   type DoctorAvailabilityCalendarResponse,
   type UpdateDoctorProfilePayload,
 } from "@/lib/api";
+import {
+  formatNigerianPhone,
+  getNigerianPhoneLocalNumber,
+  isValidNigerianPhoneLocalNumber,
+  normalizeNigerianPhoneLocalNumber,
+} from "@/lib/form-validation";
 
 type AvailabilityStatus = "Available" | "Busy" | "Offline";
 type PresenceStatus = "AVAILABLE" | "BUSY" | "OFFLINE";
@@ -305,7 +311,7 @@ export default function ConsultantSettingsPage() {
       setAvailabilityStatus(getAvailabilityStatusFromPresenceStatus(profile.presenceStatus));
       setYearsOfExperience(String(profile.yearsOfExperience ?? 0));
       setEmail(profile.user.email);
-      setPhone(profile.user.phone ?? "");
+      setPhone(getNigerianPhoneLocalNumber(profile.user.phone));
       setUsername(profile.user.username);
       setBio(profile.bio);
       setVerifiedAt(profile.verifiedAt);
@@ -374,6 +380,10 @@ export default function ConsultantSettingsPage() {
       };
     }
 
+    if (!isValidNigerianPhoneLocalNumber(phone)) {
+      return { error: "Enter a 10-digit Nigerian phone number." };
+    }
+
     const selectedBank = nigerianBanks.find(
       (bank) => bank.name === bankDetails.bankName,
     );
@@ -403,7 +413,7 @@ export default function ConsultantSettingsPage() {
         specializations: [normalizedSpecialization],
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        phone: phone.trim(),
+        phone: formatNigerianPhone(phone),
         presenceStatus: getPresenceStatusFromAvailability(nextAvailabilityStatus),
         yearsOfExperience: normalizedYearsOfExperience,
         ...(hasAnyBankDetail && selectedBank
@@ -434,7 +444,7 @@ export default function ConsultantSettingsPage() {
     setFullName(name ? `Dr. ${name}` : profile.user.username);
     setFirstName(profile.user.firstName);
     setLastName(profile.user.lastName);
-    setPhone(profile.user.phone ?? "");
+    setPhone(getNigerianPhoneLocalNumber(profile.user.phone));
     setBio(profile.bio);
     setSpecialization(
       profile.specializations[0] || fallbackSpecialization,
@@ -1249,13 +1259,20 @@ export default function ConsultantSettingsPage() {
 
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-[#334155]">Phone</span>
-              <input
-                type="text"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                disabled={isLoadingProfile || isSavingProfile}
-                className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 outline-none focus:border-[#0aa4b4]"
-              />
+              <div className="flex h-10 w-full overflow-hidden rounded-lg border border-[#c6c6cf] focus-within:border-[#0aa4b4]">
+                <span className="flex items-center border-r border-[#c6c6cf] bg-[#f8fafc] px-3 text-sm font-semibold text-[#001b5e]">+234</span>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={phone}
+                  onChange={(event) =>
+                    setPhone(normalizeNigerianPhoneLocalNumber(event.target.value))
+                  }
+                  disabled={isLoadingProfile || isSavingProfile}
+                  className="h-full min-w-0 flex-1 px-3 outline-none disabled:bg-[#f1f5f9]"
+                  placeholder="8012345678"
+                />
+              </div>
             </label>
 
             <label className="block text-sm md:col-span-2">

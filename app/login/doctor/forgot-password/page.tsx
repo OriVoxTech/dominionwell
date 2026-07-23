@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import { doctorAuthApi, getApiErrorMessage, getApiResponseMessage } from "@/lib/api";
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { isValidEmail } from "@/lib/form-validation";
 
 export default function DoctorForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -13,7 +12,9 @@ export default function DoctorForgotPasswordPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const normalizedEmail = email.trim().toLowerCase();
-  const isEmailValid = EMAIL_PATTERN.test(normalizedEmail);
+  const isEmailValid = isValidEmail(normalizedEmail);
+  const emailError =
+    email.trim() && !isEmailValid ? "Enter a valid email address." : "";
 
   const resetLink = `/login/doctor/reset-password?email=${encodeURIComponent(normalizedEmail)}`;
 
@@ -82,6 +83,7 @@ export default function DoctorForgotPasswordPage() {
             <form
               className="mt-6 grid gap-4"
               onSubmit={handleSubmit}
+              noValidate
             >
               <label className="grid gap-2 text-xs font-medium text-[#001b5e] sm:text-sm">
                 Work Email Address
@@ -93,9 +95,18 @@ export default function DoctorForgotPasswordPage() {
                     setEmail(event.target.value);
                     setErrorMessage("");
                   }}
+                  aria-invalid={Boolean(emailError)}
+                  aria-describedby={emailError ? "doctor-forgot-email-error" : undefined}
                   placeholder="doctor@hospital.com"
-                  className="h-11 rounded-xl border border-[#cbd5e1] px-3 text-sm text-[#0f172a] outline-none focus:border-[#0aa4b4]"
+                  className={`h-11 rounded-xl border px-3 text-sm text-[#0f172a] outline-none focus:border-[#0aa4b4] ${
+                    emailError ? "border-[#ef4444]" : "border-[#cbd5e1]"
+                  }`}
                 />
+                {emailError ? (
+                  <span id="doctor-forgot-email-error" className="text-xs font-normal text-[#b91c1c]">
+                    {emailError}
+                  </span>
+                ) : null}
               </label>
 
               {errorMessage ? (

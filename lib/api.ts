@@ -15,10 +15,7 @@ import {
   getAdminAccessToken,
   type AdminSession,
 } from "@/lib/admin-session";
-
-const DEFAULT_API_BASE_URL =
-  "https://dominionwell-backend-1ksa.onrender.com/api";
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+import { API_BASE_URL } from "@/lib/api-base-url";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -1504,9 +1501,10 @@ export const adminApiService = {
     adminUsersApi.patch<AdminDoctorApplication>(
       `/api/admin/doctor-applications/${encodeURIComponent(id)}/approve`,
     ),
-  rejectDoctorApplication: (id: string) =>
+  rejectDoctorApplication: (id: string, payload: { reason: string }) =>
     adminUsersApi.patch<AdminDoctorApplication>(
       `/api/admin/doctor-applications/${encodeURIComponent(id)}/reject`,
+      payload,
     ),
   getDoctorApplicationDocument: (documentId: string) =>
     adminUsersApi.get<Blob>(

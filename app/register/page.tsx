@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import PublicHeader from "@/components/public-header";
 import { getApiErrorMessage, getApiResponseMessage, patientAuthApi } from "@/lib/api";
+import {
+  formatNigerianPhone,
+  isValidEmail,
+  isValidNigerianPhoneLocalNumber,
+  normalizeNigerianPhoneLocalNumber,
+} from "@/lib/form-validation";
 
 type RegistrationField =
   | "firstName"
@@ -15,9 +21,6 @@ type RegistrationField =
   | "confirmPassword";
 
 type RegistrationErrors = Partial<Record<RegistrationField, string>>;
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_PATTERN = /^\+?[0-9\s()-]{7,20}$/;
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -38,11 +41,13 @@ export default function RegisterPage() {
   const [otpMessage, setOtpMessage] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const emailError =
+    email.trim() && !isValidEmail(email) ? "Enter a valid email address." : "";
   const isRegistrationValid =
     Boolean(firstName.trim()) &&
     Boolean(lastName.trim()) &&
-    EMAIL_PATTERN.test(email.trim()) &&
-    PHONE_PATTERN.test(phone.trim()) &&
+    isValidEmail(email) &&
+    isValidNigerianPhoneLocalNumber(phone) &&
     password.length >= 8 &&
     confirmPassword === password;
 
@@ -54,14 +59,14 @@ export default function RegisterPage() {
 
     if (!email.trim()) {
       nextErrors.email = "Email address is required.";
-    } else if (!EMAIL_PATTERN.test(email.trim())) {
+    } else if (!isValidEmail(email)) {
       nextErrors.email = "Enter a valid email address.";
     }
 
-    if (!phone.trim()) {
+    if (!phone) {
       nextErrors.phone = "Phone number is required.";
-    } else if (!PHONE_PATTERN.test(phone.trim())) {
-      nextErrors.phone = "Enter a valid phone number.";
+    } else if (!isValidNigerianPhoneLocalNumber(phone)) {
+      nextErrors.phone = "Enter a 10-digit Nigerian phone number.";
     }
 
     if (!password) {
@@ -102,7 +107,7 @@ export default function RegisterPage() {
         lastName: lastName.trim(),
         password,
         confirmPassword,
-        phone: phone.trim(),
+        phone: formatNigerianPhone(phone),
         role: "PATIENT",
       });
       setStep("verify");
@@ -184,7 +189,7 @@ export default function RegisterPage() {
           </div>
 
           {step === "create" ? (
-            <form className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2" onSubmit={handleCreateAccount}>
+            <form className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2" onSubmit={handleCreateAccount} noValidate>
               <label className="block text-xs sm:text-sm md:col-span-2">
                 <span className="mb-1 block font-medium text-[#334155]">Account Type</span>
                 <input
@@ -240,32 +245,37 @@ export default function RegisterPage() {
                   name="email"
                   autoComplete="email"
                   required
-                  aria-invalid={Boolean(errors.email)}
-                  aria-describedby={errors.email ? "email-error" : undefined}
+                  aria-invalid={Boolean(errors.email || emailError)}
+                  aria-describedby={errors.email || emailError ? "email-error" : undefined}
                   value={email}
                   onChange={(event) => {
                     setEmail(event.target.value);
                     clearFieldError("email");
                   }}
                 />
-                {errors.email ? <span id="email-error" className="mt-1 block text-xs text-[#b91c1c]">{errors.email}</span> : null}
+                {errors.email || emailError ? <span id="email-error" className="mt-1 block text-xs text-[#b91c1c]">{errors.email || emailError}</span> : null}
               </label>
               <label className="block text-xs sm:text-sm md:col-span-2">
                 <span className="mb-1 block font-medium text-[#334155]">Phone Number</span>
-                <input
-                  className="h-10 w-full rounded-lg border border-[#c6c6cf] px-3 text-xs outline-none focus:border-[#0aa4b4] sm:text-sm"
-                  type="tel"
-                  name="phone"
-                  autoComplete="tel"
-                  required
-                  aria-invalid={Boolean(errors.phone)}
-                  aria-describedby={errors.phone ? "phone-error" : undefined}
-                  value={phone}
-                  onChange={(event) => {
-                    setPhone(event.target.value);
-                    clearFieldError("phone");
-                  }}
-                />
+                <div className="flex h-10 w-full overflow-hidden rounded-lg border border-[#c6c6cf] focus-within:border-[#0aa4b4]">
+                  <span className="flex items-center border-r border-[#c6c6cf] bg-[#f8fafc] px-3 text-xs font-semibold text-[#001b5e] sm:text-sm">+234</span>
+                  <input
+                    className="h-full min-w-0 flex-1 px-3 text-xs outline-none sm:text-sm"
+                    type="tel"
+                    name="phone"
+                    autoComplete="tel"
+                    inputMode="numeric"
+                    required
+                    aria-invalid={Boolean(errors.phone)}
+                    aria-describedby={errors.phone ? "phone-error" : undefined}
+                    value={phone}
+                    onChange={(event) => {
+                      setPhone(normalizeNigerianPhoneLocalNumber(event.target.value));
+                      clearFieldError("phone");
+                    }}
+                    placeholder="8012345678"
+                  />
+                </div>
                 {errors.phone ? <span id="phone-error" className="mt-1 block text-xs text-[#b91c1c]">{errors.phone}</span> : null}
               </label>
               <label className="block text-xs sm:text-sm">

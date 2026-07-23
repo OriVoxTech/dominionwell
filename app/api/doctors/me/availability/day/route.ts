@@ -1,10 +1,4 @@
-const DEFAULT_API_BASE_URL =
-  "https://dominionwell-backend-1ksa.onrender.com/api";
-
-const API_BASE_URL =
-  process.env.API_BASE_URL ??
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  DEFAULT_API_BASE_URL;
+import { API_BASE_URL } from "@/lib/api-base-url";
 
 export async function PUT(request: Request) {
   const authorization = request.headers.get("authorization");

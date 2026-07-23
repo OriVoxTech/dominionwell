@@ -36,10 +36,10 @@ export default function ContactPage() {
           </div>
 
           <form className="grid gap-4 p-5 sm:grid-cols-2 sm:p-8">
-            <label className="grid gap-1.5 text-xs font-bold text-[#33415c]">Full name<input className="h-11 rounded-xl border border-[#d6dee8] bg-[#fbfcfe] px-3 text-sm font-medium outline-none focus:border-[#16a968]" type="text" placeholder="Your full name" /></label>
-            <label className="grid gap-1.5 text-xs font-bold text-[#33415c]">Email address<input className="h-11 rounded-xl border border-[#d6dee8] bg-[#fbfcfe] px-3 text-sm font-medium outline-none focus:border-[#16a968]" type="email" placeholder="you@example.com" /></label>
-            <label className="grid gap-1.5 text-xs font-bold text-[#33415c] sm:col-span-2">How can we help?<textarea className="min-h-32 resize-y rounded-xl border border-[#d6dee8] bg-[#fbfcfe] px-3 py-3 text-sm font-medium outline-none focus:border-[#16a968]" placeholder="Tell us what you need help with" /></label>
-            <div className="sm:col-span-2"><button className="w-full rounded-xl bg-[#16a968] px-5 py-3 text-sm font-bold text-white hover:bg-[#118d57] sm:w-auto" type="button">Send message</button></div>
+            <label className="grid gap-1.5 text-xs font-bold text-[#33415c]">Full name<input className="h-11 rounded-xl border border-[#d6dee8] bg-[#fbfcfe] px-3 text-sm font-medium outline-none focus:border-[#16a968]" type="text" placeholder="Your full name" required /></label>
+            <label className="grid gap-1.5 text-xs font-bold text-[#33415c]">Email address<input className="h-11 rounded-xl border border-[#d6dee8] bg-[#fbfcfe] px-3 text-sm font-medium outline-none focus:border-[#16a968]" type="email" placeholder="you@example.com" required /></label>
+            <label className="grid gap-1.5 text-xs font-bold text-[#33415c] sm:col-span-2">How can we help?<textarea className="min-h-32 resize-y rounded-xl border border-[#d6dee8] bg-[#fbfcfe] px-3 py-3 text-sm font-medium outline-none focus:border-[#16a968]" placeholder="Tell us what you need help with" required /></label>
+            <div className="sm:col-span-2"><button className="w-full rounded-xl bg-[#16a968] px-5 py-3 text-sm font-bold text-white hover:bg-[#118d57] sm:w-auto" type="submit">Send message</button></div>
           </form>
         </section>
       </main>
