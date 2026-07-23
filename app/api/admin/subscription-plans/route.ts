@@ -1,5 +1,5 @@
 const DEFAULT_API_BASE_URL =
-  "https://8ce1-105-127-11-129.ngrok-free.app/api";
+  "https://dominionwell-backend-1ksa.onrender.com/api";
 
 const API_BASE_URL =
   process.env.API_BASE_URL ??

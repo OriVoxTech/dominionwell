@@ -17,7 +17,7 @@ import {
 } from "@/lib/admin-session";
 
 const DEFAULT_API_BASE_URL =
-  "https://8ce1-105-127-11-129.ngrok-free.app/api";
+  "https://dominionwell-backend-1ksa.onrender.com/api";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
 export const api = axios.create({
